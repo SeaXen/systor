@@ -1,0 +1,21 @@
+[Unit]
+Description=systor collector — system metrics poller + alerter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m systor serve collector
+WorkingDirectory=/opt/systor
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=120
+StandardOutput=append:/var/log/systor/collector.log
+StandardError=append:/var/log/systor/collector.log
+
+# Load all SYSTOR_* env vars
+EnvironmentFile=-/etc/systor/systor.env
+
+[Install]
+WantedBy=default.target

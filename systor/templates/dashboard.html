@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}systor · Dashboard{% endblock %}
+{% block content %}
+<div class="header">
+  <div>
+    <h2>Live System Overview</h2>
+    <div class="meta" id="updated">— · auto-refresh every 5s</div>
+  </div>
+  <div class="meta">
+    <span id="hostname"></span> · uptime <span id="uptime"></span>
+    · <span id="dbmeta"></span>
+  </div>
+</div>
+
+<div class="kpi-grid" id="kpis">
+  <div class="kpi" id="kpi-load">
+    <div class="label">CPU Load (1m)</div>
+    <div class="value"><span id="load">—</span></div>
+    <div class="sub">5m: <span id="load5">—</span> · 15m: <span id="load15">—</span></div>
+  </div>
+  <div class="kpi" id="kpi-temp">
+    <div class="label">CPU Temperature</div>
+    <div class="value"><span id="temp">—</span><span class="unit">°C</span></div>
+    <div class="sub" id="temp-sub">—</div>
+  </div>
+  <div class="kpi" id="kpi-mem">
+    <div class="label">Memory</div>
+    <div class="value"><span id="mem-pct">—</span><span class="unit">%</span></div>
+    <div class="sub"><span id="mem-used">—</span> / <span id="mem-total">—</span> used</div>
+  </div>
+  <div class="kpi" id="kpi-swap">
+    <div class="label">Swap</div>
+    <div class="value"><span id="swap-used">—</span><span class="unit">MB</span></div>
+    <div class="sub">of <span id="swap-total">—</span> MB</div>
+  </div>
+  <div class="kpi" id="kpi-disk">
+    <div class="label">Disk <span id="disk-mount" style="font-size:10px;color:var(--text-dim)"></span></div>
+    <div class="value"><span id="disk-pct">—</span><span class="unit">%</span></div>
+    <div class="sub"><span id="disk-used">—</span> / <span id="disk-size">—</span></div>
+  </div>
+  <div class="kpi blue" id="kpi-net">
+    <div class="label">Network (cumulative)</div>
+    <div class="value" style="font-size:18px">↓ <span id="net-rx">—</span> · ↑ <span id="net-tx">—</span></div>
+    <div class="sub">all interfaces</div>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>CPU Load (last 6h)</h3>
+    <canvas id="chart-load"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>CPU Temperature (last 6h)</h3>
+    <canvas id="chart-temp"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Memory Used (last 6h)</h3>
+    <canvas id="chart-mem"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Disk Usage (last 6h)</h3>
+    <canvas id="chart-disk"></canvas>
+  </div>
+</div>
+
+<div class="table-card">
+  <h3>Recent Alerts</h3>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Severity</th><th>Metric</th><th>Message</th></tr>
+    </thead>
+    <tbody id="alerts-body">
+      <tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function refresh() {
+  try {
+    const snap = await fetchJSON('/api/snapshot');
+    document.getElementById('updated').textContent =
+      'Updated ' + new Date().toLocaleTimeString() + ' · auto-refresh every 5s';
+    document.getElementById('hostname').textContent = snap.hostname;
+    const up = snap.uptime_sec || 0;
+    document.getElementById('uptime').textContent =
+      Math.floor(up / 3600) + 'h ' + Math.floor((up % 3600) / 60) + 'm';
+    document.getElementById('dbmeta').textContent =
+      (snap.db_stats.samples || 0) + ' samples stored';
+
+    // KPIs
+    const cpu = snap.cpu || {};
+    document.getElementById('load').textContent  = fmt(cpu.load_1m);
+    document.getElementById('load5').textContent = fmt(cpu.load_5m);
+    document.getElementById('load15').textContent= fmt(cpu.load_15m);
+    document.getElementById('temp').textContent  = fmt(cpu.temp_c);
+    const t = document.getElementById('kpi-temp');
+    t.className = 'kpi ' + statusClass(cpu.temp_c, { yellow: 70, red: 80 });
+    t.className = 'kpi ' + statusClass(cpu.load_1m, { yellow: 2, red: 4 });
+
+    const mem = snap.memory || {};
+    const memPct = mem.total_mb ? Math.round(100 * mem.used_mb / mem.total_mb) : null;
+    document.getElementById('mem-pct').textContent  = memPct !== null ? memPct : '—';
+    document.getElementById('mem-used').textContent  = bytes(mem.used_mb * 1024 * 1024);
+    document.getElementById('mem-total').textContent = bytes(mem.total_mb * 1024 * 1024);
+    const m = document.getElementById('kpi-mem');
+    m.className = 'kpi ' + statusClass(memPct, { yellow: 75, red: 90 });
+
+    document.getElementById('swap-used').textContent  = mem.swap_used_mb || 0;
+    document.getElementById('swap-total').textContent = mem.swap_total_mb || 0;
+
+    const disks = snap.disks || [];
+    if (disks.length) {
+      const d = disks.reduce((a, b) => a.used_pct > b.used_pct ? a : b);
+      document.getElementById('disk-mount').textContent = d.mount;
+      document.getElementById('disk-pct').textContent  = d.used_pct;
+      document.getElementById('disk-used').textContent  = d.used_gb.toFixed(1) + ' GB';
+      document.getElementById('disk-size').textContent  = d.size_gb.toFixed(1) + ' GB';
+      const dk = document.getElementById('kpi-disk');
+      dk.className = 'kpi ' + statusClass(d.used_pct, { yellow: 80, red: 90 });
+    }
+
+    const net = snap.network || {};
+    document.getElementById('net-rx').textContent = bytes(net.rx_bytes);
+    document.getElementById('net-tx').textContent = bytes(net.tx_bytes);
+  } catch (e) { console.error(e); }
+}
+
+async function refreshCharts() {
+  const metrics = [
+    ['load_1m',    'chart-load',  COLORS.green,  0],
+    ['cpu_temp',   'chart-temp',   COLORS.red,    30],
+    ['mem_used_mb','chart-mem',    COLORS.blue,   0],
+    ['disk_used_pct','chart-disk', COLORS.yellow, 0],
+  ];
+  for (const [metric, id, color, ymin] of metrics) {
+    try {
+      const d = await fetchJSON('/api/series?metric=' + metric + '&hours=6');
+      drawLineChart(document.getElementById(id), d.data, color, ymin);
+    } catch (e) { console.error(e); }
+  }
+}
+
+async function refreshAlerts() {
+  try {
+    const alerts = await fetchJSON('/api/alerts?limit=20');
+    const body = document.getElementById('alerts-body');
+    if (!alerts.length) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No alerts — system is healthy ✓</td></tr>';
+      return;
+    }
+    body.innerHTML = alerts.map(a => `
+      <tr>
+        <td><span class="mono">${timeShort(a.ts)}</span> <span style="color:var(--text-dim)">(${timeAgo(a.ts)})</span></td>
+        <td><span class="badge ${a.severity}">${a.severity}</span></td>
+        <td>${a.metric}</td>
+        <td>${a.message}</td>
+      </tr>`).join('');
+  } catch (e) { console.error(e); }
+}
+
+refresh();
+refreshCharts();
+refreshAlerts();
+setInterval(refresh, 5000);
+setInterval(refreshCharts, 30000);
+setInterval(refreshAlerts, 15000);
+</script>
+{% endblock %}

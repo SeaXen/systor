@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}systor · Settings{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h2>Settings</h2></div>
+  <div class="meta">Edits apply on next save. Restart collector for changes to take effect.</div>
+</div>
+
+<div id="flash"></div>
+
+<form id="settings-form">
+<div class="section">
+  <h3>Thresholds</h3>
+  <div class="form-row">
+    <label>CPU load 1m</label>
+    <div>
+      <input type="number" step="0.1" name="threshold_cpu_load_1m" value="{{ cfg.thresholds.cpu_load_1m }}">
+      <div class="hint">Sustained load avg above this for {{ cfg.thresholds.sustained_samples_cpu }} samples → alert.</div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>CPU temperature (°C)</label>
+    <input type="number" step="1" name="threshold_cpu_temp_c" value="{{ cfg.thresholds.cpu_temp_c }}">
+  </div>
+  <div class="form-row">
+    <label>Memory free (MB)</label>
+    <div>
+      <input type="number" step="50" name="threshold_mem_free_mb" value="{{ cfg.thresholds.mem_free_mb }}">
+      <div class="hint">Alert when available memory drops below this.</div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>Swap used (MB)</label>
+    <input type="number" step="100" name="threshold_swap_used_mb" value="{{ cfg.thresholds.swap_used_mb }}">
+  </div>
+  <div class="form-row">
+    <label>Disk used (%)</label>
+    <input type="number" step="1" name="threshold_disk_used_pct" value="{{ cfg.thresholds.disk_used_pct }}">
+  </div>
+  <div class="form-row">
+    <label>Sustained samples (CPU)</label>
+    <input type="number" step="1" name="sustained_samples_cpu" value="{{ cfg.thresholds.sustained_samples_cpu }}">
+  </div>
+  <div class="form-row">
+    <label>Sustained samples (Temp)</label>
+    <input type="number" step="1" name="sustained_samples_temp" value="{{ cfg.thresholds.sustained_samples_temp }}">
+  </div>
+  <div class="form-row">
+    <label>Sustained samples (Mem)</label>
+    <input type="number" step="1" name="sustained_samples_mem" value="{{ cfg.thresholds.sustained_samples_mem }}">
+  </div>
+  <div class="form-row">
+    <label>Sustained samples (Swap)</label>
+    <input type="number" step="1" name="sustained_samples_swap" value="{{ cfg.thresholds.sustained_samples_swap }}">
+  </div>
+  <div class="form-row">
+    <label>Sustained samples (Disk)</label>
+    <input type="number" step="1" name="sustained_samples_disk" value="{{ cfg.thresholds.sustained_samples_disk }}">
+  </div>
+  <div class="form-row">
+    <label>Cooldown (seconds)</label>
+    <input type="number" step="30" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}">
+  </div>
+  <div class="form-row">
+    <label>Poll interval (seconds)</label>
+    <input type="number" step="5" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}">
+  </div>
+</div>
+
+<div class="section">
+  <h3>Telegram</h3>
+  <div class="form-row">
+    <label>Enabled</label>
+    <input type="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}>
+  </div>
+  <div class="form-row">
+    <label>Bot token</label>
+    <input type="text" name="telegram_bot_token" value="{{ cfg.telegram.bot_token }}" placeholder="123456:ABC-DEF...">
+  </div>
+  <div class="form-row">
+    <label>Chat ID</label>
+    <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id }}" placeholder="123456789">
+  </div>
+  <div class="btn-row">
+    <button type="button" class="btn secondary" id="test-tg">Send test</button>
+    <span id="test-tg-result" class="meta"></span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Discord (webhook)</h3>
+  <div class="form-row">
+    <label>Enabled</label>
+    <input type="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}>
+  </div>
+  <div class="form-row">
+    <label>Webhook URL</label>
+    <input type="text" name="discord_webhook_url" value="{{ cfg.discord.webhook_url }}" placeholder="https://discord.com/api/webhooks/...">
+  </div>
+  <div class="btn-row">
+    <button type="button" class="btn secondary" id="test-dc">Send test</button>
+    <span id="test-dc-result" class="meta"></span>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button type="submit" class="btn">Save settings</button>
+  <button type="button" class="btn secondary" id="restart-collector">Restart collector</button>
+</div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('settings-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const data = Object.fromEntries(fd.entries());
+  // checkbox normalization
+  data.telegram_enabled = fd.has('telegram_enabled') ? 'true' : 'false';
+  data.discord_enabled  = fd.has('discord_enabled')  ? 'true' : 'false';
+  const r = await fetch('/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+  const j = await r.json();
+  showFlash(j.ok ? 'ok' : 'err', j.message || (j.ok ? 'Saved.' : 'Error.'));
+});
+
+function showFlash(type, msg) {
+  const el = document.getElementById('flash');
+  el.className = 'flash ' + type;
+  el.textContent = msg;
+  setTimeout(() => el.textContent = '', 8000);
+}
+
+document.getElementById('test-tg').addEventListener('click', async () => {
+  const r = await fetch('/api/test-telegram', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: '🧪 systor test alert from Settings' }) });
+  const j = await r.json();
+  document.getElementById('test-tg-result').textContent = j.ok ? '✓ sent' : '✗ ' + j.error;
+});
+document.getElementById('test-dc').addEventListener('click', async () => {
+  const r = await fetch('/api/test-discord', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: '🧪 systor test alert from Settings' }) });
+  const j = await r.json();
+  document.getElementById('test-dc-result').textContent = j.ok ? '✓ sent' : '✗ ' + j.error;
+});
+document.getElementById('restart-collector').addEventListener('click', async () => {
+  showFlash('err', 'Restart from the host shell: systemctl --user restart systor-collector');
+});
+</script>
+{% endblock %}

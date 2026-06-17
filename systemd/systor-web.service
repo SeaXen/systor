@@ -1,0 +1,19 @@
+[Unit]
+Description=systor web — dashboard on port 6677
+After=network-online.target systor-collector.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m systor serve web
+WorkingDirectory=/opt/systor
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=120
+StandardOutput=append:/var/log/systor/web.log
+StandardError=append:/var/log/systor/web.log
+EnvironmentFile=-/etc/systor/systor.env
+
+[Install]
+WantedBy=default.target

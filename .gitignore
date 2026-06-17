@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual envs
+venv/
+.venv/
+env/
+
+# Local config (NEVER commit tokens!)
+.env
+*.env.local
+/etc/systor/systor.env
+
+# Runtime data
+/var/lib/systor/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+/var/log/systor/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS files
+Thumbs.db

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}systor · Logs{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h2>Logs</h2></div>
+  <div class="meta">Last 200 lines from <code class="mono">{{ log_path }}</code></div>
+</div>
+<div class="log-view" id="log-view">Loading…</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadLogs() {
+  const data = await fetchJSON('/logs/raw?lines=200');
+  document.getElementById('log-view').textContent =
+    (data && data.length) ? data.join('\n') : '(log is empty)';
+}
+loadLogs();
+setInterval(loadLogs, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}systor{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <h1>⬢ systor</h1>
+    <div class="sub">Monitor</div>
+    <nav>
+      <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
+      <a href="/alerts" class="{% if request.path == '/alerts' %}active{% endif %}">Alerts</a>
+      <a href="/logs" class="{% if request.path == '/logs' %}active{% endif %}">Logs</a>
+      <a href="/settings" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
+    </nav>
+    <div class="sub">System</div>
+    <div style="padding: 0 20px; font-size:12px; color: var(--text-dim);">
+      <div>v0.1.0</div>
+      <div style="margin-top:4px"><span class="dot green"></span> collector</div>
+    </div>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

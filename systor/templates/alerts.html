@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}systor · Alerts{% endblock %}
+{% block content %}
+<div class="header">
+  <div><h2>Alerts</h2></div>
+  <div class="meta">All alert history (most recent first)</div>
+</div>
+<div class="table-card">
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Severity</th><th>Metric</th><th>Value</th><th>Threshold</th><th>Message</th></tr>
+    </thead>
+    <tbody id="alerts-body">
+      <tr><td colspan="6" style="text-align:center;color:var(--text-dim)">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="table-card">
+  <h3>Notification Delivery Log</h3>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Channel</th><th>Status</th><th>Error</th></tr>
+    </thead>
+    <tbody id="notif-body">
+      <tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadAlerts() {
+  const a = await fetchJSON('/api/alerts?limit=200');
+  document.getElementById('alerts-body').innerHTML = a.length ? a.map(x => `
+    <tr>
+      <td><span class="mono">${timeShort(x.ts)}</span> <span style="color:var(--text-dim)">(${timeAgo(x.ts)})</span></td>
+      <td><span class="badge ${x.severity}">${x.severity}</span></td>
+      <td>${x.metric}</td>
+      <td class="mono">${x.value ?? '—'}</td>
+      <td class="mono">${x.threshold ?? '—'}</td>
+      <td>${x.message}</td>
+    </tr>`).join('') :
+    '<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">No alerts</td></tr>';
+
+  const n = await fetchJSON('/api/notifications?limit=100');
+  document.getElementById('notif-body').innerHTML = n.length ? n.map(x => `
+    <tr>
+      <td><span class="mono">${timeShort(x.ts)}</span> <span style="color:var(--text-dim)">(${timeAgo(x.ts)})</span></td>
+      <td>${x.channel}</td>
+      <td><span class="badge ${x.success ? 'ok' : 'fail'}">${x.success ? 'sent' : 'failed'}</span></td>
+      <td class="mono" style="color:var(--text-dim)">${x.error || ''}</td>
+    </tr>`).join('') :
+    '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No notifications sent yet</td></tr>';
+}
+loadAlerts();
+setInterval(loadAlerts, 10000);
+</script>
+{% endblock %}
