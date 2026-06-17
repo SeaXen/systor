@@ -1,51 +1,51 @@
 {% extends "base.html" %}
 {% block title %}systor · Dashboard{% endblock %}
 {% block content %}
-<div class="header">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;gap:8px">
   <div>
-    <h2>Live System Overview</h2>
-    <div class="meta" id="updated">— · auto-refresh every 5s</div>
+    <div class="page-title">Live System Overview</div>
+    <div class="text-muted" style="font-size:12px" id="updated">— · auto-refresh every 5s</div>
   </div>
-  <div class="meta">
+  <div class="text-muted" style="font-size:12px">
     <span id="hostname"></span> · uptime <span id="uptime"></span>
     · <span id="dbmeta"></span>
   </div>
 </div>
 
-<div class="kpi-grid" id="kpis">
-  <div class="kpi" id="kpi-load">
+<div class="stat-grid" id="kpis">
+  <div class="stat-card" id="kpi-load">
     <div class="label">CPU Load (1m)</div>
     <div class="value"><span id="load">—</span></div>
     <div class="sub">5m: <span id="load5">—</span> · 15m: <span id="load15">—</span></div>
   </div>
-  <div class="kpi" id="kpi-temp">
+  <div class="stat-card" id="kpi-temp">
     <div class="label">CPU Temperature</div>
     <div class="value"><span id="temp">—</span><span class="unit">°C</span></div>
     <div class="sub" id="temp-sub">—</div>
   </div>
-  <div class="kpi" id="kpi-mem">
+  <div class="stat-card" id="kpi-mem">
     <div class="label">Memory</div>
     <div class="value"><span id="mem-pct">—</span><span class="unit">%</span></div>
     <div class="sub"><span id="mem-used">—</span> / <span id="mem-total">—</span> used</div>
   </div>
-  <div class="kpi" id="kpi-swap">
+  <div class="stat-card" id="kpi-swap">
     <div class="label">Swap</div>
     <div class="value"><span id="swap-used">—</span><span class="unit">MB</span></div>
     <div class="sub">of <span id="swap-total">—</span> MB</div>
   </div>
-  <div class="kpi" id="kpi-disk">
-    <div class="label">Disk <span id="disk-mount" style="font-size:10px;color:var(--text-dim)"></span></div>
+  <div class="stat-card" id="kpi-disk">
+    <div class="label">Disk <span id="disk-mount" style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
     <div class="value"><span id="disk-pct">—</span><span class="unit">%</span></div>
     <div class="sub"><span id="disk-used">—</span> / <span id="disk-size">—</span></div>
   </div>
-  <div class="kpi blue" id="kpi-net">
+  <div class="stat-card" id="kpi-net">
     <div class="label">Network (cumulative)</div>
     <div class="value" style="font-size:18px">↓ <span id="net-rx">—</span> · ↑ <span id="net-tx">—</span></div>
     <div class="sub">all interfaces</div>
   </div>
 </div>
 
-<div class="chart-grid">
+<div class="chart-row">
   <div class="chart-card">
     <h3>CPU Load (last 6h)</h3>
     <canvas id="chart-load"></canvas>
@@ -54,6 +54,8 @@
     <h3>CPU Temperature (last 6h)</h3>
     <canvas id="chart-temp"></canvas>
   </div>
+</div>
+<div class="chart-row">
   <div class="chart-card">
     <h3>Memory Used (last 6h)</h3>
     <canvas id="chart-mem"></canvas>
@@ -71,7 +73,7 @@
       <tr><th>Time</th><th>Severity</th><th>Metric</th><th>Message</th></tr>
     </thead>
     <tbody id="alerts-body">
-      <tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Loading…</td></tr>
+      <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -79,6 +81,82 @@
 
 {% block scripts %}
 <script>
+const COLORS = {
+  green: '#3fb950', yellow: '#d29922', red: '#f85149',
+  blue: '#58a6ff', purple: '#bc8cff', dim: '#8b949e', grid: '#30363d'
+};
+
+function fmt(n, unit) {
+  if (n === null || n === undefined) return '—';
+  if (typeof n === 'number') {
+    if (Math.abs(n) >= 100) return n.toFixed(0) + (unit ? ' ' + unit : '');
+    if (Math.abs(n) >= 10) return n.toFixed(1) + (unit ? ' ' + unit : '');
+    return n.toFixed(2) + (unit ? ' ' + unit : '');
+  }
+  return n;
+}
+function bytes(n) {
+  if (!n) return '0 B';
+  const u = ['B','KB','MB','GB','TB']; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(1) + ' ' + u[i];
+}
+function timeShort(ts) { return new Date(ts * 1000).toLocaleTimeString(); }
+function timeAgo(ts) {
+  const s = Math.floor(Date.now() / 1000 - ts);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+function drawLineChart(canvas, data, color, ymin) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  if (!data || data.length < 2) {
+    ctx.fillStyle = COLORS.dim; ctx.font = '12px monospace';
+    ctx.fillText('No data', 8, h / 2); return;
+  }
+  const vals = data.map(p => p[1]).filter(v => v !== null);
+  if (vals.length === 0) return;
+  const lo = ymin !== undefined ? ymin : Math.min(...vals);
+  const hi = Math.max(...vals);
+  const range = (hi - lo) || 1;
+  const pad = 8;
+  const w0 = w - pad * 2, h0 = h - pad * 2;
+  ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) {
+    const y = pad + (h0 / 3) * i;
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad, y); ctx.stroke();
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i][1];
+    if (v === null || v === undefined) continue;
+    const x = pad + (data.length > 1 ? (w0 * i) / (data.length - 1) : w0 / 2);
+    const y = pad + h0 - ((v - lo) / range) * h0;
+    if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+  }
+  ctx.stroke();
+  ctx.lineTo(pad + w0, pad + h0); ctx.lineTo(pad, pad + h0); ctx.closePath();
+  ctx.fillStyle = color + '20'; ctx.fill();
+  ctx.fillStyle = COLORS.dim; ctx.font = '10px monospace';
+  ctx.fillText(hi.toFixed(1), 2, pad + 6);
+  ctx.fillText(lo.toFixed(1), 2, h - 4);
+  const last = data[data.length - 1][1];
+  if (last !== null) { ctx.fillStyle = color; ctx.fillText(last.toFixed(1), w - 30, pad + 6); }
+}
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
 async function refresh() {
   try {
     const snap = await fetchJSON('/api/snapshot');
@@ -91,26 +169,24 @@ async function refresh() {
     document.getElementById('dbmeta').textContent =
       (snap.db_stats.samples || 0) + ' samples stored';
 
-    // KPIs
     const cpu = snap.cpu || {};
     document.getElementById('load').textContent  = fmt(cpu.load_1m);
     document.getElementById('load5').textContent = fmt(cpu.load_5m);
     document.getElementById('load15').textContent= fmt(cpu.load_15m);
     document.getElementById('temp').textContent  = fmt(cpu.temp_c);
-    const t = document.getElementById('kpi-temp');
-    t.className = 'kpi ' + statusClass(cpu.temp_c, { yellow: 70, red: 80 });
-    t.className = 'kpi ' + statusClass(cpu.load_1m, { yellow: 2, red: 4 });
+    document.getElementById('kpi-load').className = 'stat-card ' + statusClass(cpu.load_1m, 2, 4);
+    document.getElementById('kpi-temp').className = 'stat-card ' + statusClass(cpu.temp_c, 70, 85);
 
     const mem = snap.memory || {};
     const memPct = mem.total_mb ? Math.round(100 * mem.used_mb / mem.total_mb) : null;
     document.getElementById('mem-pct').textContent  = memPct !== null ? memPct : '—';
     document.getElementById('mem-used').textContent  = bytes(mem.used_mb * 1024 * 1024);
     document.getElementById('mem-total').textContent = bytes(mem.total_mb * 1024 * 1024);
-    const m = document.getElementById('kpi-mem');
-    m.className = 'kpi ' + statusClass(memPct, { yellow: 75, red: 90 });
+    document.getElementById('kpi-mem').className = 'stat-card ' + statusClass(memPct, 75, 90);
 
     document.getElementById('swap-used').textContent  = mem.swap_used_mb || 0;
     document.getElementById('swap-total').textContent = mem.swap_total_mb || 0;
+    document.getElementById('kpi-swap').className = 'stat-card ' + statusClass(mem.swap_used_mb, 1024, 4096);
 
     const disks = snap.disks || [];
     if (disks.length) {
@@ -119,8 +195,7 @@ async function refresh() {
       document.getElementById('disk-pct').textContent  = d.used_pct;
       document.getElementById('disk-used').textContent  = d.used_gb.toFixed(1) + ' GB';
       document.getElementById('disk-size').textContent  = d.size_gb.toFixed(1) + ' GB';
-      const dk = document.getElementById('kpi-disk');
-      dk.className = 'kpi ' + statusClass(d.used_pct, { yellow: 80, red: 90 });
+      document.getElementById('kpi-disk').className = 'stat-card ' + statusClass(d.used_pct, 80, 90);
     }
 
     const net = snap.network || {};
@@ -129,12 +204,19 @@ async function refresh() {
   } catch (e) { console.error(e); }
 }
 
+function statusClass(value, yellowTh, redTh) {
+  if (value === null || value === undefined) return 'gray';
+  if (redTh !== undefined && value > redTh) return 'red';
+  if (yellowTh !== undefined && value > yellowTh) return 'yellow';
+  return 'green';
+}
+
 async function refreshCharts() {
   const metrics = [
-    ['load_1m',    'chart-load',  COLORS.green,  0],
-    ['cpu_temp',   'chart-temp',   COLORS.red,    30],
-    ['mem_used_mb','chart-mem',    COLORS.blue,   0],
-    ['disk_used_pct','chart-disk', COLORS.yellow, 0],
+    ['load_1m',      'chart-load',  COLORS.green,  0],
+    ['cpu_temp',     'chart-temp',  COLORS.red,    30],
+    ['mem_used_mb',  'chart-mem',   COLORS.blue,   0],
+    ['disk_used_pct','chart-disk',  COLORS.yellow, 0],
   ];
   for (const [metric, id, color, ymin] of metrics) {
     try {
@@ -149,12 +231,12 @@ async function refreshAlerts() {
     const alerts = await fetchJSON('/api/alerts?limit=20');
     const body = document.getElementById('alerts-body');
     if (!alerts.length) {
-      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No alerts — system is healthy ✓</td></tr>';
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No alerts — system is healthy ✓</td></tr>';
       return;
     }
     body.innerHTML = alerts.map(a => `
       <tr>
-        <td><span class="mono">${timeShort(a.ts)}</span> <span style="color:var(--text-dim)">(${timeAgo(a.ts)})</span></td>
+        <td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">(${timeAgo(a.ts)})</span></td>
         <td><span class="badge ${a.severity}">${a.severity}</span></td>
         <td>${a.metric}</td>
         <td>${a.message}</td>

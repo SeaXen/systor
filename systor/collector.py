@@ -3,11 +3,16 @@
 Polls metrics every N seconds, evaluates sustained threshold violations,
 sends alerts, stores everything in SQLite. Lightweight (<30 MB RAM).
 
+Hot-reloads thresholds each tick by watching the config file mtime,
+so changes from the web UI take effect within one poll interval
+without restarting the daemon.
+
 Run as a systemd service (see systemd/systor-collector.service).
 """
 from __future__ import annotations
 import json
 import logging
+import os
 import signal
 import sys
 import time
@@ -20,6 +25,7 @@ from .storage import Storage, DEFAULT_DB_PATH
 
 log = logging.getLogger("systor.collector")
 _running = True
+_reload_requested = False
 
 
 def _handle_term(signum, _frame):
@@ -28,8 +34,15 @@ def _handle_term(signum, _frame):
     _running = False
 
 
+def _handle_hup(signum, _frame):
+    global _reload_requested
+    log.info("collector: SIGHUP received, will reload config on next tick")
+    _reload_requested = True
+
+
 signal.signal(signal.SIGTERM, _handle_term)
 signal.signal(signal.SIGINT, _handle_term)
+signal.signal(signal.SIGHUP, _handle_hup)
 
 
 # Per-metric state: how many consecutive samples above/below threshold, last alert time, in_alert flag
@@ -71,6 +84,37 @@ def _fmt(metric: str, value, threshold) -> str:
     return f"{pretty}: {value}{unit} {arrow} {threshold}{unit}"
 
 
+def _th_metric(th: dict, name: str) -> tuple:
+    """Return (value, duration_min, enabled) for a threshold entry.
+
+    Accepts both old flat (float) and new dict {enabled, value, duration_min} forms.
+    """
+    entry = th.get(name)
+    if isinstance(entry, dict):
+        return (entry.get("value", 0), int(entry.get("duration_min", 2)),
+                bool(entry.get("enabled", True)))
+    return (entry or 0, 2, True)
+
+
+def _samples_for(duration_min: int, poll_sec: int) -> int:
+    """How many consecutive samples equal `duration_min` minutes at the given poll interval."""
+    if poll_sec <= 0:
+        poll_sec = 30
+    return max(1, int((duration_min * 60) // poll_sec))
+
+
+def _config_mtime() -> float:
+    """Return mtime of the first existing config file, or 0."""
+    from .config import CONFIG_PATHS
+    for p in CONFIG_PATHS:
+        if p.exists():
+            try:
+                return p.stat().st_mtime
+            except OSError:
+                continue
+    return 0.0
+
+
 def run():
     cfg = load_config()
     log_cfg = cfg.get("logging", {})
@@ -87,20 +131,45 @@ def run():
     except PermissionError:
         log.warning("cannot write to %s, logging to stdout only", log_file)
 
-    th = cfg["thresholds"]
-    poll = cfg["collector"]["poll_interval_sec"]
-    storage = Storage(
-        db_path=DEFAULT_DB_PATH,
-        retention_days=cfg["collector"]["retention_days"],
-        rollup_retention_days=cfg["collector"]["rollup_retention_days"],
-    )
-    notifier = Notifier(cfg)
+    # Write a pidfile so the web UI can SIGHUP/SIGTERM us
+    try:
+        Path("/tmp/systor-collector.pid").write_text(str(os.getpid()))
+        log.info("collector: pidfile at /tmp/systor-collector.pid (pid %d)", os.getpid())
+    except OSError as e:
+        log.warning("could not write pidfile: %s", e)
 
-    log.info("collector: starting (poll=%ds)", poll)
+    last_cfg_mtime = _config_mtime()
     last_retention_check = 0.0
+
+    log.info("collector: starting (poll=%ds)", cfg["collector"]["poll_interval_sec"])
     while _running:
         t0 = time.time()
         try:
+            # ---- Hot-reload config if file mtime changed or SIGHUP received ----
+            global _reload_requested
+            cur_mtime = _config_mtime()
+            if _reload_requested or (cur_mtime and cur_mtime > last_cfg_mtime):
+                try:
+                    new_cfg = load_config()
+                    if new_cfg != cfg:
+                        # Reset sustained counters so old violations don't bleed
+                        _metric_state.clear()
+                        log.info("collector: config reloaded from disk")
+                    cfg = new_cfg
+                    _reload_requested = False
+                    last_cfg_mtime = cur_mtime
+                except Exception as e:
+                    log.warning("config reload failed: %s", e)
+
+            poll = cfg["collector"]["poll_interval_sec"]
+            th = cfg["thresholds"]
+            storage = Storage(
+                db_path=DEFAULT_DB_PATH,
+                retention_days=cfg["collector"]["retention_days"],
+                rollup_retention_days=cfg["collector"]["rollup_retention_days"],
+            )
+            notifier = Notifier(cfg)
+
             snap = collect_snapshot()
             storage.insert_sample(snap)
             cpu = snap.get("cpu", {})
@@ -108,27 +177,31 @@ def run():
             worst_disk = max(snap.get("disks", []), key=lambda d: d.get("used_pct", 0), default={})
 
             events = []
+            cooldown = th.get("cooldown_sec", 600)
+
+            def _check(name, value, higher_is_worse):
+                v, dur_min, enabled = _th_metric(th, name)
+                if not enabled:
+                    return None
+                return _eval_metric(name, value, v, _samples_for(dur_min, poll),
+                                    higher_is_worse, cooldown)
+
             # CPU load (higher is worse)
-            r = _eval_metric("cpu_load_1m", cpu.get("load_1m"),
-                            th["cpu_load_1m"], th["sustained_samples_cpu"], True, th["cooldown_sec"])
-            if r: events.append(("CPU Load", r, _fmt("cpu_load_1m", r[1], th["cpu_load_1m"])))
+            r = _check("cpu_load_1m", cpu.get("load_1m"), True)
+            if r: events.append(("CPU Load", r, _fmt("cpu_load_1m", r[1], _th_metric(th, "cpu_load_1m")[0])))
             # CPU temp (higher is worse)
-            r = _eval_metric("cpu_temp_c", cpu.get("temp_c"),
-                            th["cpu_temp_c"], th["sustained_samples_temp"], True, th["cooldown_sec"])
-            if r: events.append(("CPU Temperature", r, _fmt("cpu_temp_c", r[1], th["cpu_temp_c"])))
+            r = _check("cpu_temp_c", cpu.get("temp_c"), True)
+            if r: events.append(("CPU Temperature", r, _fmt("cpu_temp_c", r[1], _th_metric(th, "cpu_temp_c")[0])))
             # Memory free (lower is worse)
-            r = _eval_metric("mem_free_mb", mem.get("available_mb"),
-                            th["mem_free_mb"], th["sustained_samples_mem"], False, th["cooldown_sec"])
-            if r: events.append(("Memory", r, _fmt("mem_free_mb", r[1], th["mem_free_mb"])))
+            r = _check("mem_free_mb", mem.get("available_mb"), False)
+            if r: events.append(("Memory", r, _fmt("mem_free_mb", r[1], _th_metric(th, "mem_free_mb")[0])))
             # Swap used (higher is worse)
-            r = _eval_metric("swap_used_mb", mem.get("swap_used_mb"),
-                            th["swap_used_mb"], th["sustained_samples_swap"], True, th["cooldown_sec"])
-            if r: events.append(("Swap", r, _fmt("swap_used_mb", r[1], th["swap_used_mb"])))
+            r = _check("swap_used_mb", mem.get("swap_used_mb"), True)
+            if r: events.append(("Swap", r, _fmt("swap_used_mb", r[1], _th_metric(th, "swap_used_mb")[0])))
             # Disk (higher is worse)
             if worst_disk:
-                r = _eval_metric("disk_used_pct", worst_disk.get("used_pct"),
-                                th["disk_used_pct"], th["sustained_samples_disk"], True, th["cooldown_sec"])
-                if r: events.append(("Disk", r, _fmt("disk_used_pct", r[1], th["disk_used_pct"])))
+                r = _check("disk_used_pct", worst_disk.get("used_pct"), True)
+                if r: events.append(("Disk", r, _fmt("disk_used_pct", r[1], _th_metric(th, "disk_used_pct")[0])))
 
             for subj, (kind, value, threshold), msg in events:
                 title = f"🔴 {subj} ALERT" if kind == "alert" else f"✅ {subj} recovered"
@@ -140,7 +213,6 @@ def run():
                     threshold=threshold,
                     message=msg,
                 )
-                # Extract metric key for the storage
                 metric_key = subj.lower().replace(" ", "_")
                 results = notifier.notify(title, msg)
                 for ch, ok, err in results:
@@ -156,11 +228,17 @@ def run():
             log.exception("loop error: %s", e)
 
         # Sleep with frequent interrupt checks
+        poll = cfg["collector"]["poll_interval_sec"]
         for _ in range(poll):
             if not _running:
                 break
             time.sleep(1)
 
+    # Cleanup pidfile
+    try:
+        Path("/tmp/systor-collector.pid").unlink(missing_ok=True)
+    except OSError:
+        pass
     log.info("collector: exiting")
 
 

@@ -1,17 +1,15 @@
 {% extends "base.html" %}
 {% block title %}systor · Alerts{% endblock %}
 {% block content %}
-<div class="header">
-  <div><h2>Alerts</h2></div>
-  <div class="meta">All alert history (most recent first)</div>
-</div>
+<div class="page-title">Alerts</div>
+<div class="text-muted" style="font-size:12px;margin-bottom:14px">All alert history (most recent first)</div>
 <div class="table-card">
   <table>
     <thead>
       <tr><th>Time</th><th>Severity</th><th>Metric</th><th>Value</th><th>Threshold</th><th>Message</th></tr>
     </thead>
     <tbody id="alerts-body">
-      <tr><td colspan="6" style="text-align:center;color:var(--text-dim)">Loading…</td></tr>
+      <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
     </tbody>
   </table>
 </div>
@@ -23,35 +21,44 @@
       <tr><th>Time</th><th>Channel</th><th>Status</th><th>Error</th></tr>
     </thead>
     <tbody id="notif-body">
-      <tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Loading…</td></tr>
+      <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
     </tbody>
   </table>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
+function timeShort(ts) { return new Date(ts * 1000).toLocaleTimeString(); }
+function timeAgo(ts) {
+  const s = Math.floor(Date.now() / 1000 - ts);
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
 async function loadAlerts() {
   const a = await fetchJSON('/api/alerts?limit=200');
   document.getElementById('alerts-body').innerHTML = a.length ? a.map(x => `
     <tr>
-      <td><span class="mono">${timeShort(x.ts)}</span> <span style="color:var(--text-dim)">(${timeAgo(x.ts)})</span></td>
+      <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">(${timeAgo(x.ts)})</span></td>
       <td><span class="badge ${x.severity}">${x.severity}</span></td>
       <td>${x.metric}</td>
       <td class="mono">${x.value ?? '—'}</td>
       <td class="mono">${x.threshold ?? '—'}</td>
       <td>${x.message}</td>
     </tr>`).join('') :
-    '<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">No alerts</td></tr>';
+    '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No alerts</td></tr>';
 
   const n = await fetchJSON('/api/notifications?limit=100');
   document.getElementById('notif-body').innerHTML = n.length ? n.map(x => `
     <tr>
-      <td><span class="mono">${timeShort(x.ts)}</span> <span style="color:var(--text-dim)">(${timeAgo(x.ts)})</span></td>
+      <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">(${timeAgo(x.ts)})</span></td>
       <td>${x.channel}</td>
       <td><span class="badge ${x.success ? 'ok' : 'fail'}">${x.success ? 'sent' : 'failed'}</span></td>
-      <td class="mono" style="color:var(--text-dim)">${x.error || ''}</td>
+      <td class="mono text-muted">${x.error || ''}</td>
     </tr>`).join('') :
-    '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No notifications sent yet</td></tr>';
+    '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No notifications sent yet</td></tr>';
 }
 loadAlerts();
 setInterval(loadAlerts, 10000);

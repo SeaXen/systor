@@ -1,147 +1,209 @@
 {% extends "base.html" %}
 {% block title %}systor · Settings{% endblock %}
 {% block content %}
-<div class="header">
-  <div><h2>Settings</h2></div>
-  <div class="meta">Edits apply on next save. Restart collector for changes to take effect.</div>
-</div>
-
+<div class="page-title">Settings</div>
 <div id="flash"></div>
 
 <form id="settings-form">
 <div class="section">
-  <h3>Thresholds</h3>
+  <h3>Alert Thresholds</h3>
+  <div class="text-muted" style="font-size:12px;margin-bottom:14px">
+    For each metric: enable the alert, set the threshold value, and how long it must stay
+    above/below that value (in minutes) before the notification fires.
+  </div>
+
+  {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
+  {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
+  {% if entry is mapping %}
+    {% set enabled = entry.get("enabled", true) %}
+    {% set value = entry.get("value", default_value) %}
+    {% set duration = entry.get("duration_min", default_min) %}
+  {% else %}
+    {% set enabled = true %}
+    {% set value = entry %}
+    {% set duration = default_min %}
+  {% endif %}
   <div class="form-row">
-    <label>CPU load 1m</label>
-    <div>
-      <input type="number" step="0.1" name="threshold_cpu_load_1m" value="{{ cfg.thresholds.cpu_load_1m }}">
-      <div class="hint">Sustained load avg above this for {{ cfg.thresholds.sustained_samples_cpu }} samples → alert.</div>
+    <label>
+      <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
+      <span class="threshold-title">{{ label }}</span>
+    </label>
+    <div class="input-group">
+      <span class="text-muted" style="font-size:12px">
+        {% if higher_is_worse %}alert when &gt;{% else %}alert when &lt;{% endif %}
+      </span>
+      <input type="number" step="any" name="threshold_{{ metric_key }}_value"
+             value="{{ value }}" placeholder="{{ default_value }}">
+      <span class="suffix">{{ unit }}</span>
+      <span class="text-muted" style="font-size:12px;margin-left:8px">for</span>
+      <input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration"
+             value="{{ duration }}" placeholder="{{ default_min }}">
+      <span class="suffix">minutes</span>
     </div>
   </div>
+  {%- endmacro %}
+
+  {{ threshold_row("cpu_load_1m",   "CPU load (1m avg)",   "",   4.0, 2, True) }}
+  {{ threshold_row("cpu_temp_c",    "CPU temperature",     "°C", 85.0, 3, True) }}
+  {{ threshold_row("mem_free_mb",   "Memory free (drop below)", "MB",  500, 2, False) }}
+  {{ threshold_row("swap_used_mb",  "Swap used",           "MB", 4096, 2, True) }}
+  {{ threshold_row("disk_used_pct", "Disk used",           "%",   90, 5, True) }}
+
   <div class="form-row">
-    <label>CPU temperature (°C)</label>
-    <input type="number" step="1" name="threshold_cpu_temp_c" value="{{ cfg.thresholds.cpu_temp_c }}">
-  </div>
-  <div class="form-row">
-    <label>Memory free (MB)</label>
-    <div>
-      <input type="number" step="50" name="threshold_mem_free_mb" value="{{ cfg.thresholds.mem_free_mb }}">
-      <div class="hint">Alert when available memory drops below this.</div>
+    <label>Cooldown between alerts</label>
+    <div class="input-group">
+      <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30">
+      <span class="suffix">seconds (per metric)</span>
+      <div class="hint" style="width:100%">After an alert fires, wait this long before sending another for the same metric.</div>
     </div>
-  </div>
-  <div class="form-row">
-    <label>Swap used (MB)</label>
-    <input type="number" step="100" name="threshold_swap_used_mb" value="{{ cfg.thresholds.swap_used_mb }}">
-  </div>
-  <div class="form-row">
-    <label>Disk used (%)</label>
-    <input type="number" step="1" name="threshold_disk_used_pct" value="{{ cfg.thresholds.disk_used_pct }}">
-  </div>
-  <div class="form-row">
-    <label>Sustained samples (CPU)</label>
-    <input type="number" step="1" name="sustained_samples_cpu" value="{{ cfg.thresholds.sustained_samples_cpu }}">
-  </div>
-  <div class="form-row">
-    <label>Sustained samples (Temp)</label>
-    <input type="number" step="1" name="sustained_samples_temp" value="{{ cfg.thresholds.sustained_samples_temp }}">
-  </div>
-  <div class="form-row">
-    <label>Sustained samples (Mem)</label>
-    <input type="number" step="1" name="sustained_samples_mem" value="{{ cfg.thresholds.sustained_samples_mem }}">
-  </div>
-  <div class="form-row">
-    <label>Sustained samples (Swap)</label>
-    <input type="number" step="1" name="sustained_samples_swap" value="{{ cfg.thresholds.sustained_samples_swap }}">
-  </div>
-  <div class="form-row">
-    <label>Sustained samples (Disk)</label>
-    <input type="number" step="1" name="sustained_samples_disk" value="{{ cfg.thresholds.sustained_samples_disk }}">
-  </div>
-  <div class="form-row">
-    <label>Cooldown (seconds)</label>
-    <input type="number" step="30" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}">
-  </div>
-  <div class="form-row">
-    <label>Poll interval (seconds)</label>
-    <input type="number" step="5" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}">
   </div>
 </div>
 
 <div class="section">
   <h3>Telegram</h3>
   <div class="form-row">
-    <label>Enabled</label>
-    <input type="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}>
+    <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}>
+      <span class="threshold-title">Enabled</span>
+    </label>
+    <div></div>
   </div>
   <div class="form-row">
     <label>Bot token</label>
-    <input type="text" name="telegram_bot_token" value="{{ cfg.telegram.bot_token }}" placeholder="123456:ABC-DEF...">
+    <input type="text" name="telegram_bot_token" value="{{ cfg.telegram.bot_token or '' }}" placeholder="123456:ABC-DEF...">
   </div>
   <div class="form-row">
     <label>Chat ID</label>
-    <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id }}" placeholder="123456789">
+    <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
   </div>
   <div class="btn-row">
     <button type="button" class="btn secondary" id="test-tg">Send test</button>
-    <span id="test-tg-result" class="meta"></span>
+    <span id="test-tg-result" class="text-muted" style="font-size:12px"></span>
   </div>
 </div>
 
 <div class="section">
   <h3>Discord (webhook)</h3>
   <div class="form-row">
-    <label>Enabled</label>
-    <input type="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}>
+    <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}>
+      <span class="threshold-title">Enabled</span>
+    </label>
+    <div></div>
   </div>
   <div class="form-row">
     <label>Webhook URL</label>
-    <input type="text" name="discord_webhook_url" value="{{ cfg.discord.webhook_url }}" placeholder="https://discord.com/api/webhooks/...">
+    <input type="text" name="discord_webhook_url" value="{{ cfg.discord.webhook_url or '' }}" placeholder="https://discord.com/api/webhooks/...">
   </div>
   <div class="btn-row">
     <button type="button" class="btn secondary" id="test-dc">Send test</button>
-    <span id="test-dc-result" class="meta"></span>
+    <span id="test-dc-result" class="text-muted" style="font-size:12px"></span>
   </div>
 </div>
 
-<div class="btn-row">
+<div class="section">
+  <h3>Collector &amp; Web</h3>
+  <div class="form-row">
+    <label>Poll interval</label>
+    <div class="input-group">
+      <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
+      <span class="suffix">seconds</span>
+      <div class="hint" style="width:100%">How often the collector samples metrics. 30s is a good default. Restart collector to apply.</div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>Web bind host</label>
+    <div class="input-group">
+      <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
+      <div class="hint" style="width:100%">
+        <code>0.0.0.0</code> = accessible from LAN. <code>127.0.0.1</code> = local only.
+        Restart web service to apply.
+      </div>
+    </div>
+  </div>
+  <div class="form-row">
+    <label>Web port</label>
+    <div class="input-group">
+      <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
+    </div>
+  </div>
+</div>
+
+<div class="btn-row" style="margin-bottom:24px">
   <button type="submit" class="btn">Save settings</button>
+  <button type="button" class="btn secondary" id="apply-now">Save &amp; apply</button>
   <button type="button" class="btn secondary" id="restart-collector">Restart collector</button>
 </div>
 </form>
 {% endblock %}
+
 {% block scripts %}
 <script>
-document.getElementById('settings-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const fd = new FormData(e.target);
-  const data = Object.fromEntries(fd.entries());
-  // checkbox normalization
-  data.telegram_enabled = fd.has('telegram_enabled') ? 'true' : 'false';
-  data.discord_enabled  = fd.has('discord_enabled')  ? 'true' : 'false';
-  const r = await fetch('/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-  const j = await r.json();
-  showFlash(j.ok ? 'ok' : 'err', j.message || (j.ok ? 'Saved.' : 'Error.'));
-});
-
-function showFlash(type, msg) {
+function showFlash(type, msg, ms = 6000) {
   const el = document.getElementById('flash');
   el.className = 'flash ' + type;
   el.textContent = msg;
-  setTimeout(() => el.textContent = '', 8000);
+  if (ms) setTimeout(() => { el.textContent = ''; el.className = ''; }, ms);
 }
 
+function formToJSON(form) {
+  const fd = new FormData(form);
+  const data = Object.fromEntries(fd.entries());
+  // Checkbox normalization
+  ['telegram_enabled', 'discord_enabled'].forEach(k => {
+    data[k] = fd.has(k) ? 'true' : 'false';
+  });
+  // Threshold enabled checkboxes
+  ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
+    data[`threshold_${k}_enabled`] = fd.has(`threshold_${k}_enabled`) ? 'true' : 'false';
+  });
+  return data;
+}
+
+async function saveSettings(thenApply) {
+  const data = formToJSON(document.getElementById('settings-form'));
+  const r = await fetch('/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  const j = await r.json();
+  if (!j.ok) { showFlash('err', j.message || 'Save failed'); return; }
+  if (thenApply) {
+    const r2 = await fetch('/api/apply', { method: 'POST' });
+    const j2 = await r2.json();
+    showFlash(j2.ok ? 'ok' : 'err', (j.message || 'Saved.') + ' · ' + (j2.message || ''));
+  } else {
+    showFlash('ok', j.message || 'Saved.');
+  }
+}
+
+document.getElementById('settings-form').addEventListener('submit', e => {
+  e.preventDefault();
+  saveSettings(false);
+});
+document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
+document.getElementById('restart-collector').addEventListener('click', async () => {
+  if (!confirm('Restart the collector now? It will be down for ~1 second.')) return;
+  const r = await fetch('/api/restart-collector', { method: 'POST' });
+  const j = await r.json();
+  showFlash(j.ok ? 'ok' : 'err', j.message || (j.error || 'failed'));
+});
 document.getElementById('test-tg').addEventListener('click', async () => {
-  const r = await fetch('/api/test-telegram', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: '🧪 systor test alert from Settings' }) });
+  const r = await fetch('/api/test-telegram', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ message: '🧪 systor test alert from Settings' })
+  });
   const j = await r.json();
   document.getElementById('test-tg-result').textContent = j.ok ? '✓ sent' : '✗ ' + j.error;
 });
 document.getElementById('test-dc').addEventListener('click', async () => {
-  const r = await fetch('/api/test-discord', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ message: '🧪 systor test alert from Settings' }) });
+  const r = await fetch('/api/test-discord', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ message: '🧪 systor test alert from Settings' })
+  });
   const j = await r.json();
   document.getElementById('test-dc-result').textContent = j.ok ? '✓ sent' : '✗ ' + j.error;
-});
-document.getElementById('restart-collector').addEventListener('click', async () => {
-  showFlash('err', 'Restart from the host shell: systemctl --user restart systor-collector');
 });
 </script>
 {% endblock %}

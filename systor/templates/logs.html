@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% block title %}systor · Logs{% endblock %}
 {% block content %}
-<div class="header">
-  <div><h2>Logs</h2></div>
-  <div class="meta">Last 200 lines from <code class="mono">{{ log_path }}</code></div>
+<div class="page-title">Logs</div>
+<div class="text-muted" style="font-size:12px;margin-bottom:14px">
+  Last 200 lines from <code class="mono">{{ log_path }}</code>
 </div>
 <div class="log-view" id="log-view">Loading…</div>
 {% endblock %}
 {% block scripts %}
 <script>
+async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
 async function loadLogs() {
   const data = await fetchJSON('/logs/raw?lines=200');
   document.getElementById('log-view').textContent =

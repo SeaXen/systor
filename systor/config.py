@@ -22,17 +22,14 @@ DEFAULT_CONFIG: dict = {
         "rollup_retention_days": 90,
     },
     "thresholds": {
-        "cpu_load_1m": 4.0,
-        "cpu_temp_c": 80.0,
-        "mem_free_mb": 500,
-        "swap_used_mb": 4096,
-        "disk_used_pct": 90,
-        "sustained_samples_cpu": 4,    # 4 * 30s = 2 min
-        "sustained_samples_temp": 4,
-        "sustained_samples_mem": 4,
-        "sustained_samples_swap": 4,
-        "sustained_samples_disk": 1,   # disk fills slowly
-        "cooldown_sec": 600,           # 10 min between same-metric alerts
+        # Each metric has: [enabled, threshold value, duration in minutes]
+        # Alert fires when value crosses threshold AND stays there >= duration.
+        "cpu_load_1m":      {"enabled": True,  "value": 4.0,  "duration_min": 2},
+        "cpu_temp_c":       {"enabled": True,  "value": 85.0, "duration_min": 3},
+        "mem_free_mb":      {"enabled": True,  "value": 500,  "duration_min": 2},
+        "swap_used_mb":     {"enabled": True,  "value": 4096, "duration_min": 2},
+        "disk_used_pct":    {"enabled": True,  "value": 90,   "duration_min": 5},
+        "cooldown_sec":     600,   # 10 min between same-metric alerts
     },
     "telegram": {
         "enabled": False,
@@ -44,10 +41,9 @@ DEFAULT_CONFIG: dict = {
         "webhook_url": "",            # or env SYSTOR_DISCORD_WEBHOOK
     },
     "web": {
-        "host": "127.0.0.1",
+        # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
+        "host": "0.0.0.0",
         "port": 6677,
-        "auth_enabled": False,
-        "auth_password_hash": "",     # bcrypt; use `systor web set-password`
     },
     "logging": {
         "level": "INFO",
@@ -108,27 +104,35 @@ def _deep_merge(base: dict, overlay: dict) -> dict:
 
 
 def _apply_env(cfg: dict) -> None:
-    """Override config with SYSTOR_* environment variables (dot notation)."""
+    """Override config with SYSTOR_* environment variables.
+
+    For threshold metrics (which are dicts with value/duration_min/enabled),
+    the SYSTOR_CPU_LOAD etc. env vars set the "value" field.
+    """
     env_map = {
-        "SYSTOR_POLL_INTERVAL":          ("collector", "poll_interval_sec", int),
-        "SYSTOR_RETENTION_DAYS":         ("collector", "retention_days", int),
-        "SYSTOR_CPU_LOAD":               ("thresholds", "cpu_load_1m", float),
-        "SYSTOR_CPU_TEMP":               ("thresholds", "cpu_temp_c", float),
-        "SYSTOR_MEM_FREE_MB":            ("thresholds", "mem_free_mb", int),
-        "SYSTOR_SWAP_USED_MB":           ("thresholds", "swap_used_mb", int),
-        "SYSTOR_DISK_PCT":               ("thresholds", "disk_used_pct", int),
-        "SYSTOR_COOLDOWN":               ("thresholds", "cooldown_sec", int),
-        "SYSTOR_TELEGRAM_BOT_TOKEN":     ("telegram", "bot_token", str),
-        "SYSTOR_TELEGRAM_CHAT_ID":       ("telegram", "chat_id", str),
-        "SYSTOR_DISCORD_WEBHOOK":        ("discord", "webhook_url", str),
-        "SYSTOR_WEB_PORT":               ("web", "port", int),
-        "SYSTOR_WEB_HOST":               ("web", "host", str),
+        "SYSTOR_POLL_INTERVAL":          ("collector", "poll_interval_sec", int, None),
+        "SYSTOR_RETENTION_DAYS":         ("collector", "retention_days", int, None),
+        "SYSTOR_CPU_LOAD":               ("thresholds", "cpu_load_1m", float, "value"),
+        "SYSTOR_CPU_TEMP":               ("thresholds", "cpu_temp_c", float, "value"),
+        "SYSTOR_MEM_FREE_MB":            ("thresholds", "mem_free_mb", int, "value"),
+        "SYSTOR_SWAP_USED_MB":           ("thresholds", "swap_used_mb", int, "value"),
+        "SYSTOR_DISK_PCT":               ("thresholds", "disk_used_pct", int, "value"),
+        "SYSTOR_COOLDOWN":               ("thresholds", "cooldown_sec", int, None),
+        "SYSTOR_TELEGRAM_BOT_TOKEN":     ("telegram", "bot_token", str, None),
+        "SYSTOR_TELEGRAM_CHAT_ID":       ("telegram", "chat_id", str, None),
+        "SYSTOR_DISCORD_WEBHOOK":        ("discord", "webhook_url", str, None),
+        "SYSTOR_WEB_PORT":               ("web", "port", int, None),
+        "SYSTOR_WEB_HOST":               ("web", "host", str, None),
     }
-    for env_key, (section, key, cast) in env_map.items():
+    for env_key, (section, key, cast, sub) in env_map.items():
         v = os.environ.get(env_key)
         if v is not None:
             try:
-                cfg[section][key] = cast(v)
+                casted = cast(v)
+                if sub is not None and isinstance(cfg.get(section, {}).get(key), dict):
+                    cfg[section][key][sub] = casted
+                else:
+                    cfg[section][key] = casted
             except (ValueError, TypeError):
                 pass
 
@@ -140,8 +144,57 @@ CONFIG_PATHS = [
 ]
 
 
+# Migration map: old flat key → new dict structure
+_THRESHOLD_MIGRATION = {
+    "cpu_load_1m":        ("sustained_samples_cpu",    4),
+    "cpu_temp_c":         ("sustained_samples_temp",   4),
+    "mem_free_mb":        ("sustained_samples_mem",    4),
+    "swap_used_mb":       ("sustained_samples_swap",   4),
+    "disk_used_pct":      ("sustained_samples_disk",   1),
+}
+
+
+def _migrate_thresholds(cfg: dict) -> None:
+    """If the loaded config has the old flat threshold schema, convert to the new dict form."""
+    th = cfg.get("thresholds", {})
+    if not th:
+        return
+    needs_migration = False
+    for key, val in th.items():
+        if key in ("cooldown_sec",):
+            continue
+        if not isinstance(val, dict):
+            needs_migration = True
+            break
+    if not needs_migration:
+        return
+    # Convert each flat value to dict, looking up default duration
+    new_th = {}
+    for key, val in th.items():
+        if key == "cooldown_sec":
+            new_th[key] = val
+            continue
+        if isinstance(val, dict):
+            new_th[key] = val
+            continue
+        # Flat value — convert
+        dur_key, default_dur = _THRESHOLD_MIGRATION.get(key, (None, 2))
+        if dur_key and dur_key in th:
+            try:
+                dur_min = max(1, int(int(th[dur_key]) * 0.5))  # samples * 30s / 60s, min 1
+            except (ValueError, TypeError):
+                dur_min = default_dur
+        else:
+            dur_min = default_dur
+        new_th[key] = {"enabled": True, "value": val, "duration_min": dur_min}
+    cfg["thresholds"] = new_th
+
+
 def load_config() -> dict:
-    """Load config with env overrides. Returns a fresh dict each call."""
+    """Load config with env overrides. Returns a fresh dict each call.
+
+    Migrates old flat-threshold schema to the new dict schema on the fly.
+    """
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
     for path in CONFIG_PATHS:
         if path.exists() and path.is_file():
@@ -152,6 +205,7 @@ def load_config() -> dict:
             except Exception as e:
                 import sys
                 print(f"[systor] warn: failed to parse {path}: {e}", file=sys.stderr)
+    _migrate_thresholds(cfg)
     _apply_env(cfg)
     return cfg
 

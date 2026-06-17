@@ -5,10 +5,8 @@
 Built for resource-constrained machines where Prometheus + Grafana is overkill, and where you still want clean dashboards and real alerts that don't fire on a single spike.
 
 ```
-   ____
-  / __/__ _____  ___  ___ ____
- _\ \/ _ `/ _ \/ _ \/ -_) __/
-/___/\_,_/_//_/_//_/\__/_/
+
+systor — system monitor
 
 ~15 MB RAM total. No SPA. No Electron. No Java. Just Python + Flask + SQLite.
 ```
@@ -16,9 +14,10 @@ Built for resource-constrained machines where Prometheus + Grafana is overkill, 
 ## Features
 
 - **Live metrics** — CPU load (1/5/15m), CPU temperature, memory, swap, disk, network
-- **Sustained-threshold alerts** — won't fire on a single spike; needs N consecutive samples (default 2 min)
+- **Sustained-threshold alerts** — won't fire on a single spike; set per-metric threshold + duration in **minutes**
 - **Telegram + Discord notifications** — with cooldowns to avoid alert spam
-- **Web dashboard on port 6677** — dark theme, live charts, no external JS deps
+- **Web dashboard on port 6677** — GitHub-dark style, live charts, no external JS deps, LAN-accessible
+- **Hot-reload config** — change thresholds in the UI, collector picks them up within one poll cycle
 - **SQLite storage** — 7 days raw + 90 days aggregated by default
 - **~15 MB RAM** — collector ~10 MB, web server ~20 MB peak
 - **No cron** — runs as a systemd user service, auto-restarts on crash
@@ -33,7 +32,8 @@ cd systor
 sudo ./install.sh
 ```
 
-Open <http://127.0.0.1:6677> in your browser.
+Open <http://127.0.0.1:6677> in your browser. For LAN access, use the host's IP, e.g.
+<http://192.168.1.10:6677>.
 
 The install script:
 - Copies the app to `/opt/systor`
@@ -41,6 +41,23 @@ The install script:
 - Creates `/etc/systor/systor.env` (empty — fill in tokens for notifications)
 - Installs `Flask` + `waitress` via pip
 - Installs + starts the two systemd services (`systor-collector`, `systor-web`)
+
+## Alert thresholds
+
+Each metric has three knobs: **enable** (checkbox), **threshold value**, and **duration in minutes**.
+The alert only fires when the value stays above (or below) the threshold for the configured number of minutes.
+
+| Metric              | Default      | When it fires                              |
+|---------------------|--------------|--------------------------------------------|
+| CPU load (1m avg)   | > 4.0 for 2m | 1-minute load average stays above 4.0      |
+| CPU temperature     | > 85°C for 3m| CPU temp stays above 85 °C                 |
+| Memory free         | < 500 MB for 2m | available memory drops below 500 MB     |
+| Swap used           | > 4096 MB for 2m | swap usage grows above 4 GB            |
+| Disk used           | > 90% for 5m | any mount fills above 90%                  |
+
+Example: "alert me if temperature > 85 °C for 3 minutes" → set `CPU temperature = 85 °C, 3 min` in
+the **Settings** page and click **Save & apply**. The collector picks up the change within
+`poll_interval_sec` (default 30 s) — no restart needed for threshold changes.
 
 ## Configure notifications
 
@@ -62,7 +79,8 @@ sudo -u $USER systor setup telegram --token "..." --chat-id "..." --test
 sudo -u $USER systor setup discord --webhook "https://..." --test
 ```
 
-Or use the web UI: <http://127.0.0.1:6677/settings>
+Or use the web UI: <http://127.0.0.1:6677/settings> — the **Send test** button fires a
+notification immediately so you can verify the channel.
 
 ## CLI
 
