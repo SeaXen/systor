@@ -27,7 +27,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request, abort, Response
 
 from .config import load_config, save_config
-from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb
+from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb, read_network_interfaces
 from .notifier import Notifier, send_telegram, send_discord
 from .storage import Storage, DEFAULT_DB_PATH
 
@@ -155,6 +155,11 @@ def _build_channel_test_message(channel: str) -> str:
     return "\n".join(lines)
 
 
+def _looks_masked_secret(value: str) -> bool:
+    value = (value or "").strip()
+    return bool(value) and ("***" in value or "…" in value)
+
+
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["JSON_SORT_KEYS"] = False
@@ -263,6 +268,31 @@ def create_app() -> Flask:
     def api_runtime():
         return jsonify(_runtime_status())
 
+    @app.route("/api/network-series")
+    def api_network_series():
+        hours = max(1, min(24 * 31, int(request.args.get("hours", 24))))
+        data = get_storage().network_series(hours=hours)
+        if len(data) > 600:
+            step = len(data) // 600 + 1
+            data = data[::step]
+        snap = collect_snapshot()
+        return jsonify({"ok": True, "hours": hours, "data": data, "current": snap.get("network", {})})
+
+    @app.route("/api/network-usage")
+    def api_network_usage():
+        granularity = request.args.get("granularity", "day")
+        limit = max(1, min(180, int(request.args.get("limit", 30))))
+        data = get_storage().network_usage_buckets(granularity=granularity, limit=limit)
+        return jsonify({"ok": True, "granularity": granularity, "limit": limit, "data": data, "stats": get_storage().stats()})
+
+    @app.route("/api/network-interfaces")
+    def api_network_interfaces():
+        rows = read_network_interfaces()
+        top_rx = max(rows, key=lambda r: r.get('rx_mbps', 0), default=None)
+        top_tx = max(rows, key=lambda r: r.get('tx_mbps', 0), default=None)
+        top_total = max(rows, key=lambda r: r.get('total_bytes', 0), default=None)
+        return jsonify({"ok": True, "interfaces": rows, "top_rx": top_rx, "top_tx": top_tx, "top_total": top_total})
+
     @app.route("/api/system")
     def api_system():
         cfg = load_config()
@@ -290,6 +320,11 @@ def create_app() -> Flask:
     def page_logs():
         cfg = load_config()
         return render_template("logs.html", log_path=cfg.get("logging", {}).get("file", "/var/log/systor/systor.log"))
+
+    @app.route("/network")
+    def page_network():
+        cfg = load_config()
+        return render_template("network.html", cfg=cfg)
 
     @app.route("/settings", methods=["GET", "POST"])
     def page_settings():
@@ -333,7 +368,9 @@ def create_app() -> Flask:
             if "telegram_enabled" in data:
                 cfg["telegram"]["enabled"] = _bool(data.get("telegram_enabled"))
             if "telegram_bot_token" in data and data["telegram_bot_token"]:
-                cfg["telegram"]["bot_token"] = str(data["telegram_bot_token"]).strip()
+                tok = str(data["telegram_bot_token"]).strip()
+                if not _looks_masked_secret(tok):
+                    cfg["telegram"]["bot_token"] = tok
             if "telegram_chat_id" in data:
                 cfg["telegram"]["chat_id"] = str(data["telegram_chat_id"] or "").strip()
             # Update discord
@@ -345,6 +382,18 @@ def create_app() -> Flask:
             if "poll_interval_sec" in data and data["poll_interval_sec"]:
                 try: cfg["collector"]["poll_interval_sec"] = max(5, int(data["poll_interval_sec"]))
                 except (ValueError, TypeError): pass
+            if "retention_days" in data and data["retention_days"]:
+                try: cfg["collector"]["retention_days"] = max(1, int(data["retention_days"]))
+                except (ValueError, TypeError): pass
+            cfg.setdefault("network", {})
+            if "network_default_hours" in data and data["network_default_hours"]:
+                try: cfg["network"]["default_hours"] = max(1, min(24 * 31, int(data["network_default_hours"])))
+                except (ValueError, TypeError): pass
+            if "network_auto_refresh_sec" in data and data["network_auto_refresh_sec"]:
+                try: cfg["network"]["auto_refresh_sec"] = max(5, int(data["network_auto_refresh_sec"]))
+                except (ValueError, TypeError): pass
+            if "network_default_granularity" in data and data["network_default_granularity"] in ("day", "week", "month"):
+                cfg["network"]["default_granularity"] = data["network_default_granularity"]
             # Update web (host/port)
             if "web_host" in data and data["web_host"]:
                 cfg["web"]["host"] = data["web_host"]
@@ -372,6 +421,10 @@ def create_app() -> Flask:
         chat = str(body.get("chat_id") or body.get("telegram_chat_id") or tg.get("chat_id", "")).strip()
         if not token or not chat:
             return jsonify({"ok": False, "error": "bot_token or chat_id not set"}), 400
+        if _looks_masked_secret(token):
+            err = "saved Telegram token is masked/placeholder, not a real bot token — paste the full token and save again"
+            get_storage().log_notification("telegram", False, err)
+            return jsonify({"ok": False, "error": err}), 400
         msg = body.get("message") or _build_channel_test_message("telegram")
         ok, err = send_telegram(token, chat, msg)
         get_storage().log_notification("telegram", ok, err)

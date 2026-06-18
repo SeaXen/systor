@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}systor · Network{% endblock %}
+{% block content %}
+<div class="network-layout">
+  <div class="dash-toolbar">
+    <div class="dash-status">
+      <span class="dot green"></span>
+      <strong>Network</strong>
+      <span id="net-updated">loading…</span>
+      <span id="net-coverage">usage history</span>
+    </div>
+    <div class="dash-controls">
+      <label>rate view
+        <select id="net-hours" class="control-select">
+          <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
+          <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
+          <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
+          <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
+        </select>
+      </label>
+      <label>usage view
+        <select id="net-granularity" class="control-select">
+          <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
+          <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
+          <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
+        </select>
+      </label>
+      <label>refresh
+        <select id="net-refresh-sec" class="control-select">
+          <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+          <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+          <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+          <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+          <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+        </select>
+      </label>
+      <button class="btn secondary compact" id="net-refresh">Refresh</button>
+    </div>
+  </div>
+
+  <div class="network-grid network-kpis">
+    <div class="stat-card cyan compact-stat">
+      <div class="label">RX total</div>
+      <div class="value"><span id="cur-rx">—</span></div>
+      <div class="sub">all interfaces</div>
+    </div>
+    <div class="stat-card purple compact-stat">
+      <div class="label">TX total</div>
+      <div class="value"><span id="cur-tx">—</span></div>
+      <div class="sub">all interfaces</div>
+    </div>
+    <div class="stat-card green compact-stat">
+      <div class="label">Peak RX</div>
+      <div class="value"><span id="peak-rx">—</span></div>
+      <div class="sub" id="peak-rx-ts">—</div>
+    </div>
+    <div class="stat-card yellow compact-stat">
+      <div class="label">Peak TX</div>
+      <div class="value"><span id="peak-tx">—</span></div>
+      <div class="sub" id="peak-tx-ts">—</div>
+    </div>
+    <div class="stat-card blue compact-stat">
+      <div class="label">Top RX iface</div>
+      <div class="value small-value"><span id="top-rx-iface">—</span></div>
+      <div class="sub" id="top-rx-rate">—</div>
+    </div>
+    <div class="stat-card red compact-stat">
+      <div class="label">Top TX iface</div>
+      <div class="value small-value"><span id="top-tx-iface">—</span></div>
+      <div class="sub" id="top-tx-rate">—</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <h3>Usage totals by period <span class="legend"><b class="cyan"></b>RX <b class="red"></b>TX</span></h3>
+    <canvas id="net-usage-chart"></canvas>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card"><h3>Receive rate</h3><canvas id="net-rx-chart"></canvas></div>
+    <div class="chart-card"><h3>Transmit rate</h3><canvas id="net-tx-chart"></canvas></div>
+  </div>
+
+  <div class="table-grid">
+    <div class="table-card compact-table">
+      <h3>Per-interface breakdown <span class="network-mini">live counters + rate</span></h3>
+      <table>
+        <thead>
+          <tr><th>Interface</th><th>RX</th><th>TX</th><th>RX MB/s</th><th>TX MB/s</th></tr>
+        </thead>
+        <tbody id="iface-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="table-card compact-table">
+      <h3>Usage table <span class="network-mini">{{ cfg.collector.retention_days }}d raw retention</span></h3>
+      <table>
+        <thead>
+          <tr><th>Period</th><th>RX</th><th>TX</th><th>Total</th><th>Samples</th></tr>
+        </thead>
+        <tbody id="net-usage-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const NCOL = { rx: '#22d3ee', tx: '#bc8cff', grid: '#30363d', dim: '#8b949e', fillRx:'rgba(34,211,238,.18)', fillTx:'rgba(188,140,255,.18)' };
+let netTimer = null;
+let netLoading = false;
+function bytes(n) {
+  n = Number(n || 0);
+  const u = ['B','KB','MB','GB','TB']; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return n.toFixed(i ? 1 : 0) + ' ' + u[i];
+}
+function mbs(n) { return Number(n || 0).toFixed(3) + ' MB/s'; }
+function gbVal(n) { return Number(n || 0).toFixed(3) + ' GB'; }
+function fmtTs(ts) {
+  if (!ts) return '—';
+  return new Date(ts * 1000).toLocaleString();
+}
+async function fetchJSON(url, opts) {
+  const r = await fetch(url, Object.assign({cache:'no-store'}, opts || {}));
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function drawLine(canvas, points, color) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(10, canvas.clientWidth), h = Math.max(90, canvas.clientHeight);
+  canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  if (!points.length) { ctx.fillStyle = NCOL.dim; ctx.font='12px monospace'; ctx.fillText('waiting for data', 12, h/2); return; }
+  const vals = points.map(p => Number(p[1] || 0));
+  const max = Math.max(...vals, 0.01), min = 0;
+  const padL = 38, padR = 12, padT = 8, padB = 18; const gw = w-padL-padR, gh = h-padT-padB;
+  ctx.strokeStyle = NCOL.grid; ctx.lineWidth = 1; ctx.fillStyle = NCOL.dim; ctx.font='10px monospace';
+  for (let i=0;i<=3;i++) { const y = padT + (gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.fillText((max - ((max-min)/3)*i).toFixed(2), 2, y+3); }
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+  points.forEach((p, i) => { const v = Number(p[1] || 0); const x = padL + (points.length>1 ? gw*i/(points.length-1) : gw/2); const y = padT + gh - ((v-min)/(max-min))*gh; if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+}
+function drawBars(canvas, rows) {
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(10, canvas.clientWidth), h = Math.max(120, canvas.clientHeight);
+  canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  if (!rows.length) { ctx.fillStyle = NCOL.dim; ctx.font='12px monospace'; ctx.fillText('no usage buckets yet', 12, h/2); return; }
+  const max = Math.max(...rows.map(r => Math.max(Number(r.rx_gb||0), Number(r.tx_gb||0))), 0.01);
+  const padL = 38, padR = 12, padT = 12, padB = 30; const gw = w-padL-padR, gh = h-padT-padB;
+  ctx.strokeStyle = NCOL.grid; ctx.lineWidth = 1; ctx.fillStyle = NCOL.dim; ctx.font='10px monospace';
+  for (let i=0;i<=3;i++) { const y = padT + (gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.fillText((max - (max/3)*i).toFixed(2), 2, y+3); }
+  const n = rows.length; const groupW = gw / Math.max(1, n); const barW = Math.max(4, Math.min(16, groupW * 0.32));
+  rows.forEach((r, i) => {
+    const xCenter = padL + groupW * i + groupW / 2;
+    const rxh = gh * (Number(r.rx_gb || 0) / max);
+    const txh = gh * (Number(r.tx_gb || 0) / max);
+    ctx.fillStyle = NCOL.fillRx; ctx.fillRect(xCenter - barW - 1, padT + gh - rxh, barW, rxh); ctx.strokeStyle = NCOL.rx; ctx.strokeRect(xCenter - barW - 1, padT + gh - rxh, barW, rxh);
+    ctx.fillStyle = NCOL.fillTx; ctx.fillRect(xCenter + 1, padT + gh - txh, barW, txh); ctx.strokeStyle = NCOL.tx; ctx.strokeRect(xCenter + 1, padT + gh - txh, barW, txh);
+    const label = String(r.label || '').replace(/^\d{4}-/, '');
+    ctx.fillStyle = NCOL.dim; ctx.save(); ctx.translate(xCenter, h - 6); ctx.rotate(-0.30); ctx.fillText(label, 0, 0); ctx.restore();
+  });
+}
+async function loadSeries() {
+  const hours = document.getElementById('net-hours').value;
+  const j = await fetchJSON('/api/network-series?hours=' + hours);
+  const data = j.data || [];
+  const last = data.length ? data[data.length - 1] : null;
+  const peakRx = data.reduce((a, b) => (!a || Number(b.rx_mbps||0) > Number(a.rx_mbps||0)) ? b : a, null);
+  const peakTx = data.reduce((a, b) => (!a || Number(b.tx_mbps||0) > Number(a.tx_mbps||0)) ? b : a, null);
+  document.getElementById('cur-rx').textContent = bytes((j.current || {}).rx_bytes || 0);
+  document.getElementById('cur-tx').textContent = bytes((j.current || {}).tx_bytes || 0);
+  document.getElementById('peak-rx').textContent = peakRx ? mbs(peakRx.rx_mbps) : '0.000 MB/s';
+  document.getElementById('peak-rx-ts').textContent = peakRx ? fmtTs(peakRx.ts) : '—';
+  document.getElementById('peak-tx').textContent = peakTx ? mbs(peakTx.tx_mbps) : '0.000 MB/s';
+  document.getElementById('peak-tx-ts').textContent = peakTx ? fmtTs(peakTx.ts) : '—';
+  drawLine(document.getElementById('net-rx-chart'), data.map(p => [p.ts, p.rx_mbps]), NCOL.rx);
+  drawLine(document.getElementById('net-tx-chart'), data.map(p => [p.ts, p.tx_mbps]), NCOL.tx);
+}
+async function loadUsage() {
+  const granularity = document.getElementById('net-granularity').value;
+  const limit = granularity === 'month' ? 24 : (granularity === 'week' ? 20 : 45);
+  const j = await fetchJSON('/api/network-usage?granularity=' + granularity + '&limit=' + limit);
+  document.getElementById('net-coverage').textContent = `${granularity} usage · ${j.data.length} buckets · ${j.stats?.samples || 0} raw samples`;
+  drawBars(document.getElementById('net-usage-chart'), j.data || []);
+  const body = document.getElementById('net-usage-body');
+  if (!(j.data || []).length) { body.innerHTML = '<tr><td colspan="5" class="empty-cell">No usage history yet</td></tr>'; return; }
+  body.innerHTML = j.data.slice().reverse().map(r => `<tr><td class="mono">${r.label}</td><td class="text-right mono">${gbVal(r.rx_gb)}</td><td class="text-right mono">${gbVal(r.tx_gb)}</td><td class="text-right mono">${gbVal(r.total_gb)}</td><td class="text-right mono">${r.samples}</td></tr>`).join('');
+}
+async function loadInterfaces() {
+  const j = await fetchJSON('/api/network-interfaces');
+  const body = document.getElementById('iface-body');
+  const rows = j.interfaces || [];
+  document.getElementById('top-rx-iface').textContent = j.top_rx?.iface || '—';
+  document.getElementById('top-rx-rate').textContent = j.top_rx ? `${mbs(j.top_rx.rx_mbps)} RX` : '—';
+  document.getElementById('top-tx-iface').textContent = j.top_tx?.iface || '—';
+  document.getElementById('top-tx-rate').textContent = j.top_tx ? `${mbs(j.top_tx.tx_mbps)} TX` : '—';
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="empty-cell">No interfaces found</td></tr>'; return; }
+  body.innerHTML = rows.map(r => `<tr><td class="mono">${r.iface}</td><td class="mono text-right">${bytes(r.rx_bytes)}</td><td class="mono text-right">${bytes(r.tx_bytes)}</td><td class="mono text-right">${mbs(r.rx_mbps)}</td><td class="mono text-right">${mbs(r.tx_mbps)}</td></tr>`).join('');
+}
+function resetRefreshTimer() {
+  clearInterval(netTimer);
+  const sec = Number(document.getElementById('net-refresh-sec').value || 15);
+  netTimer = setInterval(() => { if (!netLoading) refreshAll(); }, sec * 1000);
+}
+async function refreshAll() {
+  if (netLoading) return;
+  netLoading = true;
+  document.getElementById('net-updated').textContent = 'loading…';
+  try {
+    await Promise.all([loadSeries(), loadUsage(), loadInterfaces()]);
+    document.getElementById('net-updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('net-updated').textContent = 'error: ' + e.message;
+  } finally {
+    netLoading = false;
+  }
+}
+document.getElementById('net-refresh').addEventListener('click', refreshAll);
+document.getElementById('net-hours').addEventListener('change', refreshAll);
+document.getElementById('net-granularity').addEventListener('change', refreshAll);
+document.getElementById('net-refresh-sec').addEventListener('change', resetRefreshTimer);
+refreshAll();
+resetRefreshTimer();
+window.addEventListener('resize', () => { clearTimeout(window.__netResize); window.__netResize = setTimeout(refreshAll, 150); });
+</script>
+{% endblock %}

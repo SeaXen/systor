@@ -81,6 +81,36 @@
         </div>
 
         <div class="settings-card">
+          <h3>Network page defaults</h3>
+          <div class="card-subtle">Retention applies to all raw history. Network page defaults control its period, bucket view, and refresh load.</div>
+          <div class="notif-field-grid compact-top network-settings-grid">
+            <label>History retention</label>
+            <input type="number" name="retention_days" value="{{ cfg.collector.retention_days }}" min="1" step="1">
+            <label>Default rate view</label>
+            <select name="network_default_hours">
+              <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
+              <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
+              <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
+              <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
+            </select>
+            <label>Default usage view</label>
+            <select name="network_default_granularity">
+              <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
+              <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
+              <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
+            </select>
+            <label>Auto refresh</label>
+            <select name="network_auto_refresh_sec">
+              <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+              <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+              <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+              <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+              <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-card">
           <h3>Alert thresholds</h3>
           <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
           {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
@@ -138,7 +168,7 @@
           </div>
           <div class="notif-field-grid">
             <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
-            <div class="inline-help">Leave token blank to keep the saved one.</div>
+            <div class="inline-help">Leave token blank to keep the saved one. If the saved token was a masked placeholder, Telegram cannot work until you paste the full real bot token.</div>
             <label>Bot token</label>
             <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
             <label>Chat ID</label>

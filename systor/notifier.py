@@ -69,7 +69,7 @@ class Notifier:
 
     def notify(self, subject: str, body: str) -> list[tuple[str, bool, str | None]]:
         results: list[tuple[str, bool, str | None]] = []
-        tg_text = f"<b>{html.escape(subject)}</b>\n{html.escape(body).replace(chr(10), '<br>')}"
+        tg_text = f"<b>{html.escape(subject)}</b>\n{html.escape(body)}"
         dc_text = f"**{subject}**\n{body}"
 
         tg = self.cfg.get("telegram", {})

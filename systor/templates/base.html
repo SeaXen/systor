@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}systor{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.2">
 </head>
 <body>
 <div class="header">
@@ -15,6 +15,7 @@
   <div class="actions">
     <nav class="page-tabs">
       <a href="/" class="page-tab {% if request.path == '/' %}active{% endif %}">Dashboard</a>
+      <a href="/network" class="page-tab {% if request.path == '/network' %}active{% endif %}">Network</a>
       <a href="/alerts" class="page-tab {% if request.path == '/alerts' %}active{% endif %}">Alerts</a>
       <a href="/logs" class="page-tab {% if request.path == '/logs' %}active{% endif %}">Logs</a>
       <a href="/settings" class="page-tab {% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>

@@ -17,6 +17,7 @@ from typing import Any
 _prev_cpu_stat: tuple[int, int] | None = None   # (total, idle)
 _prev_disk: dict[str, tuple[int, int]] = {}     # name -> (read_sectors, write_sectors)
 _prev_net: tuple[int, int, float] | None = None # (rx, tx, ts)
+_prev_net_ifaces: dict[str, tuple[int, int]] = {}
 _prev_proc: dict[int, tuple[int, int]] = {}     # pid -> (utime, stime) in clock ticks
 _last_proc_scan_ts: float = 0.0
 _last_disk_ts: float = 0.0
@@ -254,6 +255,48 @@ def read_network_stats() -> dict[str, int] | None:
         return result
     except Exception:
         return None
+
+
+def read_network_interfaces() -> list[dict]:
+    """Per-interface network counters + cheap delta rates from /proc/net/dev."""
+    global _prev_net_ifaces, _last_net_ts
+    try:
+        rows = []
+        cur: dict[str, tuple[int, int]] = {}
+        now = time.time()
+        elapsed = (now - _last_net_ts) if _last_net_ts else 0.0
+        for line in Path('/proc/net/dev').read_text().splitlines()[2:]:
+            if ':' not in line:
+                continue
+            iface, rest = line.split(':', 1)
+            iface = iface.strip()
+            if iface == 'lo':
+                continue
+            cols = rest.split()
+            try:
+                rx = int(cols[0]); tx = int(cols[8])
+            except (ValueError, IndexError):
+                continue
+            cur[iface] = (rx, tx)
+            prev = _prev_net_ifaces.get(iface)
+            rx_mbps = tx_mbps = 0.0
+            if prev is not None and elapsed > 0:
+                rx_mbps = max(0.0, (rx - prev[0]) / elapsed / (1024 * 1024))
+                tx_mbps = max(0.0, (tx - prev[1]) / elapsed / (1024 * 1024))
+            rows.append({
+                'iface': iface,
+                'rx_bytes': rx,
+                'tx_bytes': tx,
+                'total_bytes': rx + tx,
+                'rx_mbps': round(rx_mbps, 4),
+                'tx_mbps': round(tx_mbps, 4),
+            })
+        _prev_net_ifaces = cur
+        _last_net_ts = now
+        rows.sort(key=lambda r: (r['rx_mbps'] + r['tx_mbps'], r['total_bytes']), reverse=True)
+        return rows
+    except Exception:
+        return []
 
 
 # ---------- Process list (no psutil dep) ----------

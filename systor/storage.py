@@ -4,6 +4,7 @@ import sqlite3
 import time
 import json
 import threading
+import datetime as dt
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -185,6 +186,76 @@ class Storage:
                 "SELECT * FROM notification_log ORDER BY ts DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def network_series(self, hours: int = 24) -> list[dict]:
+        """Return rx/tx throughput points derived from cumulative net byte counters."""
+        cutoff = int(time.time()) - hours * 3600
+        with self._lock, self._conn() as c:
+            rows = c.execute(
+                "SELECT ts, net_rx_bytes, net_tx_bytes FROM samples WHERE ts >= ? AND net_rx_bytes IS NOT NULL AND net_tx_bytes IS NOT NULL ORDER BY ts",
+                (cutoff,),
+            ).fetchall()
+        out: list[dict] = []
+        prev = None
+        for r in rows:
+            cur = {"ts": int(r[0]), "rx": int(r[1] or 0), "tx": int(r[2] or 0)}
+            if prev is not None:
+                dt_sec = cur["ts"] - prev["ts"]
+                if dt_sec > 0:
+                    d_rx = cur["rx"] - prev["rx"]
+                    d_tx = cur["tx"] - prev["tx"]
+                    if d_rx < 0:
+                        d_rx = 0
+                    if d_tx < 0:
+                        d_tx = 0
+                    out.append({
+                        "ts": cur["ts"],
+                        "rx_mbps": round(d_rx / dt_sec / (1024 * 1024), 4),
+                        "tx_mbps": round(d_tx / dt_sec / (1024 * 1024), 4),
+                    })
+            prev = cur
+        return out
+
+    def network_usage_buckets(self, granularity: str = "day", limit: int = 30) -> list[dict]:
+        """Aggregate network usage deltas into day/week/month buckets."""
+        if granularity not in {"day", "week", "month"}:
+            granularity = "day"
+        with self._lock, self._conn() as c:
+            rows = c.execute(
+                "SELECT ts, net_rx_bytes, net_tx_bytes FROM samples WHERE net_rx_bytes IS NOT NULL AND net_tx_bytes IS NOT NULL ORDER BY ts"
+            ).fetchall()
+        buckets: dict[str, dict] = {}
+        prev = None
+        for r in rows:
+            cur = {"ts": int(r[0]), "rx": int(r[1] or 0), "tx": int(r[2] or 0)}
+            if prev is not None and cur["ts"] > prev["ts"]:
+                d_rx = cur["rx"] - prev["rx"]
+                d_tx = cur["tx"] - prev["tx"]
+                if d_rx < 0:
+                    d_rx = 0
+                if d_tx < 0:
+                    d_tx = 0
+                stamp = dt.datetime.fromtimestamp(cur["ts"])
+                if granularity == "week":
+                    iso = stamp.isocalendar()
+                    key = f"{iso.year}-W{iso.week:02d}"
+                elif granularity == "month":
+                    key = stamp.strftime("%Y-%m")
+                else:
+                    key = stamp.strftime("%Y-%m-%d")
+                bucket = buckets.setdefault(key, {"label": key, "rx_bytes": 0, "tx_bytes": 0, "samples": 0, "start_ts": cur["ts"], "end_ts": cur["ts"]})
+                bucket["rx_bytes"] += d_rx
+                bucket["tx_bytes"] += d_tx
+                bucket["samples"] += 1
+                bucket["end_ts"] = cur["ts"]
+            prev = cur
+        result = list(buckets.values())[-max(1, limit):]
+        for row in result:
+            row["total_bytes"] = row["rx_bytes"] + row["tx_bytes"]
+            row["rx_gb"] = round(row["rx_bytes"] / (1024 ** 3), 3)
+            row["tx_gb"] = round(row["tx_bytes"] / (1024 ** 3), 3)
+            row["total_gb"] = round(row["total_bytes"] / (1024 ** 3), 3)
+        return result
 
     def apply_retention(self) -> tuple[int, int]:
         """Delete old data. Returns (raw_deleted, rollup_deleted)."""

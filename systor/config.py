@@ -40,6 +40,11 @@ DEFAULT_CONFIG: dict = {
         "enabled": False,
         "webhook_url": "",            # or env SYSTOR_DISCORD_WEBHOOK
     },
+    "network": {
+        "default_hours": 24,
+        "default_granularity": "day",
+        "auto_refresh_sec": 15,
+    },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
         "host": "0.0.0.0",
@@ -121,6 +126,8 @@ def _apply_env(cfg: dict) -> None:
         "SYSTOR_TELEGRAM_BOT_TOKEN":     ("telegram", "bot_token", str, None),
         "SYSTOR_TELEGRAM_CHAT_ID":       ("telegram", "chat_id", str, None),
         "SYSTOR_DISCORD_WEBHOOK":        ("discord", "webhook_url", str, None),
+        "SYSTOR_NETWORK_HOURS":          ("network", "default_hours", int, None),
+        "SYSTOR_NETWORK_REFRESH_SEC":    ("network", "auto_refresh_sec", int, None),
         "SYSTOR_WEB_PORT":               ("web", "port", int, None),
         "SYSTOR_WEB_HOST":               ("web", "host", str, None),
     }
