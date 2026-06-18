@@ -1,4 +1,9 @@
-"""System metric readers. All readers are best-effort and return None on error."""
+"""System metric readers. All readers are best-effort and return None on error.
+
+For stateful metrics (CPU % over time, disk I/O rates, per-process CPU%),
+we keep module-level state so consecutive snapshots can compute deltas.
+The state is minimal: a few ints and dicts, total ~1 KB.
+"""
 from __future__ import annotations
 import os
 import shutil
@@ -6,6 +11,16 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Any
+
+
+# Module-level state for deltas
+_prev_cpu_stat: tuple[int, int] | None = None   # (total, idle)
+_prev_disk: dict[str, tuple[int, int]] = {}     # name -> (read_sectors, write_sectors)
+_prev_net: tuple[int, int, float] | None = None # (rx, tx, ts)
+_prev_proc: dict[int, tuple[int, int]] = {}     # pid -> (utime, stime) in clock ticks
+_last_proc_scan_ts: float = 0.0
+_last_disk_ts: float = 0.0
+_last_net_ts: float = 0.0
 
 
 def read_loadavg() -> float | None:
@@ -16,20 +31,39 @@ def read_loadavg() -> float | None:
         return None
 
 
-def read_cpu_percent(sample_interval: float = 0.5) -> float | None:
-    """CPU usage % over a short sample. Returns None on error.
+def read_cpu_percent(prev_total: int | None = None, prev_idle: int | None = None) -> float | None:
+    """CPU usage % between two /proc/stat reads.
 
-    Reads /proc/stat twice and computes delta. ~sample_interval second cost.
+    Pass the previous sample's totals; if absent, this returns None.
+    Use _cpu_percent_delta() to get a single value with internal state.
     """
     try:
-        t0 = _stat_total_idle()
-        time.sleep(sample_interval)
-        t1 = _stat_total_idle()
-        total = t1[0] - t0[0]
-        idle = t1[1] - t0[1]
-        if total <= 0:
+        if prev_total is None or prev_idle is None:
+            return None
+        total, idle = _stat_total_idle()
+        dt = total - prev_total
+        di = idle - prev_idle
+        if dt <= 0:
             return 0.0
-        return round(100.0 * (total - idle) / total, 1)
+        return round(100.0 * (dt - di) / dt, 1)
+    except Exception:
+        return None
+
+
+def _cpu_percent_delta() -> float | None:
+    """Track CPU% across calls (no per-call sleep, so very cheap)."""
+    global _prev_cpu_stat
+    try:
+        total, idle = _stat_total_idle()
+        prev = _prev_cpu_stat
+        _prev_cpu_stat = (total, idle)
+        if prev is None:
+            return None
+        dt = total - prev[0]
+        di = idle - prev[1]
+        if dt <= 0:
+            return 0.0
+        return round(100.0 * (dt - di) / dt, 1)
     except Exception:
         return None
 
@@ -38,7 +72,8 @@ def _stat_total_idle() -> tuple[int, int]:
     line = Path("/proc/stat").read_text().splitlines()[0]  # "cpu  ..."
     vals = [int(x) for x in line.split()[1:]]
     total = sum(vals)
-    idle = vals[3] + (vals[4] if len(vals) > 4 else 0)  # idle + iowait
+    # idle = idle + iowait
+    idle = vals[3] + (vals[4] if len(vals) > 4 else 0)
     return total, idle
 
 
@@ -111,6 +146,83 @@ def read_disk_usage() -> list[dict]:
         return []
 
 
+def _read_diskstats_raw() -> dict[str, tuple[int, int]]:
+    """Returns dict of device -> (read_sectors, write_sectors). Only real block devices."""
+    out: dict[str, tuple[int, int]] = {}
+    try:
+        for line in Path("/proc/diskstats").read_text().splitlines():
+            parts = line.split()
+            if len(parts) < 14:
+                continue
+            try:
+                name = parts[2]
+                # skip pseudo / virtual devices
+                if any(name.startswith(p) for p in ("loop", "ram", "dm-", "md", "sr", "zd", "nbd", "fd")):
+                    continue
+                # Whole-disk filter: keep names without trailing digits (sda, sdb, vda, ...)
+                # or nvme0n1-style (no 'p' followed by digit at the end).
+                if name.startswith(("sd", "vd", "hd", "xvd")):
+                    # partitions are sda1, sda2 etc; whole disks are sda, sdb, ...
+                    if name[-1].isdigit():
+                        continue
+                elif name.startswith("nvme"):
+                    # nvme0n1 is a whole disk; nvme0n1p1 is a partition
+                    if "p" in name and name.rsplit("p", 1)[-1].isdigit():
+                        continue
+                else:
+                    # unknown naming (mmcblk, etc.) — keep if not ending in a partition digit
+                    # skip generic partition suffix guess: name followed by digits at end
+                    if any(name.endswith(str(d)) for d in range(10)):
+                        continue
+                read_sectors = int(parts[5])
+                write_sectors = int(parts[9])
+                out[name] = (read_sectors, write_sectors)
+            except (ValueError, IndexError):
+                continue
+    except Exception:
+        pass
+    return out
+
+
+def read_disk_io_mbps(elapsed_sec: float | None = None) -> dict:
+    """Returns {read_mbps, write_mbps, devices: [{name, read_mbps, write_mbps}]}.
+
+    Reads /proc/diskstats and computes delta per second since last call.
+    First call returns zeros. If elapsed_sec is None, uses wall-clock delta
+    from the last call (also returns zeros on first call).
+    """
+    global _prev_disk, _last_disk_ts
+    try:
+        cur = _read_diskstats_raw()
+        prev = _prev_disk
+        now = time.time()
+        if elapsed_sec is None:
+            elapsed = (now - _last_disk_ts) if _last_disk_ts else 0
+        else:
+            elapsed = elapsed_sec
+        _prev_disk = cur
+        _last_disk_ts = now
+        if not prev or elapsed <= 0:
+            return {"read_mbps": 0.0, "write_mbps": 0.0, "devices": []}
+        devs = []
+        total_r = 0.0
+        total_w = 0.0
+        for name, (r, w) in cur.items():
+            if name in prev:
+                pr, pw = prev[name]
+                d_r = max(0, r - pr)
+                d_w = max(0, w - pw)
+                # sectors are 512 bytes
+                r_mbps = round(d_r * 512 / elapsed / (1024 * 1024), 3)
+                w_mbps = round(d_w * 512 / elapsed / (1024 * 1024), 3)
+                devs.append({"name": name, "read_mbps": r_mbps, "write_mbps": w_mbps})
+                total_r += r_mbps
+                total_w += w_mbps
+        return {"read_mbps": round(total_r, 3), "write_mbps": round(total_w, 3), "devices": devs}
+    except Exception:
+        return {"read_mbps": 0.0, "write_mbps": 0.0, "devices": []}
+
+
 def read_uptime_sec() -> int | None:
     try:
         return int(float(Path("/proc/uptime").read_text().split()[0]))
@@ -144,14 +256,130 @@ def read_network_stats() -> dict[str, int] | None:
         return None
 
 
+# ---------- Process list (no psutil dep) ----------
+def _read_proc_stat(pid: int) -> tuple[str, int, int, int, int] | None:
+    """Read /proc/<pid>/stat. Returns (comm, utime, stime, rss_pages, starttime) or None."""
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as f:
+            data = f.read().decode(errors="replace")
+        # comm is the second field, in parens, may contain spaces
+        lparen = data.index("(")
+        rparen = data.rindex(")")
+        comm = data[lparen + 1:rparen]
+        rest = data[rparen + 2:].split()
+        # fields after ) are: state, ppid, pgrp, session, tty_nr, tpgid, flags,
+        # minflt, cminflt, majflt, cmajflt, utime, stime, ...
+        # utime is field 14 (1-indexed overall = 12 after comm + state), stime is 15
+        # After the closing paren: index 11 = utime, 12 = stime, 21 = starttime, 22 = rss
+        utime = int(rest[11])
+        stime = int(rest[12])
+        rss = int(rest[21])  # in pages
+        starttime = int(rest[19])
+        return comm, utime, stime, rss, starttime
+    except Exception:
+        return None
+
+
+def _read_proc_cmdline(pid: int) -> str:
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            data = f.read().replace(b"\x00", b" ").decode(errors="replace").strip()
+        return data[:200] or ""
+    except Exception:
+        return ""
+
+
+def _read_proc_uid(pid: int) -> str:
+    try:
+        st = os.stat(f"/proc/{pid}")
+        uid = st.st_uid
+        import pwd
+        try:
+            return pwd.getpwuid(uid).pw_name
+        except KeyError:
+            return str(uid)
+    except Exception:
+        return "?"
+
+
+def read_top_processes(n: int = 10, by: str = "cpu") -> list[dict]:
+    """Return top-n processes by cpu% or memory%.
+
+    CPU% is computed from /proc/<pid>/stat utime+stime delta. The function
+    caches previous values and is a no-op on the very first call (returns
+    cpu_percent=0 for everything).
+
+    Memory is RSS from /proc/<pid>/stat (in pages, converted to MB).
+
+    The first call always returns cpu_percent=0 because there's no previous
+    baseline. The second call (30s later by default) has real values.
+
+    Cost: O(num_procs) syscalls. For 250 procs ~5ms.
+    """
+    global _prev_proc, _last_proc_scan_ts
+    clk_tck = os.sysconf("SC_CLK_TCK") or 100
+    now = time.time()
+    elapsed = now - _last_proc_scan_ts if _last_proc_scan_ts else None
+    _last_proc_scan_ts = now
+
+    procs = []
+    try:
+        pids = [int(p) for p in os.listdir("/proc") if p.isdigit()]
+    except Exception:
+        return []
+
+    cur_proc: dict[int, tuple[int, int, int]] = {}
+    for pid in pids:
+        s = _read_proc_stat(pid)
+        if s is None:
+            continue
+        comm, utime, stime, rss_pages, _start = s
+        cur_proc[pid] = (utime, stime, rss_pages)
+        prev = _prev_proc.get(pid)
+        if prev is not None and elapsed and elapsed > 0:
+            d_ut = max(0, utime - prev[0])
+            d_st = max(0, stime - prev[1])
+            cpu_pct = round(100.0 * (d_ut + d_st) / clk_tck / elapsed, 1)
+        else:
+            cpu_pct = 0.0
+        procs.append({
+            "pid": pid,
+            "name": comm[:60],
+            "user": _read_proc_uid(pid),
+            "cpu_percent": cpu_pct,
+            "mem_mb": round(rss_pages * 4 / 1024, 1),  # pages * 4 KB → MB
+            "cmdline": _read_proc_cmdline(pid),
+        })
+    _prev_proc = cur_proc
+
+    if by == "mem":
+        procs.sort(key=lambda p: p["mem_mb"], reverse=True)
+    else:
+        procs.sort(key=lambda p: (p["cpu_percent"], p["mem_mb"]), reverse=True)
+    return procs[:n]
+
+
+def read_total_memory_mb() -> int:
+    """Returns total RAM in MB. Used to compute mem_percent for processes."""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemTotal"):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return 0
+
+
 def collect_snapshot() -> dict[str, Any]:
     """One-time snapshot of all metrics. Returned as a single dict."""
     load = read_loadavg()
     temp = read_cpu_temp_c()
     mem = read_meminfo() or {}
     disks = read_disk_usage()
-    cpu_pct = read_cpu_percent(sample_interval=0.4)
+    cpu_pct = _cpu_percent_delta()
     net = read_network_stats() or {}
+    disk_io = read_disk_io_mbps()
     return {
         "ts": int(time.time()),
         "hostname": read_hostname(),
@@ -165,6 +393,7 @@ def collect_snapshot() -> dict[str, Any]:
         },
         "memory": mem,
         "disks": disks,
+        "disk_io": disk_io,
         "network": net,
     }
 
@@ -175,3 +404,4 @@ def _safe_loadavg(idx: int) -> float | None:
         return float(parts[idx])
     except Exception:
         return None
+

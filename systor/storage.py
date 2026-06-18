@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS samples (
     disk_used_gb    REAL,
     disk_size_gb    REAL,
     disk_mount      TEXT,
+    disk_read_mbps  REAL,
+    disk_write_mbps REAL,
     net_rx_bytes    INTEGER,
     net_tx_bytes    INTEGER,
     hostname        TEXT
@@ -92,14 +94,16 @@ class Storage:
             mem = s.get("memory", {}) or {}
             net = s.get("network", {}) or {}
             cpu = s.get("cpu", {}) or {}
+            disk_io = s.get("disk_io", {}) or {}
             c.execute(
                 """INSERT INTO samples
                 (ts, load_1m, load_5m, load_15m, cpu_pct, cpu_temp,
                  mem_total_mb, mem_used_mb, mem_free_mb, mem_avail_mb,
                  swap_used_mb, swap_total_mb,
                  disk_used_pct, disk_used_gb, disk_size_gb, disk_mount,
+                 disk_read_mbps, disk_write_mbps,
                  net_rx_bytes, net_tx_bytes, hostname)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     s.get("ts", int(time.time())),
                     cpu.get("load_1m"), cpu.get("load_5m"), cpu.get("load_15m"),
@@ -107,6 +111,7 @@ class Storage:
                     mem.get("total_mb"), mem.get("used_mb"), mem.get("free_mb"), mem.get("available_mb"),
                     mem.get("swap_used_mb"), mem.get("swap_total_mb"),
                     worst_disk.get("used_pct"), worst_disk.get("used_gb"), worst_disk.get("size_gb"), worst_disk.get("mount"),
+                    disk_io.get("read_mbps"), disk_io.get("write_mbps"),
                     net.get("rx_bytes"), net.get("tx_bytes"),
                     s.get("hostname"),
                 ),
@@ -141,6 +146,7 @@ class Storage:
             "cpu_pct": "cpu_pct", "cpu_temp": "cpu_temp",
             "mem_used_mb": "mem_used_mb", "mem_free_mb": "mem_free_mb",
             "swap_used_mb": "swap_used_mb", "disk_used_pct": "disk_used_pct",
+            "disk_read_mbps": "disk_read_mbps", "disk_write_mbps": "disk_write_mbps",
         }
         col = col_map.get(metric)
         if not col:

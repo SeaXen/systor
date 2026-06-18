@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}systor · Dashboard{% endblock %}
 {% block content %}
-<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;gap:8px">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;gap:8px">
   <div>
     <div class="page-title">Live System Overview</div>
-    <div class="text-muted" style="font-size:12px" id="updated">— · auto-refresh every 5s</div>
+    <div class="text-muted" style="font-size:12px" id="updated">— · auto-refresh</div>
   </div>
   <div class="text-muted" style="font-size:12px">
     <span id="hostname"></span> · uptime <span id="uptime"></span>
@@ -12,11 +12,37 @@
   </div>
 </div>
 
+<!-- Controls: refresh interval + time range -->
+<div class="controls" style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+  <label class="control-group">
+    <span class="text-muted" style="font-size:11px;margin-right:6px;text-transform:uppercase;letter-spacing:0.5px">Refresh</span>
+    <select id="refresh-sec" class="control-select">
+      <option value="1000">1s</option>
+      <option value="2000">2s</option>
+      <option value="5000" selected>5s</option>
+      <option value="10000">10s</option>
+      <option value="30000">30s</option>
+      <option value="60000">1m</option>
+    </select>
+  </label>
+  <label class="control-group">
+    <span class="text-muted" style="font-size:11px;margin-right:6px;text-transform:uppercase;letter-spacing:0.5px">Range</span>
+    <select id="range-hours" class="control-select">
+      <option value="1">1 hour</option>
+      <option value="6" selected>6 hours</option>
+      <option value="24">24 hours</option>
+      <option value="168">7 days</option>
+    </select>
+  </label>
+  <button class="btn secondary" id="pause-btn" style="padding:4px 10px;font-size:12px">Pause</button>
+  <span class="text-muted" style="font-size:11px" id="top-procs-note">top procs auto-refresh every 30s</span>
+</div>
+
 <div class="stat-grid" id="kpis">
-  <div class="stat-card" id="kpi-load">
-    <div class="label">CPU Load (1m)</div>
-    <div class="value"><span id="load">—</span></div>
-    <div class="sub">5m: <span id="load5">—</span> · 15m: <span id="load15">—</span></div>
+  <div class="stat-card" id="kpi-cpu-pct">
+    <div class="label">CPU Usage</div>
+    <div class="value"><span id="cpu-pct">—</span><span class="unit">%</span></div>
+    <div class="sub">load 1m: <span id="load">—</span> · 5m: <span id="load5">—</span></div>
   </div>
   <div class="stat-card" id="kpi-temp">
     <div class="label">CPU Temperature</div>
@@ -33,10 +59,15 @@
     <div class="value"><span id="swap-used">—</span><span class="unit">MB</span></div>
     <div class="sub">of <span id="swap-total">—</span> MB</div>
   </div>
-  <div class="stat-card" id="kpi-disk">
-    <div class="label">Disk <span id="disk-mount" style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+  <div class="stat-card" id="kpi-disk-use">
+    <div class="label">Disk usage <span id="disk-mount" style="font-size:10px;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
     <div class="value"><span id="disk-pct">—</span><span class="unit">%</span></div>
     <div class="sub"><span id="disk-used">—</span> / <span id="disk-size">—</span></div>
+  </div>
+  <div class="stat-card" id="kpi-disk-io">
+    <div class="label">Disk I/O load</div>
+    <div class="value" style="font-size:18px">↓ <span id="disk-r-mbps">0.0</span> · ↑ <span id="disk-w-mbps">0.0</span><span class="unit">MB/s</span></div>
+    <div class="sub" id="disk-io-devs">—</div>
   </div>
   <div class="stat-card" id="kpi-net">
     <div class="label">Network (cumulative)</div>
@@ -47,22 +78,72 @@
 
 <div class="chart-row">
   <div class="chart-card">
-    <h3>CPU Load (last 6h)</h3>
-    <canvas id="chart-load"></canvas>
+    <h3>CPU Usage % (history)</h3>
+    <canvas id="chart-cpu-pct"></canvas>
   </div>
   <div class="chart-card">
-    <h3>CPU Temperature (last 6h)</h3>
+    <h3>CPU Temperature (history)</h3>
     <canvas id="chart-temp"></canvas>
   </div>
 </div>
 <div class="chart-row">
   <div class="chart-card">
-    <h3>Memory Used (last 6h)</h3>
+    <h3>Memory Used (history)</h3>
     <canvas id="chart-mem"></canvas>
   </div>
   <div class="chart-card">
-    <h3>Disk Usage (last 6h)</h3>
+    <h3>Disk I/O (history, MB/s)</h3>
+    <canvas id="chart-disk-io"></canvas>
+  </div>
+</div>
+<div class="chart-row">
+  <div class="chart-card">
+    <h3>CPU Load (history)</h3>
+    <canvas id="chart-load"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Disk Usage (history)</h3>
     <canvas id="chart-disk"></canvas>
+  </div>
+</div>
+
+<!-- Top processes (CPU + Memory) -->
+<div class="chart-row">
+  <div class="table-card" style="margin-bottom:0">
+    <h3 style="display:flex;justify-content:space-between;align-items:center">
+      <span>Top Processes by CPU</span>
+      <span class="text-muted" style="font-size:11px;font-weight:400">updates every 30s</span>
+    </h3>
+    <table>
+      <thead>
+        <tr>
+          <th>PID</th><th>Name</th><th>User</th>
+          <th class="text-right">CPU%</th>
+          <th class="text-right">Mem (MB)</th>
+        </tr>
+      </thead>
+      <tbody id="top-cpu-body">
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-card" style="margin-bottom:0">
+    <h3 style="display:flex;justify-content:space-between;align-items:center">
+      <span>Top Processes by Memory</span>
+      <span class="text-muted" style="font-size:11px;font-weight:400">updates every 30s</span>
+    </h3>
+    <table>
+      <thead>
+        <tr>
+          <th>PID</th><th>Name</th><th>User</th>
+          <th class="text-right">Mem (MB)</th>
+          <th class="text-right">Mem%</th>
+        </tr>
+      </thead>
+      <tbody id="top-mem-body">
+        <tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -83,7 +164,8 @@
 <script>
 const COLORS = {
   green: '#3fb950', yellow: '#d29922', red: '#f85149',
-  blue: '#58a6ff', purple: '#bc8cff', dim: '#8b949e', grid: '#30363d'
+  blue: '#58a6ff', purple: '#bc8cff', cyan: '#22d3ee',
+  dim: '#8b949e', grid: '#30363d'
 };
 
 function fmt(n, unit) {
@@ -109,7 +191,13 @@ function timeAgo(ts) {
   if (s < 86400) return Math.floor(s / 3600) + 'h ago';
   return Math.floor(s / 86400) + 'd ago';
 }
-function drawLineChart(canvas, data, color, ymin) {
+function statusClass(value, yellowTh, redTh) {
+  if (value === null || value === undefined) return 'gray';
+  if (redTh !== undefined && value > redTh) return 'red';
+  if (yellowTh !== undefined && value > yellowTh) return 'yellow';
+  return 'green';
+}
+function drawLineChart(canvas, data, color, ymin, ymax) {
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -123,7 +211,7 @@ function drawLineChart(canvas, data, color, ymin) {
   const vals = data.map(p => p[1]).filter(v => v !== null);
   if (vals.length === 0) return;
   const lo = ymin !== undefined ? ymin : Math.min(...vals);
-  const hi = Math.max(...vals);
+  const hi = ymax !== undefined ? ymax : Math.max(...vals);
   const range = (hi - lo) || 1;
   const pad = 8;
   const w0 = w - pad * 2, h0 = h - pad * 2;
@@ -157,11 +245,58 @@ async function fetchJSON(url) {
   return r.json();
 }
 
+// ---------- Settings (persisted in localStorage) ----------
+const SETTINGS_KEY = 'systor.dashboard';
+let settings = { refreshMs: 5000, rangeHours: 6, paused: false };
+try {
+  const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+  settings = { ...settings, ...stored };
+} catch (e) {}
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+function setupControls() {
+  const refreshSel = document.getElementById('refresh-sec');
+  const rangeSel = document.getElementById('range-hours');
+  const pauseBtn = document.getElementById('pause-btn');
+  refreshSel.value = String(settings.refreshMs);
+  rangeSel.value = String(settings.rangeHours);
+  pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause';
+  refreshSel.addEventListener('change', () => {
+    settings.refreshMs = parseInt(refreshSel.value);
+    saveSettings();
+    restartTimers();
+  });
+  rangeSel.addEventListener('change', () => {
+    settings.rangeHours = parseInt(rangeSel.value);
+    saveSettings();
+    refreshCharts();
+  });
+  pauseBtn.addEventListener('click', () => {
+    settings.paused = !settings.paused;
+    pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause';
+    saveSettings();
+  });
+}
+
+// ---------- Refresh logic ----------
+let snapTimer, chartTimer, alertTimer, procTimer;
+function restartTimers() {
+  clearInterval(snapTimer); clearInterval(chartTimer);
+  clearInterval(alertTimer); clearInterval(procTimer);
+  if (settings.paused) return;
+  snapTimer  = setInterval(refresh,        settings.refreshMs);
+  chartTimer = setInterval(refreshCharts,  Math.max(settings.refreshMs, 15000));
+  alertTimer = setInterval(refreshAlerts,  Math.max(settings.refreshMs, 10000));
+  procTimer  = setInterval(refreshProcs,   30000);
+}
+
 async function refresh() {
+  if (settings.paused) return;
   try {
     const snap = await fetchJSON('/api/snapshot');
     document.getElementById('updated').textContent =
-      'Updated ' + new Date().toLocaleTimeString() + ' · auto-refresh every 5s';
+      'Updated ' + new Date().toLocaleTimeString() + ' · refresh ' + (settings.refreshMs/1000) + 's';
     document.getElementById('hostname').textContent = snap.hostname;
     const up = snap.uptime_sec || 0;
     document.getElementById('uptime').textContent =
@@ -170,11 +305,12 @@ async function refresh() {
       (snap.db_stats.samples || 0) + ' samples stored';
 
     const cpu = snap.cpu || {};
-    document.getElementById('load').textContent  = fmt(cpu.load_1m);
-    document.getElementById('load5').textContent = fmt(cpu.load_5m);
-    document.getElementById('load15').textContent= fmt(cpu.load_15m);
+    document.getElementById('cpu-pct').textContent = fmt(cpu.percent);
+    document.getElementById('load').textContent   = fmt(cpu.load_1m);
+    document.getElementById('load5').textContent  = fmt(cpu.load_5m);
+    document.getElementById('kpi-cpu-pct').className = 'stat-card ' + statusClass(cpu.percent, 50, 85);
+
     document.getElementById('temp').textContent  = fmt(cpu.temp_c);
-    document.getElementById('kpi-load').className = 'stat-card ' + statusClass(cpu.load_1m, 2, 4);
     document.getElementById('kpi-temp').className = 'stat-card ' + statusClass(cpu.temp_c, 70, 85);
 
     const mem = snap.memory || {};
@@ -195,8 +331,18 @@ async function refresh() {
       document.getElementById('disk-pct').textContent  = d.used_pct;
       document.getElementById('disk-used').textContent  = d.used_gb.toFixed(1) + ' GB';
       document.getElementById('disk-size').textContent  = d.size_gb.toFixed(1) + ' GB';
-      document.getElementById('kpi-disk').className = 'stat-card ' + statusClass(d.used_pct, 80, 90);
+      document.getElementById('kpi-disk-use').className = 'stat-card ' + statusClass(d.used_pct, 80, 90);
     }
+
+    const dio = snap.disk_io || {};
+    document.getElementById('disk-r-mbps').textContent = (dio.read_mbps || 0).toFixed(2);
+    document.getElementById('disk-w-mbps').textContent = (dio.write_mbps || 0).toFixed(2);
+    const devs = dio.devices || [];
+    document.getElementById('disk-io-devs').textContent = devs.length
+      ? devs.map(x => x.name).join(', ')
+      : 'no disks';
+    const ioHigh = Math.max(dio.read_mbps || 0, dio.write_mbps || 0);
+    document.getElementById('kpi-disk-io').className = 'stat-card ' + statusClass(ioHigh, 50, 200);
 
     const net = snap.network || {};
     document.getElementById('net-rx').textContent = bytes(net.rx_bytes);
@@ -204,29 +350,32 @@ async function refresh() {
   } catch (e) { console.error(e); }
 }
 
-function statusClass(value, yellowTh, redTh) {
-  if (value === null || value === undefined) return 'gray';
-  if (redTh !== undefined && value > redTh) return 'red';
-  if (yellowTh !== undefined && value > yellowTh) return 'yellow';
-  return 'green';
-}
-
 async function refreshCharts() {
+  const range = settings.rangeHours;
   const metrics = [
-    ['load_1m',      'chart-load',  COLORS.green,  0],
-    ['cpu_temp',     'chart-temp',  COLORS.red,    30],
-    ['mem_used_mb',  'chart-mem',   COLORS.blue,   0],
-    ['disk_used_pct','chart-disk',  COLORS.yellow, 0],
+    ['cpu_pct',         'chart-cpu-pct', COLORS.purple, 0,  100],
+    ['cpu_temp',        'chart-temp',    COLORS.red,    30, null],
+    ['mem_used_mb',     'chart-mem',     COLORS.blue,   0,  null],
+    ['disk_read_mbps',  'chart-disk-io', COLORS.cyan,   0,  null],
+    ['load_1m',         'chart-load',    COLORS.green,  0,  null],
+    ['disk_used_pct',   'chart-disk',    COLORS.yellow, 0,  null],
   ];
-  for (const [metric, id, color, ymin] of metrics) {
+  for (const [metric, id, color, ymin, ymax] of metrics) {
     try {
-      const d = await fetchJSON('/api/series?metric=' + metric + '&hours=6');
-      drawLineChart(document.getElementById(id), d.data, color, ymin);
+      const d = await fetchJSON('/api/series?metric=' + metric + '&hours=' + range);
+      // disk_read_mbps is a single line; we can draw both r/w as overlay later
+      drawLineChart(document.getElementById(id), d.data, color, ymin, ymax);
     } catch (e) { console.error(e); }
   }
+  // Overlay disk write MB/s on the disk I/O chart in a different color
+  try {
+    const w = await fetchJSON('/api/series?metric=disk_write_mbps&hours=' + range);
+    drawLineChart(document.getElementById('chart-disk-io'), w.data, COLORS.red, 0, null);
+  } catch (e) { console.error(e); }
 }
 
 async function refreshAlerts() {
+  if (settings.paused) return;
   try {
     const alerts = await fetchJSON('/api/alerts?limit=20');
     const body = document.getElementById('alerts-body');
@@ -244,11 +393,41 @@ async function refreshAlerts() {
   } catch (e) { console.error(e); }
 }
 
+async function refreshProcs() {
+  if (settings.paused) return;
+  try {
+    const [cpuTop, memTop] = await Promise.all([
+      fetchJSON('/api/top-processes?by=cpu&n=10'),
+      fetchJSON('/api/top-processes?by=mem&n=10'),
+    ]);
+    document.getElementById('top-cpu-body').innerHTML = cpuTop.processes.length
+      ? cpuTop.processes.map(p => `
+        <tr>
+          <td class="mono text-muted">${p.pid}</td>
+          <td title="${p.cmdline}">${p.name}</td>
+          <td class="text-muted">${p.user}</td>
+          <td class="text-right mono" style="color:${p.cpu_percent > 50 ? COLORS.red : p.cpu_percent > 20 ? COLORS.yellow : COLORS.text}">${p.cpu_percent}</td>
+          <td class="text-right mono">${p.mem_mb}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data</td></tr>';
+    document.getElementById('top-mem-body').innerHTML = memTop.processes.length
+      ? memTop.processes.map(p => `
+        <tr>
+          <td class="mono text-muted">${p.pid}</td>
+          <td title="${p.cmdline}">${p.name}</td>
+          <td class="text-muted">${p.user}</td>
+          <td class="text-right mono">${p.mem_mb}</td>
+          <td class="text-right mono" style="color:${p.mem_percent > 10 ? COLORS.red : p.mem_percent > 5 ? COLORS.yellow : COLORS.text}">${p.mem_percent}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data</td></tr>';
+  } catch (e) { console.error(e); }
+}
+
+setupControls();
 refresh();
 refreshCharts();
 refreshAlerts();
-setInterval(refresh, 5000);
-setInterval(refreshCharts, 30000);
-setInterval(refreshAlerts, 15000);
+refreshProcs();
+restartTimers();
 </script>
 {% endblock %}

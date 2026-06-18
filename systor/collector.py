@@ -138,6 +138,15 @@ def run():
     except OSError as e:
         log.warning("could not write pidfile: %s", e)
 
+    # Pre-warm process CPU% baseline so the first /api/top-processes call
+    # has data (otherwise the first call always returns 0% for everything).
+    try:
+        from .metrics import read_top_processes
+        read_top_processes(n=1, by="cpu")
+        log.info("collector: pre-warmed process CPU baseline")
+    except Exception as e:
+        log.debug("pre-warm processes: %s", e)
+
     last_cfg_mtime = _config_mtime()
     last_retention_check = 0.0
 

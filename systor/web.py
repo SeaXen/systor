@@ -26,7 +26,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request, abort, Response
 
 from .config import load_config, save_config
-from .metrics import collect_snapshot
+from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb
 from .notifier import Notifier, send_telegram, send_discord
 from .storage import Storage, DEFAULT_DB_PATH
 
@@ -89,6 +89,29 @@ def create_app() -> Flask:
     def api_alerts():
         limit = int(request.args.get("limit", 50))
         return jsonify(get_storage().recent_alerts(limit=limit))
+
+    @app.route("/api/top-processes")
+    def api_top_processes():
+        """Top N processes by CPU% or memory MB.
+
+        CPU% requires at least one previous scan to compute the delta. The
+        first call always returns 0% for everything. Subsequent calls
+        (every ~30s by default from the collector's poll interval) have
+        real values.
+        """
+        try:
+            n = max(1, min(50, int(request.args.get("n", 10))))
+        except ValueError:
+            n = 10
+        by = request.args.get("by", "cpu")
+        if by not in ("cpu", "mem"):
+            by = "cpu"
+        procs = read_top_processes(n=n, by=by)
+        # Add mem_percent based on total memory
+        total_mb = read_total_memory_mb()
+        for p in procs:
+            p["mem_percent"] = round(100.0 * p["mem_mb"] / total_mb, 1) if total_mb else 0.0
+        return jsonify({"by": by, "n": len(procs), "processes": procs, "total_memory_mb": total_mb})
 
     @app.route("/api/notifications")
     def api_notifications():
