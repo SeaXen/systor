@@ -75,8 +75,21 @@ class Storage:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as c:
             c.executescript(SCHEMA)
+            self._migrate(c)
             c.execute("PRAGMA journal_mode=WAL")
             c.execute("PRAGMA synchronous=NORMAL")
+
+    def _migrate(self, c: sqlite3.Connection) -> None:
+        """Apply lightweight additive migrations for existing SQLite DBs."""
+        existing = {row[1] for row in c.execute("PRAGMA table_info(samples)").fetchall()}
+        additions = {
+            "cpu_pct": "REAL",
+            "disk_read_mbps": "REAL",
+            "disk_write_mbps": "REAL",
+        }
+        for col, typ in additions.items():
+            if col not in existing:
+                c.execute(f"ALTER TABLE samples ADD COLUMN {col} {typ}")
 
     @contextmanager
     def _conn(self):
