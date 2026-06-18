@@ -44,6 +44,17 @@ DEFAULT_CONFIG: dict = {
         "default_hours": 24,
         "default_granularity": "day",
         "auto_refresh_sec": 15,
+        "hide_virtual_default": True,
+    },
+    "dashboard": {
+        "default_hours": 6,
+        "refresh_sec": 5,
+        "chart_refresh_sec": 5,
+    },
+    "apps": {
+        "auto_refresh_sec": 15,
+        "default_scope": "all",
+        "default_sort": "cpu",
     },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
@@ -128,6 +139,10 @@ def _apply_env(cfg: dict) -> None:
         "SYSTOR_DISCORD_WEBHOOK":        ("discord", "webhook_url", str, None),
         "SYSTOR_NETWORK_HOURS":          ("network", "default_hours", int, None),
         "SYSTOR_NETWORK_REFRESH_SEC":    ("network", "auto_refresh_sec", int, None),
+        "SYSTOR_DASHBOARD_HOURS":        ("dashboard", "default_hours", int, None),
+        "SYSTOR_DASHBOARD_REFRESH_SEC":  ("dashboard", "refresh_sec", int, None),
+        "SYSTOR_DASHBOARD_CHART_SEC":    ("dashboard", "chart_refresh_sec", int, None),
+        "SYSTOR_APPS_REFRESH_SEC":       ("apps", "auto_refresh_sec", int, None),
         "SYSTOR_WEB_PORT":               ("web", "port", int, None),
         "SYSTOR_WEB_HOST":               ("web", "host", str, None),
     }

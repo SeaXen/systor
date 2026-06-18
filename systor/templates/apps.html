@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}systor · Apps{% endblock %}
+{% block content %}
+<div class="apps-layout">
+  <div class="dash-toolbar">
+    <div class="dash-status">
+      <span class="dot green"></span>
+      <strong>Apps</strong>
+      <span id="apps-updated">loading…</span>
+      <span id="apps-meta">host + docker usage</span>
+    </div>
+    <div class="dash-controls">
+      <label>scope
+        <select id="apps-scope" class="control-select">
+          <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
+          <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host</option>
+          <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker</option>
+        </select>
+      </label>
+      <label>sort
+        <select id="apps-sort" class="control-select">
+          <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
+          <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
+          <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
+          <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
+        </select>
+      </label>
+      <label>refresh
+        <select id="apps-refresh-sec" class="control-select">
+          <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+          <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
+          <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+          <option value="10" {% if cfg.apps.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+          <option value="15" {% if cfg.apps.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+          <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+          <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+        </select>
+      </label>
+      <button class="btn secondary compact" id="apps-refresh">Refresh</button>
+    </div>
+  </div>
+
+  <div class="network-grid network-kpis network-kpis-6">
+    <div class="stat-card compact-stat compact-row-card"><div class="label">Host apps</div><div class="value" id="host-count">—</div></div>
+    <div class="stat-card compact-stat compact-row-card"><div class="label">Docker apps</div><div class="value" id="docker-count">—</div></div>
+    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Host CPU</div><div class="value rx-text" id="host-cpu">—</div></div>
+    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Host RAM</div><div class="value" id="host-mem">—</div></div>
+    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Docker CPU</div><div class="value rx-text" id="docker-cpu">—</div></div>
+    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Docker RAM</div><div class="value" id="docker-mem">—</div></div>
+  </div>
+
+  <div class="table-card compact-table">
+    <h3><span>Apps usage</span><span class="network-mini" id="apps-title-meta">0 rows</span></h3>
+    <table class="apps-table aligned-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Kind</th>
+          <th class="text-right">CPU%</th>
+          <th class="text-right">RAM</th>
+          <th class="text-right">Network</th>
+          <th class="text-right">Disk</th>
+          <th>Usage chart</th>
+        </tr>
+      </thead>
+      <tbody id="apps-body"><tr><td colspan="7" class="empty-cell">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let appsTimer=null, appsLoading=false;
+function bytesMB(n){ n=Number(n||0); if(n>=1024) return (n/1024).toFixed(2)+' GB'; return n.toFixed(2)+' MB'; }
+async function fetchJSON(url, opts){ const r=await fetch(url, Object.assign({cache:'no-store'}, opts||{})); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
+function usageCell(row){ const cpu=Math.min(100, Number(row.cpu_percent||0)); const mem=Math.min(100, Number(row.mem_percent||0) || Math.min(100, Number(row.mem_mb||0)/50)); const net=Math.min(100, (Number(row.net_in_mb||0)+Number(row.net_out_mb||0))*2); const disk=Math.min(100, (Number(row.disk_in_mb||0)+Number(row.disk_out_mb||0))*2); return `<div class="app-usage-bars"><div class="app-bar-row"><span class="rx-text">CPU</span><div class="app-bar"><i class="cpu" style="width:${cpu}%"></i></div></div><div class="app-bar-row"><span class="tx-text">RAM</span><div class="app-bar"><i class="mem" style="width:${mem}%"></i></div></div><div class="app-bar-row"><span class="rx-text">NET</span><div class="app-bar"><i class="net" style="width:${net}%"></i></div></div><div class="app-bar-row"><span class="tx-text">DSK</span><div class="app-bar"><i class="disk" style="width:${disk}%"></i></div></div></div>`; }
+async function loadApps(){ const scope=document.getElementById('apps-scope').value; const sort=document.getElementById('apps-sort').value; const j=await fetchJSON(`/api/apps?scope=${scope}&sort=${sort}&limit=30`); document.getElementById('host-count').textContent=j.host_count; document.getElementById('docker-count').textContent=j.docker_count; document.getElementById('host-cpu').textContent=(j.summary.host_cpu||0).toFixed(2)+'%'; document.getElementById('host-mem').textContent=bytesMB(j.summary.host_mem_mb||0); document.getElementById('docker-cpu').textContent=(j.summary.docker_cpu||0).toFixed(2)+'%'; document.getElementById('docker-mem').textContent=bytesMB(j.summary.docker_mem_mb||0); document.getElementById('apps-title-meta').textContent=`${j.rows.length} rows · ${scope} · sort ${sort}`; const body=document.getElementById('apps-body'); if(!(j.rows||[]).length){ body.innerHTML='<tr><td colspan="7" class="empty-cell">No apps found</td></tr>'; return; } body.innerHTML=j.rows.map(r=>`<tr><td><div class="app-name-cell"><strong>${r.name}</strong>${r.kind==='host'&&r.pid?`<span class="text-muted mono">pid ${r.pid}</span>`:''}</div></td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${Number(r.cpu_percent||0).toFixed(2)}</td><td class="text-right mono">${bytesMB(r.mem_mb||0)}</td><td class="text-right mono">${bytesMB((r.net_in_mb||0)+(r.net_out_mb||0))}</td><td class="text-right mono">${bytesMB((r.disk_in_mb||0)+(r.disk_out_mb||0))}</td><td>${usageCell(r)}</td></tr>`).join(''); }
+function resetAppsTimer(){ clearInterval(appsTimer); const sec=Number(document.getElementById('apps-refresh-sec').value||15); appsTimer=setInterval(()=>{ if(!appsLoading) refreshApps(); }, sec*1000); }
+async function refreshApps(){ if(appsLoading) return; appsLoading=true; document.getElementById('apps-updated').textContent='loading…'; try{ await loadApps(); document.getElementById('apps-updated').textContent='updated '+new Date().toLocaleTimeString(); } catch(e){ document.getElementById('apps-updated').textContent='error: '+e.message; } finally { appsLoading=false; } }
+document.getElementById('apps-refresh').addEventListener('click', refreshApps); document.getElementById('apps-scope').addEventListener('change', refreshApps); document.getElementById('apps-sort').addEventListener('change', refreshApps); document.getElementById('apps-refresh-sec').addEventListener('change', resetAppsTimer); refreshApps(); resetAppsTimer();
+</script>
+{% endblock %}

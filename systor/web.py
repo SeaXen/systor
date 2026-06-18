@@ -92,6 +92,105 @@ def _find_exact_processes(args_variants: list[str]) -> list[dict]:
         return []
 
 
+def _pid_stats(pid: int | None) -> dict:
+    if not pid:
+        return {"cpu_percent": None, "rss_mb": None, "vsz_mb": None}
+    try:
+        out = subprocess.run(["ps", "-p", str(pid), "-o", "%cpu=,rss=,vsz="], capture_output=True, text=True, timeout=3).stdout.strip()
+        if not out:
+            return {"cpu_percent": None, "rss_mb": None, "vsz_mb": None}
+        parts = out.split()
+        return {
+            "cpu_percent": float(parts[0]) if len(parts) > 0 else None,
+            "rss_mb": round(int(parts[1]) / 1024, 1) if len(parts) > 1 else None,
+            "vsz_mb": round(int(parts[2]) / 1024, 1) if len(parts) > 2 else None,
+        }
+    except Exception:
+        return {"cpu_percent": None, "rss_mb": None, "vsz_mb": None}
+
+
+def _file_size_mb(path: Path) -> float:
+    try:
+        return round(path.stat().st_size / (1024 * 1024), 2)
+    except Exception:
+        return 0.0
+
+
+def _systor_storage_state() -> dict:
+    db = DEFAULT_DB_PATH
+    logp = Path(load_config().get("logging", {}).get("file", "/var/log/systor/systor.log"))
+    db_mb = _file_size_mb(db)
+    log_mb = _file_size_mb(logp)
+    return {"db_mb": db_mb, "log_mb": log_mb, "total_mb": round(db_mb + log_mb, 2), "db_path": str(db), "log_path": str(logp)}
+
+
+def _parse_docker_size_mb(text: str) -> float:
+    text = (text or "").strip()
+    if not text:
+        return 0.0
+    m = re.match(r"([0-9.]+)\s*([KMGTP]?i?B)", text)
+    if not m:
+        return 0.0
+    num = float(m.group(1))
+    unit = m.group(2)
+    factor = {"B": 1 / (1024 * 1024), "KiB": 1 / 1024, "MiB": 1, "GiB": 1024, "TiB": 1024 * 1024, "KB": 1 / 1024, "MB": 1, "GB": 1024, "TB": 1024 * 1024}.get(unit, 0)
+    return round(num * factor, 3)
+
+
+def _docker_apps(limit: int = 24) -> list[dict]:
+    try:
+        if subprocess.run(["bash", "-lc", "command -v docker >/dev/null"], timeout=3).returncode != 0:
+            return []
+        out = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.Container}}\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}"], capture_output=True, text=True, timeout=12).stdout.splitlines()
+        rows: list[dict] = []
+        for line in out[:limit]:
+            parts = line.split("\t")
+            if len(parts) < 6:
+                continue
+            cid, name, cpu_s, mem_s, net_s, blk_s = parts[:6]
+            cpu_pct = float(cpu_s.strip().rstrip('%') or 0)
+            mem_used_s = mem_s.split('/')[0].strip()
+            net_in_s = net_s.split('/')[0].strip()
+            net_out_s = net_s.split('/')[1].strip() if '/' in net_s else "0B"
+            blk_in_s = blk_s.split('/')[0].strip()
+            blk_out_s = blk_s.split('/')[1].strip() if '/' in blk_s else "0B"
+            rows.append({
+                "kind": "docker", "id": cid[:12], "name": name,
+                "cpu_percent": round(cpu_pct, 2),
+                "mem_mb": _parse_docker_size_mb(mem_used_s),
+                "net_in_mb": _parse_docker_size_mb(net_in_s),
+                "net_out_mb": _parse_docker_size_mb(net_out_s),
+                "disk_in_mb": _parse_docker_size_mb(blk_in_s),
+                "disk_out_mb": _parse_docker_size_mb(blk_out_s),
+            })
+        return rows
+    except Exception:
+        return []
+
+
+def _host_apps(limit: int = 24) -> list[dict]:
+    total_mb = max(1, read_total_memory_mb())
+    seen: set[int] = set()
+    rows: list[dict] = []
+    for mode in ("cpu", "mem"):
+        for p in read_top_processes(n=limit, by=mode):
+            pid = int(p.get("pid") or 0)
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            rows.append({
+                "kind": "host", "id": str(pid), "pid": pid,
+                "name": p.get("name") or f"pid-{pid}", "user": p.get("user") or "",
+                "cpu_percent": round(float(p.get("cpu_percent") or 0), 2),
+                "mem_mb": round(float(p.get("mem_mb") or 0), 2),
+                "mem_percent": round(100.0 * float(p.get("mem_mb") or 0) / total_mb, 2),
+                "net_in_mb": 0.0, "net_out_mb": 0.0, "disk_in_mb": 0.0, "disk_out_mb": 0.0,
+                "cmdline": p.get("cmdline") or "",
+            })
+    rows.sort(key=lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)), reverse=True)
+    return rows[:limit]
+
+
 def _runtime_status() -> dict:
     cfg = load_config()
     py = sys.executable
@@ -100,9 +199,9 @@ def _runtime_status() -> dict:
 
     def _proc_row(rows: list[dict]) -> dict:
         if not rows:
-            return {"running": False, "pid": None, "uptime_sec": None}
+            return {"running": False, "pid": None, "uptime_sec": None, "cpu_percent": None, "rss_mb": None, "vsz_mb": None}
         row = rows[0]
-        return {"running": True, "pid": row["pid"], "uptime_sec": row["uptime_sec"]}
+        return {"running": True, "pid": row["pid"], "uptime_sec": row["uptime_sec"]} | _pid_stats(row["pid"])
 
     cloudflare = {"running": False, "pid": None, "uptime_sec": None, "label": "cloudflared"}
     tailscaled = {"running": False, "pid": None, "uptime_sec": None, "label": "tailscaled"}
@@ -131,6 +230,7 @@ def _runtime_status() -> dict:
         "collector": _proc_row(collector_rows) | {"poll_interval_sec": int(cfg.get("collector", {}).get("poll_interval_sec", 30))},
         "cloudflared": cloudflare,
         "tailscaled": tailscaled,
+        "storage": _systor_storage_state(),
     }
 
 
@@ -293,6 +393,41 @@ def create_app() -> Flask:
         top_total = max(rows, key=lambda r: r.get('total_bytes', 0), default=None)
         return jsonify({"ok": True, "interfaces": rows, "top_rx": top_rx, "top_tx": top_tx, "top_total": top_total})
 
+    @app.route("/api/apps")
+    def api_apps():
+        scope = request.args.get("scope", "all")
+        sort_by = request.args.get("sort", "cpu")
+        limit = max(1, min(60, int(request.args.get("limit", 24))))
+        host_rows = _host_apps(limit=limit)
+        docker_rows = _docker_apps(limit=limit)
+        rows = []
+        if scope in ("all", "host"):
+            rows.extend(host_rows)
+        if scope in ("all", "docker"):
+            rows.extend(docker_rows)
+        sort_key = {
+            "cpu": lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)),
+            "mem": lambda r: (r.get("mem_mb", 0), r.get("cpu_percent", 0)),
+            "net": lambda r: ((r.get("net_in_mb", 0) + r.get("net_out_mb", 0)), r.get("cpu_percent", 0)),
+            "disk": lambda r: ((r.get("disk_in_mb", 0) + r.get("disk_out_mb", 0)), r.get("cpu_percent", 0)),
+        }.get(sort_by, lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)))
+        rows.sort(key=sort_key, reverse=True)
+        rows = rows[:limit]
+        return jsonify({
+            "ok": True,
+            "scope": scope,
+            "sort": sort_by,
+            "rows": rows,
+            "host_count": len(host_rows),
+            "docker_count": len(docker_rows),
+            "summary": {
+                "host_cpu": round(sum(r.get("cpu_percent", 0) for r in host_rows), 2),
+                "host_mem_mb": round(sum(r.get("mem_mb", 0) for r in host_rows), 2),
+                "docker_cpu": round(sum(r.get("cpu_percent", 0) for r in docker_rows), 2),
+                "docker_mem_mb": round(sum(r.get("mem_mb", 0) for r in docker_rows), 2),
+            }
+        })
+
     @app.route("/api/system")
     def api_system():
         cfg = load_config()
@@ -310,7 +445,8 @@ def create_app() -> Flask:
     # ---------- HTML pages ----------
     @app.route("/")
     def page_dashboard():
-        return render_template("dashboard.html")
+        cfg = load_config()
+        return render_template("dashboard.html", cfg=cfg)
 
     @app.route("/alerts")
     def page_alerts():
@@ -325,6 +461,11 @@ def create_app() -> Flask:
     def page_network():
         cfg = load_config()
         return render_template("network.html", cfg=cfg)
+
+    @app.route("/apps")
+    def page_apps():
+        cfg = load_config()
+        return render_template("apps.html", cfg=cfg)
 
     @app.route("/settings", methods=["GET", "POST"])
     def page_settings():
@@ -390,10 +531,30 @@ def create_app() -> Flask:
                 try: cfg["network"]["default_hours"] = max(1, min(24 * 31, int(data["network_default_hours"])))
                 except (ValueError, TypeError): pass
             if "network_auto_refresh_sec" in data and data["network_auto_refresh_sec"]:
-                try: cfg["network"]["auto_refresh_sec"] = max(5, int(data["network_auto_refresh_sec"]))
+                try: cfg["network"]["auto_refresh_sec"] = max(1, int(data["network_auto_refresh_sec"]))
                 except (ValueError, TypeError): pass
             if "network_default_granularity" in data and data["network_default_granularity"] in ("day", "week", "month"):
                 cfg["network"]["default_granularity"] = data["network_default_granularity"]
+            if "network_hide_virtual_default" in data:
+                cfg["network"]["hide_virtual_default"] = _bool(data.get("network_hide_virtual_default"))
+            cfg.setdefault("dashboard", {})
+            if "dashboard_default_hours" in data and data["dashboard_default_hours"]:
+                try: cfg["dashboard"]["default_hours"] = max(1, min(24 * 31, int(data["dashboard_default_hours"])))
+                except (ValueError, TypeError): pass
+            if "dashboard_refresh_sec" in data and data["dashboard_refresh_sec"]:
+                try: cfg["dashboard"]["refresh_sec"] = max(1, int(data["dashboard_refresh_sec"]))
+                except (ValueError, TypeError): pass
+            if "dashboard_chart_refresh_sec" in data and data["dashboard_chart_refresh_sec"]:
+                try: cfg["dashboard"]["chart_refresh_sec"] = max(1, int(data["dashboard_chart_refresh_sec"]))
+                except (ValueError, TypeError): pass
+            cfg.setdefault("apps", {})
+            if "apps_auto_refresh_sec" in data and data["apps_auto_refresh_sec"]:
+                try: cfg["apps"]["auto_refresh_sec"] = max(1, int(data["apps_auto_refresh_sec"]))
+                except (ValueError, TypeError): pass
+            if "apps_default_scope" in data and data["apps_default_scope"] in ("all", "host", "docker"):
+                cfg["apps"]["default_scope"] = data["apps_default_scope"]
+            if "apps_default_sort" in data and data["apps_default_sort"] in ("cpu", "mem", "net", "disk"):
+                cfg["apps"]["default_sort"] = data["apps_default_sort"]
             # Update web (host/port)
             if "web_host" in data and data["web_host"]:
                 cfg["web"]["host"] = data["web_host"]

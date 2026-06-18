@@ -81,8 +81,42 @@
         </div>
 
         <div class="settings-card">
+          <h3>Dashboard defaults</h3>
+          <div class="card-subtle">Default time window and refresh rates for the homepage.</div>
+          <div class="notif-field-grid compact-top network-settings-grid">
+            <label>Default time view</label>
+            <select name="dashboard_default_hours">
+              <option value="1" {% if cfg.dashboard.default_hours == 1 %}selected{% endif %}>1h</option>
+              <option value="6" {% if cfg.dashboard.default_hours == 6 %}selected{% endif %}>6h</option>
+              <option value="24" {% if cfg.dashboard.default_hours == 24 %}selected{% endif %}>24h</option>
+              <option value="168" {% if cfg.dashboard.default_hours == 168 %}selected{% endif %}>7d</option>
+            </select>
+            <label>Refresh</label>
+            <select name="dashboard_refresh_sec">
+              <option value="1" {% if cfg.dashboard.refresh_sec == 1 %}selected{% endif %}>1s</option>
+              <option value="3" {% if cfg.dashboard.refresh_sec == 3 %}selected{% endif %}>3s</option>
+              <option value="5" {% if cfg.dashboard.refresh_sec == 5 %}selected{% endif %}>5s</option>
+              <option value="10" {% if cfg.dashboard.refresh_sec == 10 %}selected{% endif %}>10s</option>
+              <option value="15" {% if cfg.dashboard.refresh_sec == 15 %}selected{% endif %}>15s</option>
+              <option value="30" {% if cfg.dashboard.refresh_sec == 30 %}selected{% endif %}>30s</option>
+              <option value="60" {% if cfg.dashboard.refresh_sec == 60 %}selected{% endif %}>1m</option>
+            </select>
+            <label>Chart refresh</label>
+            <select name="dashboard_chart_refresh_sec">
+              <option value="1" {% if cfg.dashboard.chart_refresh_sec == 1 %}selected{% endif %}>1s</option>
+              <option value="3" {% if cfg.dashboard.chart_refresh_sec == 3 %}selected{% endif %}>3s</option>
+              <option value="5" {% if cfg.dashboard.chart_refresh_sec == 5 %}selected{% endif %}>5s</option>
+              <option value="10" {% if cfg.dashboard.chart_refresh_sec == 10 %}selected{% endif %}>10s</option>
+              <option value="15" {% if cfg.dashboard.chart_refresh_sec == 15 %}selected{% endif %}>15s</option>
+              <option value="30" {% if cfg.dashboard.chart_refresh_sec == 30 %}selected{% endif %}>30s</option>
+              <option value="60" {% if cfg.dashboard.chart_refresh_sec == 60 %}selected{% endif %}>1m</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-card">
           <h3>Network page defaults</h3>
-          <div class="card-subtle">Retention applies to all raw history. Network page defaults control its period, bucket view, and refresh load.</div>
+          <div class="card-subtle">Retention applies to all raw history. Network page defaults control its period, bucket view, refresh load, and interface filtering.</div>
           <div class="notif-field-grid compact-top network-settings-grid">
             <label>History retention</label>
             <input type="number" name="retention_days" value="{{ cfg.collector.retention_days }}" min="1" step="1">
@@ -101,11 +135,45 @@
             </select>
             <label>Auto refresh</label>
             <select name="network_auto_refresh_sec">
+              <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+              <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
               <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
               <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
               <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
               <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
               <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+            </select>
+            <label>Hide docker/bridge/veth by default</label>
+            <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Apps page defaults</h3>
+          <div class="card-subtle">Default scope, sort order, and refresh for the apps/process view.</div>
+          <div class="notif-field-grid compact-top network-settings-grid">
+            <label>Scope</label>
+            <select name="apps_default_scope">
+              <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
+              <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host only</option>
+              <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker only</option>
+            </select>
+            <label>Sort</label>
+            <select name="apps_default_sort">
+              <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
+              <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
+              <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
+              <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
+            </select>
+            <label>Auto refresh</label>
+            <select name="apps_auto_refresh_sec">
+              <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+              <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
+              <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+              <option value="10" {% if cfg.apps.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+              <option value="15" {% if cfg.apps.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+              <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+              <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
             </select>
           </div>
         </div>
@@ -242,7 +310,7 @@ function fmtUptime(sec) {
 function formToJSON(form) {
   const fd = new FormData(form);
   const data = Object.fromEntries(fd.entries());
-  ['telegram_enabled', 'discord_enabled'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
+  ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
   ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
     data[`threshold_${k}_enabled`] = fd.has(`threshold_${k}_enabled`) ? 'true' : 'false';
   });

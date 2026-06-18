@@ -13,7 +13,9 @@
   <div class="dash-controls">
     <label>refresh
       <select id="refresh-sec" class="control-select">
-        <option value="5000" selected>5s</option>
+        <option value="1000">1s</option>
+        <option value="3000">3s</option>
+        <option value="5000">5s</option>
         <option value="10000">10s</option>
         <option value="15000">15s</option>
         <option value="30000">30s</option>
@@ -22,7 +24,9 @@
     </label>
     <label>charts
       <select id="chart-sec" class="control-select">
-        <option value="5000" selected>5s</option>
+        <option value="1000">1s</option>
+        <option value="3000">3s</option>
+        <option value="5000">5s</option>
         <option value="10000">10s</option>
         <option value="15000">15s</option>
         <option value="30000">30s</option>
@@ -32,7 +36,7 @@
     <label>view
       <select id="range-hours" class="control-select">
         <option value="1">1h</option>
-        <option value="6" selected>6h</option>
+        <option value="6">6h</option>
         <option value="24">24h</option>
         <option value="168">7d</option>
       </select>
@@ -46,9 +50,14 @@
 
 <div class="stat-grid compact-grid" id="kpis">
   <div class="stat-card" id="kpi-cpu-pct">
-    <div class="label">CPU</div>
+    <div class="label">CPU usage</div>
     <div class="value"><span id="cpu-pct">—</span><span class="unit">%</span></div>
-    <div class="sub">load <span id="load">—</span> / <span id="load5">—</span></div>
+    <div class="sub">now</div>
+  </div>
+  <div class="stat-card" id="kpi-load">
+    <div class="label">CPU load</div>
+    <div class="value small-value"><strong>1m</strong> <span id="load1">—</span> <strong>5m</strong> <span id="load5">—</span> <strong>15m</strong> <span id="load15">—</span></div>
+    <div class="sub">loadavg</div>
   </div>
   <div class="stat-card" id="kpi-temp">
     <div class="label">Temp</div>
@@ -65,30 +74,47 @@
     <div class="value"><span id="swap-used">—</span><span class="unit">MB</span></div>
     <div class="sub">of <span id="swap-total">—</span> MB</div>
   </div>
-  <div class="stat-card" id="kpi-disk-use">
-    <div class="label">Disk <span id="disk-mount" class="mini-muted"></span></div>
-    <div class="value"><span id="disk-pct">—</span><span class="unit">%</span></div>
-    <div class="sub"><span id="disk-used">—</span> / <span id="disk-size">—</span></div>
-  </div>
   <div class="stat-card" id="kpi-disk-io">
     <div class="label">Disk load</div>
-    <div class="value small-value">↓ <span id="disk-r-mbps">0.0</span> ↑ <span id="disk-w-mbps">0.0</span><span class="unit">MB/s</span></div>
+    <div class="value small-value"><span class="rx-text">RX</span> <span id="disk-r-mbps">0.0</span> <span class="tx-text">TX</span> <span id="disk-w-mbps">0.0</span><span class="unit">MB/s</span></div>
     <div class="sub" id="disk-io-devs">—</div>
   </div>
   <div class="stat-card" id="kpi-net">
     <div class="label">Network</div>
-    <div class="value small-value">↓ <span id="net-rx">—</span> ↑ <span id="net-tx">—</span></div>
+    <div class="value small-value"><span class="rx-text">RX</span> <span id="net-rx">—</span> <span class="tx-text">TX</span> <span id="net-tx">—</span></div>
     <div class="sub">cumulative</div>
   </div>
 </div>
 
-<div class="chart-grid">
-  <div class="chart-card"><h3>CPU usage</h3><canvas id="chart-cpu-pct"></canvas></div>
-  <div class="chart-card"><h3>Temperature</h3><canvas id="chart-temp"></canvas></div>
-  <div class="chart-card"><h3>Memory used</h3><canvas id="chart-mem"></canvas></div>
-  <div class="chart-card"><h3>Disk I/O <span class="legend"><b class="cyan"></b>read <b class="red"></b>write</span></h3><canvas id="chart-disk-io"></canvas></div>
-  <div class="chart-card"><h3>CPU load</h3><canvas id="chart-load"></canvas></div>
-  <div class="chart-card"><h3>Disk usage</h3><canvas id="chart-disk"></canvas></div>
+<div class="chart-grid chart-grid-6">
+  <div class="chart-card">
+    <div class="chart-head"><h3><strong>CPU usage</strong></h3><div class="chart-meta" id="meta-cpu-pct">latest — · peak —</div></div>
+    <canvas id="chart-cpu-pct"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head"><h3><strong>Temperature</strong></h3><div class="chart-meta" id="meta-temp">latest — · peak —</div></div>
+    <canvas id="chart-temp"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head"><h3><strong>Memory used</strong></h3><div class="chart-meta" id="meta-mem">latest — · peak —</div></div>
+    <canvas id="chart-mem"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head"><h3><strong>Disk I/O</strong></h3><div class="chart-meta" id="meta-disk-io"><span class="rx-text"><strong>read —</strong></span> · <span class="tx-text"><strong>write —</strong></span></div></div>
+    <canvas id="chart-disk-io"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-head"><h3><strong>CPU load</strong></h3><div class="chart-meta" id="meta-load">1m — · 5m — · 15m —</div></div>
+    <canvas id="chart-load"></canvas>
+  </div>
+  <div class="chart-card self-card">
+    <div class="chart-head"><h3><strong>Systor self-monitor</strong></h3><div class="chart-meta" id="meta-self">web — · collector — · storage —</div></div>
+    <div class="self-mini-grid">
+      <div class="self-mini-row"><span>CPU</span><canvas id="chart-self-cpu"></canvas></div>
+      <div class="self-mini-row"><span>RAM</span><canvas id="chart-self-ram"></canvas></div>
+      <div class="self-mini-row"><span>Disk</span><canvas id="chart-self-disk"></canvas></div>
+    </div>
+  </div>
 </div>
 
 <div class="table-grid">
@@ -119,244 +145,53 @@
 
 {% block scripts %}
 <script>
+const SERVER_DEFAULTS = {
+  refreshMs: {{ (cfg.dashboard.refresh_sec or 5) * 1000 }},
+  chartMs: {{ (cfg.dashboard.chart_refresh_sec or 5) * 1000 }},
+  rangeHours: {{ cfg.dashboard.default_hours or 6 }}
+};
 const COLORS = {
   green: '#3fb950', yellow: '#d29922', red: '#f85149',
-  blue: '#58a6ff', purple: '#bc8cff', cyan: '#22d3ee',
-  dim: '#8b949e', grid: '#30363d', text: '#c9d1d9', card: '#161b22'
+  blue: '#58a6ff', purple: '#bc8cff', cyan: '#22d3ee', tx: '#ff6b8a',
+  dim: '#8b949e', grid: '#30363d', text: '#c9d1d9'
 };
-function fmt(n, unit) {
-  if (n === null || n === undefined || Number.isNaN(n)) return '—';
-  if (typeof n === 'number') {
-    if (Math.abs(n) >= 100) return n.toFixed(0) + (unit ? ' ' + unit : '');
-    if (Math.abs(n) >= 10) return n.toFixed(1) + (unit ? ' ' + unit : '');
-    return n.toFixed(2) + (unit ? ' ' + unit : '');
-  }
-  return n;
-}
-function bytes(n) {
-  if (!n) return '0 B';
-  const u = ['B','KB','MB','GB','TB']; let i = 0;
-  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
-  return n.toFixed(1) + ' ' + u[i];
-}
-function timeShort(ts) { return new Date(ts * 1000).toLocaleTimeString(); }
-function timeAgo(ts) {
-  const s = Math.floor(Date.now() / 1000 - ts);
-  if (s < 60) return s + 's ago';
-  if (s < 3600) return Math.floor(s / 60) + 'm ago';
-  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-  return Math.floor(s / 86400) + 'd ago';
-}
-function statusClass(value, yellowTh, redTh) {
-  if (value === null || value === undefined || Number.isNaN(value)) return 'gray';
-  if (redTh !== undefined && value > redTh) return 'red';
-  if (yellowTh !== undefined && value > yellowTh) return 'yellow';
-  return 'green';
-}
-function niceBounds(values, ymin, ymax) {
-  const clean = values.filter(v => v !== null && v !== undefined && Number.isFinite(v));
-  if (!clean.length) return null;
-  let lo = ymin !== null && ymin !== undefined ? ymin : Math.min(...clean);
-  let hi = ymax !== null && ymax !== undefined ? ymax : Math.max(...clean);
-  if (hi === lo) { hi = hi + 1; lo = ymin !== null && ymin !== undefined ? ymin : lo - 1; }
-  const pad = (hi - lo) * 0.08;
-  if (ymin === null || ymin === undefined) lo = Math.max(0, lo - pad);
-  if (ymax === null || ymax === undefined) hi = hi + pad;
-  return [lo, hi];
-}
-function drawChart(canvas, series, opts = {}) {
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const w = Math.max(10, canvas.clientWidth), h = Math.max(80, canvas.clientHeight);
-  canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-  const allVals = series.flatMap(s => (s.data || []).map(p => p[1]));
-  const bounds = niceBounds(allVals, opts.ymin, opts.ymax);
-  if (!bounds) { ctx.fillStyle = COLORS.dim; ctx.font = '12px monospace'; ctx.fillText('waiting for data', 12, h / 2); return; }
-  const [lo, hi] = bounds;
-  const padL = 34, padR = 10, padT = 8, padB = 18;
-  const gw = w - padL - padR, gh = h - padT - padB;
-  ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
-  ctx.fillStyle = COLORS.dim; ctx.font = '10px monospace';
-  for (let i = 0; i <= 3; i++) {
-    const y = padT + (gh / 3) * i;
-    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
-    const label = (hi - ((hi - lo) / 3) * i).toFixed(hi > 100 ? 0 : 1);
-    ctx.fillText(label, 2, y + 3);
-  }
-  for (const s of series) {
-    const data = s.data || [];
-    if (data.length < 2) continue;
-    ctx.beginPath();
-    ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.7;
-    let started = false;
-    for (let i = 0; i < data.length; i++) {
-      const v = data[i][1];
-      if (v === null || v === undefined || !Number.isFinite(v)) continue;
-      const x = padL + (data.length > 1 ? (gw * i) / (data.length - 1) : gw / 2);
-      const y = padT + gh - ((v - lo) / (hi - lo)) * gh;
-      if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
-    }
-    if (started) ctx.stroke();
-    if (started && s.fill) { ctx.lineTo(padL + gw, padT + gh); ctx.lineTo(padL, padT + gh); ctx.closePath(); ctx.fillStyle = s.color + '20'; ctx.fill(); }
-    const last = [...data].reverse().find(p => p[1] !== null && p[1] !== undefined);
-    if (last) { ctx.fillStyle = s.color; ctx.fillText(Number(last[1]).toFixed(hi > 100 ? 0 : 1), w - 42, padT + 10 + (s.labelOffset || 0)); }
-  }
-}
-async function fetchJSON(url, opts) {
-  const r = await fetch(url, opts || {cache:'no-store'});
-  if (!r.ok) {
-    let msg = 'HTTP ' + r.status;
-    try { const j = await r.json(); msg = j.error || j.message || msg; } catch (e) {}
-    throw new Error(msg);
-  }
-  return r.json();
-}
-const SETTINGS_KEY = 'systor.dashboard';
-let settings = { refreshMs: 5000, chartMs: 5000, rangeHours: 6, paused: false };
-try { settings = { ...settings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch (e) {}
-settings.refreshMs = Math.max(5000, Number(settings.refreshMs) || 5000);
-settings.chartMs = Math.max(5000, Number(settings.chartMs) || 5000);
-function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-function setLoadState(text) { document.getElementById('load-state').textContent = text; }
-function setupControls() {
-  const refreshSel = document.getElementById('refresh-sec');
-  const chartSel = document.getElementById('chart-sec');
-  const rangeSel = document.getElementById('range-hours');
-  const pauseBtn = document.getElementById('pause-btn');
-  refreshSel.value = String(settings.refreshMs);
-  chartSel.value = String(settings.chartMs);
-  rangeSel.value = String(settings.rangeHours);
-  pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause';
-  refreshSel.addEventListener('change', () => { settings.refreshMs = Math.max(5000, parseInt(refreshSel.value)); saveSettings(); restartTimers(); refreshAll(); });
-  chartSel.addEventListener('change', () => { settings.chartMs = Math.max(5000, parseInt(chartSel.value)); saveSettings(); restartTimers(); refreshCharts(); });
-  rangeSel.addEventListener('change', () => { settings.rangeHours = parseInt(rangeSel.value); saveSettings(); refreshCharts(); });
-  pauseBtn.addEventListener('click', () => { settings.paused = !settings.paused; pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause'; saveSettings(); restartTimers(); });
-  document.getElementById('manual-refresh-btn').addEventListener('click', refreshAll);
-  document.getElementById('restart-collector-btn').addEventListener('click', async () => {
-    if (!confirm('Restart collector now?')) return;
-    const j = await fetchJSON('/api/restart-collector', { method:'POST' });
-    setLoadState('collector restarted');
-    alert(j.message || 'collector restarting');
-  });
-  document.getElementById('restart-web-btn').addEventListener('click', async () => {
-    if (!confirm('Restart dashboard web now?')) return;
-    const j = await fetchJSON('/api/restart-web', { method:'POST' });
-    setLoadState('web restarting');
-    alert(j.message || 'web restarting');
-  });
-}
-let snapTimer, chartTimer, alertTimer, procTimer;
-const inflight = { snap:false, charts:false, alerts:false, procs:false };
-function restartTimers() {
-  clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer);
-  if (settings.paused) return;
-  snapTimer  = setInterval(refresh, settings.refreshMs);
-  chartTimer = setInterval(refreshCharts, settings.chartMs);
-  alertTimer = setInterval(refreshAlerts, Math.max(settings.refreshMs, 10000));
-  procTimer  = setInterval(refreshProcs, 30000);
-}
-function refreshAll() { refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); }
-async function refresh() {
-  if (settings.paused || inflight.snap) return;
-  inflight.snap = true; setLoadState('loading snapshot…');
-  try {
-    const snap = await fetchJSON('/api/snapshot');
-    document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
-    document.getElementById('hostname').textContent = snap.hostname || 'systor';
-    const up = snap.uptime_sec || 0;
-    document.getElementById('uptime').textContent = Math.floor(up / 3600) + 'h ' + Math.floor((up % 3600) / 60) + 'm';
-    document.getElementById('dbmeta').textContent = (snap.db_stats.samples || 0) + ' samples';
-    const cpu = snap.cpu || {};
-    document.getElementById('cpu-pct').textContent = fmt(cpu.percent);
-    document.getElementById('load').textContent = fmt(cpu.load_1m);
-    document.getElementById('load5').textContent = fmt(cpu.load_5m);
-    document.getElementById('kpi-cpu-pct').className = 'stat-card ' + statusClass(cpu.percent, 50, 85);
-    document.getElementById('temp').textContent = fmt(cpu.temp_c);
-    document.getElementById('temp-sub').textContent = cpu.temp_c === null || cpu.temp_c === undefined ? 'sensor n/a' : 'CPU sensor';
-    document.getElementById('kpi-temp').className = 'stat-card ' + statusClass(cpu.temp_c, 70, 85);
-    const mem = snap.memory || {};
-    const memPct = mem.total_mb ? Math.round(100 * mem.used_mb / mem.total_mb) : null;
-    document.getElementById('mem-pct').textContent = memPct !== null ? memPct : '—';
-    document.getElementById('mem-used').textContent = bytes((mem.used_mb || 0) * 1024 * 1024);
-    document.getElementById('mem-total').textContent = bytes((mem.total_mb || 0) * 1024 * 1024);
-    document.getElementById('kpi-mem').className = 'stat-card ' + statusClass(memPct, 75, 90);
-    document.getElementById('swap-used').textContent = mem.swap_used_mb || 0;
-    document.getElementById('swap-total').textContent = mem.swap_total_mb || 0;
-    document.getElementById('kpi-swap').className = 'stat-card ' + statusClass(mem.swap_used_mb, 1024, 4096);
-    const disks = snap.disks || [];
-    if (disks.length) {
-      const d = disks.reduce((a, b) => a.used_pct > b.used_pct ? a : b);
-      document.getElementById('disk-mount').textContent = d.mount;
-      document.getElementById('disk-pct').textContent = d.used_pct;
-      document.getElementById('disk-used').textContent = d.used_gb.toFixed(1) + ' GB';
-      document.getElementById('disk-size').textContent = d.size_gb.toFixed(1) + ' GB';
-      document.getElementById('kpi-disk-use').className = 'stat-card ' + statusClass(d.used_pct, 80, 90);
-    }
-    const dio = snap.disk_io || {};
-    document.getElementById('disk-r-mbps').textContent = (dio.read_mbps || 0).toFixed(2);
-    document.getElementById('disk-w-mbps').textContent = (dio.write_mbps || 0).toFixed(2);
-    const devs = dio.devices || [];
-    document.getElementById('disk-io-devs').textContent = devs.length ? devs.map(x => `${x.name} r${x.read_mbps}/w${x.write_mbps}`).join(' · ') : 'no disk delta yet';
-    const ioHigh = Math.max(dio.read_mbps || 0, dio.write_mbps || 0);
-    document.getElementById('kpi-disk-io').className = 'stat-card ' + statusClass(ioHigh, 50, 200);
-    const net = snap.network || {};
-    document.getElementById('net-rx').textContent = bytes(net.rx_bytes);
-    document.getElementById('net-tx').textContent = bytes(net.tx_bytes);
-    setLoadState('snapshot ok');
-  } catch (e) { console.error(e); document.getElementById('updated').textContent = 'update failed'; setLoadState('snapshot failed'); }
-  finally { inflight.snap = false; }
-}
-async function getSeries(metric) {
-  const d = await fetchJSON('/api/series?metric=' + metric + '&hours=' + settings.rangeHours);
-  return d.data || [];
-}
-async function refreshCharts() {
-  if (settings.paused || inflight.charts) return;
-  inflight.charts = true; setLoadState('loading charts…');
-  try {
-    const [cpu, temp, mem, dRead, dWrite, load, disk] = await Promise.all([
-      getSeries('cpu_pct'), getSeries('cpu_temp'), getSeries('mem_used_mb'),
-      getSeries('disk_read_mbps'), getSeries('disk_write_mbps'), getSeries('load_1m'), getSeries('disk_used_pct')
-    ]);
-    drawChart(document.getElementById('chart-cpu-pct'), [{data: cpu, color: COLORS.purple, fill: true}], {ymin:0, ymax:100});
-    drawChart(document.getElementById('chart-temp'), [{data: temp, color: COLORS.red, fill: true}], {ymin:null, ymax:null});
-    drawChart(document.getElementById('chart-mem'), [{data: mem, color: COLORS.blue, fill: true}], {ymin:0, ymax:null});
-    drawChart(document.getElementById('chart-disk-io'), [{data: dRead, color: COLORS.cyan, labelOffset: 0}, {data: dWrite, color: COLORS.red, labelOffset: 12}], {ymin:0, ymax:null});
-    drawChart(document.getElementById('chart-load'), [{data: load, color: COLORS.green, fill: true}], {ymin:0, ymax:null});
-    drawChart(document.getElementById('chart-disk'), [{data: disk, color: COLORS.yellow, fill: true}], {ymin:0, ymax:100});
-    setLoadState('charts ok');
-  } catch (e) { console.error(e); setLoadState('charts failed'); }
-  finally { inflight.charts = false; }
-}
-async function refreshAlerts() {
-  if (settings.paused || inflight.alerts) return;
-  inflight.alerts = true;
-  try {
-    const alerts = await fetchJSON('/api/alerts?limit=20');
-    const body = document.getElementById('alerts-body');
-    if (!alerts.length) { body.innerHTML = '<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; }
-    body.innerHTML = alerts.map(a => `<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join('');
-  } catch (e) { console.error(e); }
-  finally { inflight.alerts = false; }
-}
-function procColor(v, warn, danger) { return v > danger ? COLORS.red : v > warn ? COLORS.yellow : COLORS.text; }
-function esc(s) { return String(s || '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-async function refreshProcs() {
-  if (settings.paused || inflight.procs) return;
-  inflight.procs = true;
-  try {
-    const [cpuTop, memTop] = await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'), fetchJSON('/api/top-processes?by=mem&n=10')]);
-    document.getElementById('top-cpu-body').innerHTML = cpuTop.processes.length ? cpuTop.processes.map(p => `<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-cell">No data</td></tr>';
-    document.getElementById('top-mem-body').innerHTML = memTop.processes.length ? memTop.processes.map(p => `<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-cell">No data</td></tr>';
-  } catch (e) { console.error(e); }
-  finally { inflight.procs = false; }
-}
-setupControls();
-refreshAll();
-restartTimers();
-window.addEventListener('resize', () => { clearTimeout(window.__chartResize); window.__chartResize = setTimeout(refreshCharts, 150); });
+const tooltip = document.createElement('div');
+tooltip.className = 'canvas-tooltip hidden';
+document.body.appendChild(tooltip);
+const selfHistory = { webCpu: [], collectorCpu: [], webRam: [], collectorRam: [], disk: [] };
+function fmt(n, unit) { if (n === null || n === undefined || Number.isNaN(n)) return '—'; if (typeof n === 'number') { if (Math.abs(n) >= 100) return n.toFixed(0) + (unit ? ' ' + unit : ''); if (Math.abs(n) >= 10) return n.toFixed(1) + (unit ? ' ' + unit : ''); return n.toFixed(2) + (unit ? ' ' + unit : ''); } return n; }
+function bytes(n) { if (!n) return '0 B'; const u=['B','KB','MB','GB','TB']; let i=0; while (n>=1024&&i<u.length-1){n/=1024;i++;} return n.toFixed(1)+' '+u[i]; }
+function timeShort(ts){return new Date(ts*1000).toLocaleTimeString();}
+function timeAgo(ts){ const s=Math.floor(Date.now()/1000-ts); if(s<60)return s+'s ago'; if(s<3600)return Math.floor(s/60)+'m ago'; if(s<86400)return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
+function statusClass(value, y, r){ if(value===null||value===undefined||Number.isNaN(value)) return 'gray'; if(r!==undefined&&value>r) return 'red'; if(y!==undefined&&value>y) return 'yellow'; return 'green'; }
+function niceBounds(values,ymin,ymax){ const clean=values.filter(v=>v!==null&&v!==undefined&&Number.isFinite(v)); if(!clean.length) return null; let lo=ymin!==null&&ymin!==undefined?ymin:Math.min(...clean); let hi=ymax!==null&&ymax!==undefined?ymax:Math.max(...clean); if(hi===lo){hi=hi+1; lo=ymin!==null&&ymin!==undefined?ymin:lo-1;} const pad=(hi-lo)*0.08; if(ymin===null||ymin===undefined) lo=Math.max(0,lo-pad); if(ymax===null||ymax===undefined) hi=hi+pad; return [lo,hi]; }
+function showTooltip(html,x,y){ tooltip.innerHTML=html; tooltip.classList.remove('hidden'); tooltip.style.left=(x+14)+'px'; tooltip.style.top=(y+14)+'px'; }
+function hideTooltip(){ tooltip.classList.add('hidden'); }
+function bindLineTooltip(canvas){ if(canvas.__tooltipBound) return; canvas.__tooltipBound=true; canvas.addEventListener('mouseleave', hideTooltip); canvas.addEventListener('mousemove', ev=>{ const meta=canvas.__hoverMeta; if(!meta||!meta.groups||!meta.groups.length) return hideTooltip(); const rect=canvas.getBoundingClientRect(); const x=ev.clientX-rect.left; let best=null; for(const g of meta.groups){ const dx=Math.abs(g.x-x); if(!best||dx<best.dx) best={dx,g}; } if(!best||best.dx>18) return hideTooltip(); const lines=[`<div class="tt-time">${new Date(best.g.ts*1000).toLocaleString()}</div>`]; for(const item of best.g.items) lines.push(`<div><span style="color:${item.color};font-weight:700">${item.name}</span>: <strong>${item.value}</strong></div>`); showTooltip(lines.join(''),ev.clientX,ev.clientY); }); }
+function drawChart(canvas, series, opts={}){ if(!canvas) return; bindLineTooltip(canvas); const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(84,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); const allVals=series.flatMap(s=>(s.data||[]).map(p=>p[1])); const bounds=niceBounds(allVals,opts.ymin,opts.ymax); if(!bounds){ ctx.fillStyle=COLORS.dim; ctx.font='12px monospace'; ctx.fillText('waiting for data',12,h/2); canvas.__hoverMeta={groups:[]}; return; } const [lo,hi]=bounds; const padL=38,padR=10,padT=8,padB=18; const gw=w-padL-padR, gh=h-padT-padB; ctx.strokeStyle=COLORS.grid; ctx.lineWidth=1; ctx.fillStyle=COLORS.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); const label=(hi-((hi-lo)/3)*i).toFixed(hi>100?0:2); ctx.fillText(label,2,y+3); } const groups=[]; for(const s of series){ const data=s.data||[]; if(!data.length) continue; if(s.fill){ const grad=ctx.createLinearGradient(0,padT,0,padT+gh); grad.addColorStop(0,(s.fillColor||s.color)+'33'); grad.addColorStop(1,(s.fillColor||s.color)+'05'); ctx.beginPath(); let started=false; for(let i=0;i<data.length;i++){ const v=data[i][1]; if(v===null||v===undefined||!Number.isFinite(v)) continue; const x=padL+(data.length>1?(gw*i)/(data.length-1):gw/2); const y=padT+gh-((v-lo)/(hi-lo))*gh; if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); } if(started){ ctx.lineTo(padL+gw,padT+gh); ctx.lineTo(padL,padT+gh); ctx.closePath(); ctx.fillStyle=grad; ctx.fill(); } } ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=s.width||1.8; let started=false; for(let i=0;i<data.length;i++){ const ts=data[i][0], v=data[i][1]; if(v===null||v===undefined||!Number.isFinite(v)) continue; const x=padL+(data.length>1?(gw*i)/(data.length-1):gw/2); const y=padT+gh-((v-lo)/(hi-lo))*gh; if(!started){ctx.moveTo(x,y); started=true;} else ctx.lineTo(x,y); let g=groups.find(p=>Math.abs(p.x-x)<0.5); if(!g){ g={x,ts,items:[]}; groups.push(g);} g.items.push({name:s.name, value:fmt(v,s.unit), color:s.color}); } if(started) ctx.stroke(); } canvas.__hoverMeta={groups}; }
+async function fetchJSON(url, opts){ const r=await fetch(url, opts||{cache:'no-store'}); if(!r.ok){ let msg='HTTP '+r.status; try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){} throw new Error(msg);} return r.json(); }
+const SETTINGS_KEY='systor.dashboard';
+let settings={ refreshMs: SERVER_DEFAULTS.refreshMs, chartMs: SERVER_DEFAULTS.chartMs, rangeHours: SERVER_DEFAULTS.rangeHours, paused:false };
+try{ settings={...settings,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}; }catch(e){}
+settings.refreshMs=Math.max(1000, Number(settings.refreshMs)||SERVER_DEFAULTS.refreshMs);
+settings.chartMs=Math.max(1000, Number(settings.chartMs)||SERVER_DEFAULTS.chartMs);
+function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+function setLoadState(text){ document.getElementById('load-state').textContent=text; }
+function setupControls(){ const refreshSel=document.getElementById('refresh-sec'); const chartSel=document.getElementById('chart-sec'); const rangeSel=document.getElementById('range-hours'); const pauseBtn=document.getElementById('pause-btn'); refreshSel.value=String(settings.refreshMs); chartSel.value=String(settings.chartMs); rangeSel.value=String(settings.rangeHours); pauseBtn.textContent=settings.paused?'Resume':'Pause'; refreshSel.addEventListener('change',()=>{ settings.refreshMs=Math.max(1000, parseInt(refreshSel.value)); saveSettings(); restartTimers(); refreshAll();}); chartSel.addEventListener('change',()=>{ settings.chartMs=Math.max(1000, parseInt(chartSel.value)); saveSettings(); restartTimers(); refreshCharts();}); rangeSel.addEventListener('change',()=>{ settings.rangeHours=parseInt(rangeSel.value); saveSettings(); refreshCharts();}); pauseBtn.addEventListener('click',()=>{ settings.paused=!settings.paused; pauseBtn.textContent=settings.paused?'Resume':'Pause'; saveSettings(); restartTimers();}); document.getElementById('manual-refresh-btn').addEventListener('click', refreshAll); document.getElementById('restart-collector-btn').addEventListener('click', async()=>{ if(!confirm('Restart collector now?')) return; const j=await fetchJSON('/api/restart-collector',{method:'POST'}); setLoadState('collector restarted'); alert(j.message||'collector restarting'); }); document.getElementById('restart-web-btn').addEventListener('click', async()=>{ if(!confirm('Restart dashboard web now?')) return; const j=await fetchJSON('/api/restart-web',{method:'POST'}); setLoadState('web restarting'); alert(j.message||'web restarting'); }); }
+let snapTimer, chartTimer, alertTimer, procTimer; const inflight={snap:false, charts:false, alerts:false, procs:false};
+function restartTimers(){ clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer); if(settings.paused) return; snapTimer=setInterval(refresh, settings.refreshMs); chartTimer=setInterval(refreshCharts, settings.chartMs); alertTimer=setInterval(refreshAlerts, Math.max(settings.refreshMs,10000)); procTimer=setInterval(refreshProcs,30000); }
+function refreshAll(){ refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); }
+function pushSelfHistory(ts, runtime){ const web=runtime.web||{}, collector=runtime.collector||{}, storage=runtime.storage||{}; selfHistory.webCpu.push([ts, Number(web.cpu_percent||0)]); selfHistory.collectorCpu.push([ts, Number(collector.cpu_percent||0)]); selfHistory.webRam.push([ts, Number(web.rss_mb||0)]); selfHistory.collectorRam.push([ts, Number(collector.rss_mb||0)]); selfHistory.disk.push([ts, Number(storage.total_mb||0)]); const cutoff=Date.now()/1000-3600; ['webCpu','collectorCpu','webRam','collectorRam','disk'].forEach(k=>{ selfHistory[k]=selfHistory[k].filter(p=>p[0]>=cutoff).slice(-120); }); }
+function drawSelf(runtime){ drawChart(document.getElementById('chart-self-cpu'), [{name:'web cpu',unit:'%',data:selfHistory.webCpu,color:COLORS.cyan},{name:'collector cpu',unit:'%',data:selfHistory.collectorCpu,color:COLORS.tx}], {ymin:0,ymax:null}); drawChart(document.getElementById('chart-self-ram'), [{name:'web ram',unit:'MB',data:selfHistory.webRam,color:COLORS.blue},{name:'collector ram',unit:'MB',data:selfHistory.collectorRam,color:COLORS.green}], {ymin:0,ymax:null}); drawChart(document.getElementById('chart-self-disk'), [{name:'db+log',unit:'MB',data:selfHistory.disk,color:COLORS.yellow,fill:true}], {ymin:0,ymax:null}); const s=runtime.storage||{}; document.getElementById('meta-self').innerHTML=`<strong>web ${fmt((runtime.web||{}).rss_mb,'MB')}</strong> · <strong>collector ${fmt((runtime.collector||{}).rss_mb,'MB')}</strong> · <strong>storage ${fmt(s.total_mb,'MB')}</strong>`; }
+async function refresh(){ if(settings.paused||inflight.snap) return; inflight.snap=true; setLoadState('loading snapshot…'); try{ const [snap,runtime]=await Promise.all([fetchJSON('/api/snapshot'), fetchJSON('/api/runtime')]); document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString(); document.getElementById('hostname').textContent=snap.hostname||'systor'; const up=snap.uptime_sec||0; document.getElementById('uptime').textContent=Math.floor(up/3600)+'h '+Math.floor((up%3600)/60)+'m'; document.getElementById('dbmeta').textContent=(snap.db_stats.samples||0)+' samples'; const cpu=snap.cpu||{}; document.getElementById('cpu-pct').textContent=fmt(cpu.percent); document.getElementById('load1').textContent=fmt(cpu.load_1m); document.getElementById('load5').textContent=fmt(cpu.load_5m); document.getElementById('load15').textContent=fmt(cpu.load_15m); document.getElementById('kpi-cpu-pct').className='stat-card '+statusClass(cpu.percent,50,85); document.getElementById('kpi-load').className='stat-card '+statusClass(Math.max(cpu.load_1m||0,cpu.load_5m||0),3,6); document.getElementById('temp').textContent=fmt(cpu.temp_c); document.getElementById('temp-sub').textContent=(cpu.temp_c===null||cpu.temp_c===undefined)?'sensor n/a':'CPU sensor'; document.getElementById('kpi-temp').className='stat-card '+statusClass(cpu.temp_c,70,85); const mem=snap.memory||{}; const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null; document.getElementById('mem-pct').textContent=memPct!==null?memPct:'—'; document.getElementById('mem-used').textContent=bytes((mem.used_mb||0)*1024*1024); document.getElementById('mem-total').textContent=bytes((mem.total_mb||0)*1024*1024); document.getElementById('kpi-mem').className='stat-card '+statusClass(memPct,75,90); document.getElementById('swap-used').textContent=mem.swap_used_mb||0; document.getElementById('swap-total').textContent=mem.swap_total_mb||0; document.getElementById('kpi-swap').className='stat-card '+statusClass(mem.swap_used_mb,1024,4096); const dio=snap.disk_io||{}; document.getElementById('disk-r-mbps').textContent=(dio.read_mbps||0).toFixed(2); document.getElementById('disk-w-mbps').textContent=(dio.write_mbps||0).toFixed(2); const devs=dio.devices||[]; document.getElementById('disk-io-devs').textContent=devs.length?devs.map(x=>`${x.name} r${x.read_mbps}/w${x.write_mbps}`).join(' · '):'no disk delta yet'; document.getElementById('kpi-disk-io').className='stat-card '+statusClass(Math.max(dio.read_mbps||0,dio.write_mbps||0),50,200); const net=snap.network||{}; document.getElementById('net-rx').textContent=bytes(net.rx_bytes); document.getElementById('net-tx').textContent=bytes(net.tx_bytes); pushSelfHistory(snap.ts||Math.floor(Date.now()/1000), runtime); drawSelf(runtime); setLoadState('snapshot ok'); }catch(e){ console.error(e); document.getElementById('updated').textContent='update failed'; setLoadState('snapshot failed'); } finally { inflight.snap=false; } }
+async function getSeries(metric){ const d=await fetchJSON('/api/series?metric='+metric+'&hours='+settings.rangeHours); return d.data||[]; }
+function lastVal(data){ const p=[...(data||[])].reverse().find(x=>x[1]!==null&&x[1]!==undefined); return p?p[1]:null; }
+function maxVal(data){ const vals=(data||[]).map(x=>x[1]).filter(v=>v!==null&&v!==undefined); return vals.length?Math.max(...vals):null; }
+async function refreshCharts(){ if(settings.paused||inflight.charts) return; inflight.charts=true; setLoadState('loading charts…'); try{ const [cpu,temp,mem,dRead,dWrite,load1,load5,load15]=await Promise.all([getSeries('cpu_pct'),getSeries('cpu_temp'),getSeries('mem_used_mb'),getSeries('disk_read_mbps'),getSeries('disk_write_mbps'),getSeries('load_1m'),getSeries('load_5m'),getSeries('load_15m')]); drawChart(document.getElementById('chart-cpu-pct'),[{name:'CPU',unit:'%',data:cpu,color:COLORS.purple,fill:true}],{ymin:0,ymax:100}); drawChart(document.getElementById('chart-temp'),[{name:'Temp',unit:'°C',data:temp,color:COLORS.red,fill:true}],{ymin:null,ymax:null}); drawChart(document.getElementById('chart-mem'),[{name:'Used',unit:'MB',data:mem,color:COLORS.blue,fill:true}],{ymin:0,ymax:null}); drawChart(document.getElementById('chart-disk-io'),[{name:'RX read',unit:'MB/s',data:dRead,color:COLORS.cyan},{name:'TX write',unit:'MB/s',data:dWrite,color:COLORS.tx}],{ymin:0,ymax:null}); drawChart(document.getElementById('chart-load'),[{name:'1m',unit:'',data:load1,color:COLORS.green,fill:true},{name:'5m',unit:'',data:load5,color:COLORS.yellow},{name:'15m',unit:'',data:load15,color:COLORS.blue}],{ymin:0,ymax:null}); document.getElementById('meta-cpu-pct').innerHTML=`<strong>latest ${fmt(lastVal(cpu),'%')}</strong> · peak ${fmt(maxVal(cpu),'%')}`; document.getElementById('meta-temp').innerHTML=`<strong>latest ${fmt(lastVal(temp),'°C')}</strong> · peak ${fmt(maxVal(temp),'°C')}`; document.getElementById('meta-mem').innerHTML=`<strong>latest ${fmt(lastVal(mem),'MB')}</strong> · peak ${fmt(maxVal(mem),'MB')}`; document.getElementById('meta-disk-io').innerHTML=`<span class="rx-text"><strong>read ${fmt(lastVal(dRead),'MB/s')}</strong></span> · <span class="tx-text"><strong>write ${fmt(lastVal(dWrite),'MB/s')}</strong></span>`; document.getElementById('meta-load').innerHTML=`<strong>1m ${fmt(lastVal(load1))}</strong> · <strong>5m ${fmt(lastVal(load5))}</strong> · <strong>15m ${fmt(lastVal(load15))}</strong>`; setLoadState('charts ok'); }catch(e){ console.error(e); setLoadState('charts failed'); } finally { inflight.charts=false; } }
+async function refreshAlerts(){ if(settings.paused||inflight.alerts) return; inflight.alerts=true; try{ const alerts=await fetchJSON('/api/alerts?limit=20'); const body=document.getElementById('alerts-body'); if(!alerts.length){ body.innerHTML='<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; } body.innerHTML=alerts.map(a=>`<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join(''); }catch(e){ console.error(e); } finally { inflight.alerts=false; } }
+function procColor(v,warn,danger){ return v>danger?COLORS.red:v>warn?COLORS.yellow:COLORS.text; }
+function esc(s){ return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function refreshProcs(){ if(settings.paused||inflight.procs) return; inflight.procs=true; try{ const [cpuTop,memTop]=await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'),fetchJSON('/api/top-processes?by=mem&n=10')]); document.getElementById('top-cpu-body').innerHTML=cpuTop.processes.length?cpuTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; document.getElementById('top-mem-body').innerHTML=memTop.processes.length?memTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; }catch(e){ console.error(e); } finally { inflight.procs=false; } }
+setupControls(); refreshAll(); restartTimers(); window.addEventListener('resize',()=>{ clearTimeout(window.__chartResize); window.__chartResize=setTimeout(()=>{ refreshCharts(); drawSelf({web:{},collector:{},storage:{}}); },150); });
 </script>
 {% endblock %}
