@@ -91,19 +91,18 @@
 
   <details class="table-card compact-table apps-all-card" id="apps-all-wrap">
     <summary class="apps-all-summary">
-      <span><strong>Show all apps</strong></span>
+      <span class="apps-all-title"><strong>Show all apps</strong></span>
       <span class="network-mini" id="apps-all-meta">full list</span>
-    </summary>
-    <div class="apps-all-controls">
-      <label>rows
+      <span class="apps-all-spacer"></span>
+      <label class="apps-all-rows">rows
         <select id="apps-all-limit" class="control-select">
           {% for n in [10,20,25,50,100] %}
           <option value="{{ n }}" {% if n == 25 %}selected{% endif %}>{{ n }}</option>
           {% endfor %}
         </select>
       </label>
-      <div class="apps-pager" id="all-pager"></div>
-    </div>
+      <span class="apps-pager" id="all-pager"></span>
+    </summary>
     <table class="apps-table aligned-table compact-apps-table apps-full-table">
       <thead><tr><th>App</th><th>Kind</th><th class="text-right">CPU%</th><th class="text-right">RAM</th><th class="text-right">Disk</th><th class="text-right">Network</th></tr></thead>
       <tbody id="apps-all-body"><tr><td colspan="6" class="empty-cell">Loading…</td></tr></tbody>
@@ -137,8 +136,8 @@ function usageCell(row, metric){
   return `<div class="single-app-bar"><span class="${cls==='cpu'?'rx-text':cls==='mem'?'tx-text':cls==='disk'?'disk-text':'net-text'}">${label}</span><strong>${val}</strong><div class="app-bar"><i class="${cls}" style="width:${width}%"></i></div></div>`;
 }
 function rowName(r){
-  const pid = r.kind==='host' && r.pid ? `<span class="app-pid mono">${r.pid}</span>` : '';
-  return `<div class="app-inline-cell">${pid}<strong class="app-inline-name">${r.name}</strong></div>`;
+  const pid = r.kind==='host' && r.pid ? `<span class="app-pid mono">pid ${r.pid}</span>` : '';
+  return `<div class="app-inline-cell"><strong class="app-inline-name">${r.name}</strong>${pid}</div>`;
 }
 function metricSort(metric){
   return (a,b)=>{
@@ -164,7 +163,7 @@ function renderRows(metric, rows, bodyId, key, pagerId, titleId, pageSize, scope
   if(!(rows||[]).length){ body.innerHTML=`<tr><td colspan="4" class="empty-cell">No apps found</td></tr>`; document.getElementById(titleId).textContent=`0 rows · ${scope}${note}`; renderPager(key, 0, pageSize, pagerId); return; }
   const { totalPages, pageRows } = pageSlice(rows, key, pageSize);
   body.innerHTML = pageRows.map(r=>`<tr><td>${rowName(r)}</td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${metricVal(r, metric)}</td><td>${usageCell(r, metric)}</td></tr>`).join('');
-  document.getElementById(titleId).textContent = `${rows.length} rows · ${scope} · page ${state.pages[key]}/${totalPages}${note}`;
+  document.getElementById(titleId).textContent = `${pageRows.length}/${rows.length} · ${scope} · ${state.pages[key]}/${totalPages}${note}`;
   renderPager(key, rows.length, pageSize, pagerId);
 }
 function renderAllRows(rows, scope){
@@ -211,6 +210,8 @@ document.addEventListener('click', (ev)=>{
   state.pages[key] = Math.max(1, (state.pages[key] || 1) + dir);
   repaintFromRows(document.getElementById('apps-scope').value, state.summary || {});
 });
+document.getElementById('all-pager')?.addEventListener('click', ev=>ev.stopPropagation());
+document.getElementById('apps-all-limit')?.addEventListener('click', ev=>ev.stopPropagation());
 document.getElementById('apps-refresh').addEventListener('click', refreshApps);
 document.getElementById('apps-scope').addEventListener('change', ()=>{ state.pages={ cpu:1, mem:1, disk:1, net:1, all:1 }; refreshApps(); });
 document.getElementById('apps-limit').addEventListener('change', ()=>{ state.pages.cpu=1; state.pages.mem=1; state.pages.disk=1; state.pages.net=1; repaintFromRows(document.getElementById('apps-scope').value, state.summary || {}); });
