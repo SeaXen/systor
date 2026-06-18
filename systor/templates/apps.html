@@ -104,8 +104,8 @@
       <span class="apps-pager" id="all-pager"></span>
     </summary>
     <table class="apps-table aligned-table compact-apps-table apps-full-table">
-      <thead><tr><th>App</th><th>Kind</th><th class="text-right">CPU%</th><th class="text-right">RAM</th><th class="text-right">Disk</th><th class="text-right">Network</th></tr></thead>
-      <tbody id="apps-all-body"><tr><td colspan="6" class="empty-cell">Loading…</td></tr></tbody>
+      <thead><tr><th>App</th><th class="text-right">CPU</th><th class="text-right">RAM</th><th class="text-right">DSK</th><th class="text-right">NET</th></tr></thead>
+      <tbody id="apps-all-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
     </table>
   </details>
 </div>
@@ -169,9 +169,9 @@ function renderRows(metric, rows, bodyId, key, pagerId, titleId, pageSize, scope
 function renderAllRows(rows, scope){
   const pageSize = Number(document.getElementById('apps-all-limit').value || 25);
   const body = document.getElementById('apps-all-body');
-  if(!rows.length){ body.innerHTML = '<tr><td colspan="6" class="empty-cell">No apps found</td></tr>'; document.getElementById('apps-all-meta').textContent='0 rows'; renderPager('all', 0, pageSize, 'all-pager'); return; }
+  if(!rows.length){ body.innerHTML = '<tr><td colspan="5" class="empty-cell">No apps found</td></tr>'; document.getElementById('apps-all-meta').textContent='0 rows'; renderPager('all', 0, pageSize, 'all-pager'); return; }
   const { totalPages, pageRows } = pageSlice(rows, 'all', pageSize);
-  body.innerHTML = pageRows.map(r=>`<tr><td>${rowName(r)}</td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${metricVal(r,'cpu')}</td><td class="text-right mono">${metricVal(r,'mem')}</td><td class="text-right mono">${metricVal(r,'disk')}</td><td class="text-right mono">${metricVal(r,'net')}</td></tr>`).join('');
+  body.innerHTML = pageRows.map(r=>`<tr><td><div class="app-full-name">${rowName(r)}<span class="kind-pill ${r.kind}">${r.kind}</span></div></td><td class="text-right mono">${metricVal(r,'cpu')}</td><td class="text-right mono">${metricVal(r,'mem')}</td><td class="text-right mono">${metricVal(r,'disk')}</td><td class="text-right mono">${metricVal(r,'net')}</td></tr>`).join('');
   document.getElementById('apps-all-meta').textContent = `${rows.length} rows · ${scope} · page ${state.pages.all}/${totalPages}`;
   renderPager('all', rows.length, pageSize, 'all-pager');
 }

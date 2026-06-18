@@ -528,7 +528,7 @@ def create_app() -> Flask:
                 cfg["discord"]["webhook_url"] = str(data["discord_webhook_url"]).strip()
             # Update poll interval
             if "poll_interval_sec" in data and data["poll_interval_sec"]:
-                try: cfg["collector"]["poll_interval_sec"] = max(5, int(data["poll_interval_sec"]))
+                try: cfg["collector"]["poll_interval_sec"] = max(1, int(data["poll_interval_sec"]))
                 except (ValueError, TypeError): pass
             if "retention_days" in data and data["retention_days"]:
                 try: cfg["collector"]["retention_days"] = max(1, int(data["retention_days"]))

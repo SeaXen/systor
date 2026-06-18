@@ -45,7 +45,7 @@
           </div>
           <div class="notif-field-grid compact-top">
             <label>Poll interval</label>
-            <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
+            <input type="number" value="{{ cfg.collector.poll_interval_sec }}" min="1" step="1" disabled title="Use Dashboard defaults → Sample interval to change this">
             <label>Web bind host</label>
             <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
             <label>Web port</label>
@@ -103,6 +103,7 @@
             </select>
             <label>Sample interval</label>
             <select name="poll_interval_sec">
+              <option value="1" {% if cfg.collector.poll_interval_sec == 1 %}selected{% endif %}>1s</option>
               <option value="5" {% if cfg.collector.poll_interval_sec == 5 %}selected{% endif %}>5s</option>
               <option value="10" {% if cfg.collector.poll_interval_sec == 10 %}selected{% endif %}>10s</option>
               <option value="15" {% if cfg.collector.poll_interval_sec == 15 %}selected{% endif %}>15s</option>
