@@ -1,5 +1,6 @@
 """Telegram + Discord notifier with retry + cooldown."""
 from __future__ import annotations
+import html
 import json
 import logging
 import urllib.request
@@ -11,6 +12,8 @@ log = logging.getLogger("systor.notifier")
 
 
 def send_telegram(bot_token: str, chat_id: str, text: str, timeout: int = 10) -> tuple[bool, str | None]:
+    bot_token = (bot_token or "").strip()
+    chat_id = (chat_id or "").strip()
     if not bot_token or not chat_id:
         return False, "missing bot_token or chat_id"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -38,6 +41,7 @@ def send_telegram(bot_token: str, chat_id: str, text: str, timeout: int = 10) ->
 
 
 def send_discord(webhook_url: str, text: str, timeout: int = 10) -> tuple[bool, str | None]:
+    webhook_url = (webhook_url or "").strip()
     if not webhook_url:
         return False, "missing webhook_url"
     if len(text) > 1900:
@@ -65,17 +69,18 @@ class Notifier:
 
     def notify(self, subject: str, body: str) -> list[tuple[str, bool, str | None]]:
         results: list[tuple[str, bool, str | None]] = []
-        text = f"<b>{subject}</b>\n\n{body}"
+        tg_text = f"<b>{html.escape(subject)}</b>\n{html.escape(body).replace(chr(10), '<br>')}"
+        dc_text = f"**{subject}**\n{body}"
 
         tg = self.cfg.get("telegram", {})
         if tg.get("enabled"):
-            ok, err = send_telegram(tg.get("bot_token", ""), tg.get("chat_id", ""), text)
+            ok, err = send_telegram(tg.get("bot_token", ""), tg.get("chat_id", ""), tg_text)
             log.info("telegram ok=%s err=%s", ok, err)
             results.append(("telegram", ok, err))
 
         dc = self.cfg.get("discord", {})
         if dc.get("enabled"):
-            ok, err = send_discord(dc.get("webhook_url", ""), text)
+            ok, err = send_discord(dc.get("webhook_url", ""), dc_text)
             log.info("discord ok=%s err=%s", ok, err)
             results.append(("discord", ok, err))
 

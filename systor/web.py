@@ -238,14 +238,14 @@ def create_app() -> Flask:
             if "telegram_enabled" in data:
                 cfg["telegram"]["enabled"] = _bool(data.get("telegram_enabled"))
             if "telegram_bot_token" in data and data["telegram_bot_token"]:
-                cfg["telegram"]["bot_token"] = data["telegram_bot_token"]
+                cfg["telegram"]["bot_token"] = str(data["telegram_bot_token"]).strip()
             if "telegram_chat_id" in data:
-                cfg["telegram"]["chat_id"] = data["telegram_chat_id"]
+                cfg["telegram"]["chat_id"] = str(data["telegram_chat_id"] or "").strip()
             # Update discord
             if "discord_enabled" in data:
                 cfg["discord"]["enabled"] = _bool(data.get("discord_enabled"))
             if "discord_webhook_url" in data and data["discord_webhook_url"]:
-                cfg["discord"]["webhook_url"] = data["discord_webhook_url"]
+                cfg["discord"]["webhook_url"] = str(data["discord_webhook_url"]).strip()
             # Update poll interval
             if "poll_interval_sec" in data and data["poll_interval_sec"]:
                 try: cfg["collector"]["poll_interval_sec"] = max(5, int(data["poll_interval_sec"]))
@@ -273,8 +273,8 @@ def create_app() -> Flask:
         tg = cfg.get("telegram", {})
         body = request.get_json(silent=True) or {}
         # Allow Settings page to test currently typed values before saving.
-        token = body.get("bot_token") or body.get("telegram_bot_token") or tg.get("bot_token", "")
-        chat = body.get("chat_id") or body.get("telegram_chat_id") or tg.get("chat_id", "")
+        token = str(body.get("bot_token") or body.get("telegram_bot_token") or tg.get("bot_token", "")).strip()
+        chat = str(body.get("chat_id") or body.get("telegram_chat_id") or tg.get("chat_id", "")).strip()
         if not token or not chat:
             return jsonify({"ok": False, "error": "bot_token or chat_id not set"}), 400
         msg = body.get("message", "🧪 systor test alert from web UI")
@@ -288,7 +288,7 @@ def create_app() -> Flask:
         dc = cfg.get("discord", {})
         body = request.get_json(silent=True) or {}
         # Allow Settings page to test currently typed values before saving.
-        url = body.get("webhook_url") or body.get("discord_webhook_url") or dc.get("webhook_url", "")
+        url = str(body.get("webhook_url") or body.get("discord_webhook_url") or dc.get("webhook_url", "")).strip()
         if not url:
             return jsonify({"ok": False, "error": "webhook_url not set"}), 400
         msg = body.get("message", "🧪 systor test alert from web UI")
@@ -344,16 +344,86 @@ def create_app() -> Flask:
 
     @app.route("/api/restart-collector", methods=["POST"])
     def api_restart_collector():
-        """Send SIGTERM to the collector; systemd will restart it."""
+        """Restart collector whether it is pidfile-managed or just a bare process."""
         pidfile = Path("/tmp/systor-collector.pid")
-        if not pidfile.exists():
-            return jsonify({"ok": False, "error": "no collector pidfile"}), 404
-        try:
-            pid = int(pidfile.read_text().strip())
-            os.kill(pid, signal.SIGTERM)
-        except (ValueError, ProcessLookupError) as e:
-            return jsonify({"ok": False, "error": str(e)}), 500
-        return jsonify({"ok": True, "message": f"SIGTERM sent to PID {pid}; systemd will restart it."})
+        pid = None
+        started_fallback = False
+
+        if pidfile.exists():
+            try:
+                pid = int(pidfile.read_text().strip())
+            except ValueError:
+                pid = None
+        def _collector_pids() -> list[int]:
+            try:
+                out = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True, timeout=3).stdout.splitlines()
+                pids = []
+                for line in out:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(None, 1)
+                    if len(parts) != 2:
+                        continue
+                    pid_txt, args = parts
+                    if args.strip() in ("python3 -m systor serve collector", f"{sys.executable} -m systor serve collector"):
+                        try:
+                            pids.append(int(pid_txt))
+                        except ValueError:
+                            pass
+                return pids
+            except Exception:
+                return []
+
+        if pid is None:
+            pids = [p for p in _collector_pids() if p != os.getpid()]
+            if pids:
+                pid = pids[0]
+
+        if pid is not None:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                pid = None
+
+        # Give the old collector a moment to exit, then check whether another
+        # collector came back. If not, start a detached replacement so the
+        # button works in manual/non-systemd deployments.
+        live = []
+        for _ in range(8):
+            try:
+                live = _collector_pids()
+            except Exception:
+                live = []
+            if pid is None:
+                break
+            pid_still_live = pid in live
+            if not pid_still_live:
+                break
+            time.sleep(0.35)
+        live = [p for p in live if pid is None or p != pid]
+        if not live:
+            try:
+                subprocess.Popen(
+                    [sys.executable, "-m", "systor", "serve", "collector"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                started_fallback = True
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"collector stopped but fallback start failed: {e}"}), 500
+
+        if pid is None and not started_fallback:
+            return jsonify({"ok": False, "error": "collector not found"}), 404
+        return jsonify({
+            "ok": True,
+            "message": (
+                f"Collector restart triggered for PID {pid}."
+                if pid is not None else "Collector started."
+            ) + (" Fallback start used." if started_fallback else "")
+        })
 
     @app.route("/logs/raw")
     def api_logs_raw():

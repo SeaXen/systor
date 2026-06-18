@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 from .config import load_config
-from .metrics import collect_snapshot
+from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb
 from .notifier import Notifier
 from .storage import Storage, DEFAULT_DB_PATH
 
@@ -82,6 +82,51 @@ def _fmt(metric: str, value, threshold) -> str:
         return f"Disk usage {value}% (>{threshold}%)"
     pretty = metric.replace("_", " ").title()
     return f"{pretty}: {value}{unit} {arrow} {threshold}{unit}"
+
+
+def _top_cause_line(metric_key: str) -> str:
+    """Compact single-line likely-cause hint. Only CPU OR memory, never both."""
+    try:
+        if metric_key in ("cpu_load", "cpu_temperature"):
+            p = (read_top_processes(n=1, by="cpu") or [{}])[0]
+            if p.get("name"):
+                return f"Top CPU app: {p['name']} ({p.get('cpu_percent', 0)}% CPU, pid {p.get('pid')})"
+        elif metric_key in ("memory", "swap"):
+            p = (read_top_processes(n=1, by="mem") or [{}])[0]
+            if p.get("name"):
+                total_mb = read_total_memory_mb() or 0
+                mem_pct = round(100.0 * p.get("mem_mb", 0) / total_mb, 1) if total_mb else 0.0
+                return f"Top memory app: {p['name']} ({p.get('mem_mb', 0)} MB, {mem_pct}% RAM, pid {p.get('pid')})"
+    except Exception:
+        pass
+    return ""
+
+
+def _build_alert_body(subject: str, metric_key: str, kind: str, value, threshold, snap: dict, worst_disk: dict | None, msg: str) -> str:
+    host = snap.get("hostname", "host")
+    cpu = snap.get("cpu", {}) or {}
+    mem = snap.get("memory", {}) or {}
+    parts = [
+        f"Host: {host}",
+        f"State: {'ALERT' if kind == 'alert' else 'RECOVERED'}",
+        f"Metric: {subject}",
+        f"Detail: {msg}",
+    ]
+    if metric_key == "disk":
+        if worst_disk:
+            parts.append(f"Disk: {worst_disk.get('mount', '?')} · {worst_disk.get('used_gb', '?')}/{worst_disk.get('size_gb', '?')} GB used")
+    elif metric_key == "cpu_load":
+        parts.append(f"CPU now: {cpu.get('percent', '?')}% · load1 {cpu.get('load_1m', '?')}")
+    elif metric_key == "cpu_temperature":
+        parts.append(f"CPU temp now: {cpu.get('temp_c', '?')}°C")
+    elif metric_key == "memory":
+        parts.append(f"RAM avail: {mem.get('available_mb', '?')} MB · used {mem.get('used_mb', '?')} MB")
+    elif metric_key == "swap":
+        parts.append(f"Swap used: {mem.get('swap_used_mb', '?')} MB")
+    cause = _top_cause_line(metric_key)
+    if cause and kind == "alert":
+        parts.append(cause)
+    return "\n".join(parts)
 
 
 def _th_metric(th: dict, name: str) -> tuple:
@@ -223,7 +268,8 @@ def run():
                     message=msg,
                 )
                 metric_key = subj.lower().replace(" ", "_")
-                results = notifier.notify(title, msg)
+                body = _build_alert_body(subj, metric_key, kind, value, threshold, snap, worst_disk, msg)
+                results = notifier.notify(title, body)
                 for ch, ok, err in results:
                     storage.log_notification(ch, ok, err)
 
