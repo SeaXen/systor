@@ -101,6 +101,14 @@
               <option value="30" {% if cfg.dashboard.refresh_sec == 30 %}selected{% endif %}>30s</option>
               <option value="60" {% if cfg.dashboard.refresh_sec == 60 %}selected{% endif %}>1m</option>
             </select>
+            <label>Sample interval</label>
+            <select name="poll_interval_sec">
+              <option value="5" {% if cfg.collector.poll_interval_sec == 5 %}selected{% endif %}>5s</option>
+              <option value="10" {% if cfg.collector.poll_interval_sec == 10 %}selected{% endif %}>10s</option>
+              <option value="15" {% if cfg.collector.poll_interval_sec == 15 %}selected{% endif %}>15s</option>
+              <option value="30" {% if cfg.collector.poll_interval_sec == 30 %}selected{% endif %}>30s</option>
+              <option value="60" {% if cfg.collector.poll_interval_sec == 60 %}selected{% endif %}>1m</option>
+            </select>
             <label>Chart refresh</label>
             <select name="dashboard_chart_refresh_sec">
               <option value="1" {% if cfg.dashboard.chart_refresh_sec == 1 %}selected{% endif %}>1s</option>

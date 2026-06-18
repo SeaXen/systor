@@ -5,17 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}systor{% endblock %}</title>
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=1">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.7">
 </head>
 <body>
 <div class="header">
   <div class="header-left">
     <div class="brand-row">
       <img class="brand-logo" src="{{ url_for('static', filename='img/systor-logo.png') }}?v=1" alt="systor logo">
-      <div>
-        <h1>systor<span>.</span></h1>
-        <div class="sub" id="global-header-meta">system monitor</div>
-      </div>
+      <h1>systor<span>.</span></h1>
+      <div class="sub" id="global-header-meta">loading monitor…</div>
     </div>
   </div>
   <div class="actions">

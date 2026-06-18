@@ -16,7 +16,7 @@ APP_NAME = "systor"
 
 DEFAULT_CONFIG: dict = {
     "collector": {
-        "poll_interval_sec": 30,
+        "poll_interval_sec": 5,
         "retention_days": 7,           # raw samples kept this long
         "rollup_after_hours": 24,      # when to start averaging into 5-min buckets
         "rollup_retention_days": 90,
