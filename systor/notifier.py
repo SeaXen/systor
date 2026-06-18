@@ -21,7 +21,10 @@ def send_telegram(bot_token: str, chat_id: str, text: str, timeout: int = 10) ->
         "disable_web_page_preview": "true",
     }).encode()
     req = urllib.request.Request(url, data=payload, method="POST",
-        headers={"Content-Type": "application/x-www-form-urlencoded"})
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "systor/0.4 (+https://github.com/SeaXen/systor)",
+        })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read())
@@ -41,7 +44,10 @@ def send_discord(webhook_url: str, text: str, timeout: int = 10) -> tuple[bool, 
         text = text[:1850] + "\n…(truncated)"
     payload = json.dumps({"content": text}).encode()
     req = urllib.request.Request(webhook_url, data=payload, method="POST",
-        headers={"Content-Type": "application/json"})
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "systor/0.4 (+https://github.com/SeaXen/systor)",
+        })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return (200 <= r.status < 300), None

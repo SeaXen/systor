@@ -61,6 +61,9 @@
 
 <div class="section">
   <h3>Telegram</h3>
+  <div class="text-muted" style="font-size:12px;margin-bottom:12px">
+    {% if cfg.telegram.bot_token and cfg.telegram.chat_id %}Saved credentials detected. Leave token blank to keep current value.{% else %}Bot token and chat ID are required for Telegram alerts.{% endif %}
+  </div>
   <div class="form-row">
     <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}>
       <span class="threshold-title">Enabled</span>
@@ -69,7 +72,7 @@
   </div>
   <div class="form-row">
     <label>Bot token</label>
-    <input type="text" name="telegram_bot_token" value="{{ cfg.telegram.bot_token or '' }}" placeholder="123456:ABC-DEF...">
+    <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
   </div>
   <div class="form-row">
     <label>Chat ID</label>
@@ -83,6 +86,9 @@
 
 <div class="section">
   <h3>Discord (webhook)</h3>
+  <div class="text-muted" style="font-size:12px;margin-bottom:12px">
+    {% if cfg.discord.webhook_url %}Webhook saved. Leave field blank to keep current webhook.{% else %}Paste a Discord webhook URL, save, then send test.{% endif %}
+  </div>
   <div class="form-row">
     <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}>
       <span class="threshold-title">Enabled</span>
@@ -91,7 +97,7 @@
   </div>
   <div class="form-row">
     <label>Webhook URL</label>
-    <input type="text" name="discord_webhook_url" value="{{ cfg.discord.webhook_url or '' }}" placeholder="https://discord.com/api/webhooks/...">
+    <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
   </div>
   <div class="btn-row">
     <button type="button" class="btn secondary" id="test-dc">Send test</button>
@@ -106,7 +112,7 @@
     <div class="input-group">
       <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
       <span class="suffix">seconds</span>
-      <div class="hint" style="width:100%">How often the collector samples metrics. 30s is a good default. Restart collector to apply.</div>
+      <div class="hint" style="width:100%">How often the collector samples metrics. 30s is a good default. Save & apply reloads thresholds; restart collector applies interval immediately.</div>
     </div>
   </div>
   <div class="form-row">
@@ -188,22 +194,28 @@ document.getElementById('restart-collector').addEventListener('click', async () 
   showFlash(j.ok ? 'ok' : 'err', j.message || (j.error || 'failed'));
 });
 document.getElementById('test-tg').addEventListener('click', async () => {
+  const data = formToJSON(document.getElementById('settings-form'));
   const r = await fetch('/api/test-telegram', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ message: '🧪 systor test alert from Settings' })
+    body: JSON.stringify({ ...data, message: '🧪 systor test alert from Settings' })
   });
   const j = await r.json();
-  document.getElementById('test-tg-result').textContent = j.ok ? '✓ sent' : '✗ ' + j.error;
+  const el = document.getElementById('test-tg-result');
+  el.textContent = j.ok ? '✓ sent' : '✗ ' + (j.error || 'failed');
+  el.style.color = j.ok ? 'var(--green)' : 'var(--red)';
 });
 document.getElementById('test-dc').addEventListener('click', async () => {
+  const data = formToJSON(document.getElementById('settings-form'));
   const r = await fetch('/api/test-discord', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ message: '🧪 systor test alert from Settings' })
+    body: JSON.stringify({ ...data, message: '🧪 systor test alert from Settings' })
   });
   const j = await r.json();
-  document.getElementById('test-dc-result').textContent = j.ok ? '✓ sent' : '✗ ' + j.error;
+  const el = document.getElementById('test-dc-result');
+  el.textContent = j.ok ? '✓ sent' : '✗ ' + (j.error || 'failed');
+  el.style.color = j.ok ? 'var(--green)' : 'var(--red)';
 });
 </script>
 {% endblock %}

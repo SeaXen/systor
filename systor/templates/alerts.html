@@ -1,28 +1,34 @@
 {% extends "base.html" %}
 {% block title %}systor · Alerts{% endblock %}
 {% block content %}
-<div class="page-title">Alerts</div>
-<div class="text-muted" style="font-size:12px;margin-bottom:14px">All alert history (most recent first)</div>
-<div class="table-card">
+<div class="dash-toolbar">
+  <div class="dash-status">
+    <span class="dot green" id="alert-dot"></span>
+    <strong>Alerts</strong>
+    <span id="alert-status">loading</span>
+  </div>
+  <div class="dash-controls">
+    <button class="btn secondary compact" id="refresh-alerts">Refresh</button>
+    <button class="btn secondary compact" id="test-telegram">Test Telegram</button>
+    <button class="btn secondary compact" id="test-discord">Test Discord</button>
+  </div>
+</div>
+
+<div id="alert-flash"></div>
+
+<div class="table-card compact-table">
+  <h3><span>Alert History</span><span class="text-muted">latest 200</span></h3>
   <table>
-    <thead>
-      <tr><th>Time</th><th>Severity</th><th>Metric</th><th>Value</th><th>Threshold</th><th>Message</th></tr>
-    </thead>
-    <tbody id="alerts-body">
-      <tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
-    </tbody>
+    <thead><tr><th>Time</th><th>Severity</th><th>Metric</th><th>Value</th><th>Threshold</th><th>Message</th></tr></thead>
+    <tbody id="alerts-body"><tr><td colspan="6" class="empty-cell">Loading…</td></tr></tbody>
   </table>
 </div>
 
-<div class="table-card">
-  <h3>Notification Delivery Log</h3>
+<div class="table-card compact-table">
+  <h3><span>Notification Delivery Log</span><span class="text-muted">latest 100</span></h3>
   <table>
-    <thead>
-      <tr><th>Time</th><th>Channel</th><th>Status</th><th>Error</th></tr>
-    </thead>
-    <tbody id="notif-body">
-      <tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Loading…</td></tr>
-    </tbody>
+    <thead><tr><th>Time</th><th>Channel</th><th>Status</th><th>Error</th></tr></thead>
+    <tbody id="notif-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
   </table>
 </div>
 {% endblock %}
@@ -36,30 +42,65 @@ function timeAgo(ts) {
   if (s < 86400) return Math.floor(s / 3600) + 'h ago';
   return Math.floor(s / 86400) + 'd ago';
 }
-async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
-async function loadAlerts() {
-  const a = await fetchJSON('/api/alerts?limit=200');
-  document.getElementById('alerts-body').innerHTML = a.length ? a.map(x => `
-    <tr>
-      <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">(${timeAgo(x.ts)})</span></td>
-      <td><span class="badge ${x.severity}">${x.severity}</span></td>
-      <td>${x.metric}</td>
-      <td class="mono">${x.value ?? '—'}</td>
-      <td class="mono">${x.threshold ?? '—'}</td>
-      <td>${x.message}</td>
-    </tr>`).join('') :
-    '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No alerts</td></tr>';
-
-  const n = await fetchJSON('/api/notifications?limit=100');
-  document.getElementById('notif-body').innerHTML = n.length ? n.map(x => `
-    <tr>
-      <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">(${timeAgo(x.ts)})</span></td>
-      <td>${x.channel}</td>
-      <td><span class="badge ${x.success ? 'ok' : 'fail'}">${x.success ? 'sent' : 'failed'}</span></td>
-      <td class="mono text-muted">${x.error || ''}</td>
-    </tr>`).join('') :
-    '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No notifications sent yet</td></tr>';
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function fetchJSON(url, opts) {
+  const r = await fetch(url, opts || {cache:'no-store'});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || j.message || ('HTTP ' + r.status));
+  return j;
 }
+function flash(type, msg) {
+  const el = document.getElementById('alert-flash');
+  el.className = 'flash ' + type;
+  el.textContent = msg;
+  setTimeout(() => { el.className=''; el.textContent=''; }, 7000);
+}
+async function loadAlerts() {
+  const dot = document.getElementById('alert-dot');
+  try {
+    const [a, n] = await Promise.all([
+      fetchJSON('/api/alerts?limit=200'),
+      fetchJSON('/api/notifications?limit=100'),
+    ]);
+    document.getElementById('alerts-body').innerHTML = a.length ? a.map(x => `
+      <tr>
+        <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">${timeAgo(x.ts)}</span></td>
+        <td><span class="badge ${esc(x.severity)}">${esc(x.severity)}</span></td>
+        <td>${esc(x.metric)}</td>
+        <td class="mono">${x.value ?? '—'}</td>
+        <td class="mono">${x.threshold ?? '—'}</td>
+        <td>${esc(x.message)}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty-cell">No alerts</td></tr>';
+
+    document.getElementById('notif-body').innerHTML = n.length ? n.map(x => `
+      <tr>
+        <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">${timeAgo(x.ts)}</span></td>
+        <td>${esc(x.channel)}</td>
+        <td><span class="badge ${x.success ? 'ok' : 'fail'}">${x.success ? 'sent' : 'failed'}</span></td>
+        <td class="mono text-muted">${esc(x.error || '')}</td>
+      </tr>`).join('') : '<tr><td colspan="4" class="empty-cell">No notifications sent yet</td></tr>';
+
+    const failures = n.filter(x => !x.success).length;
+    document.getElementById('alert-status').textContent = `${a.length} alerts · ${n.length} deliveries · ${failures} failed · ${new Date().toLocaleTimeString()}`;
+    dot.className = 'dot ' + (failures ? 'yellow' : 'green');
+  } catch (e) {
+    dot.className = 'dot red';
+    document.getElementById('alert-status').textContent = 'failed: ' + e.message;
+  }
+}
+async function testChannel(channel) {
+  try {
+    const j = await fetchJSON('/api/test-' + channel, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({message:`🧪 systor ${channel} test from Alerts page`})
+    });
+    flash(j.ok ? 'ok' : 'err', channel + ': ' + (j.ok ? 'sent' : (j.error || 'failed')));
+  } catch(e) { flash('err', channel + ': ' + e.message); }
+  await loadAlerts();
+}
+document.getElementById('refresh-alerts').addEventListener('click', loadAlerts);
+document.getElementById('test-telegram').addEventListener('click', () => testChannel('telegram'));
+document.getElementById('test-discord').addEventListener('click', () => testChannel('discord'));
 loadAlerts();
 setInterval(loadAlerts, 10000);
 </script>

@@ -1,21 +1,71 @@
 {% extends "base.html" %}
 {% block title %}systor · Logs{% endblock %}
 {% block content %}
-<div class="page-title">Logs</div>
-<div class="text-muted" style="font-size:12px;margin-bottom:14px">
-  Last 200 lines from <code class="mono">{{ log_path }}</code>
+<div class="dash-toolbar">
+  <div class="dash-status">
+    <span class="dot green" id="log-dot"></span>
+    <strong>Logs</strong>
+    <span id="log-path">{{ log_path }}</span>
+    <span id="log-status">loading</span>
+  </div>
+  <div class="dash-controls">
+    <label>lines
+      <select id="log-lines" class="control-select">
+        <option value="100">100</option>
+        <option value="200" selected>200</option>
+        <option value="500">500</option>
+        <option value="1000">1000</option>
+      </select>
+    </label>
+    <label>level
+      <select id="log-level" class="control-select">
+        <option value="all">all</option>
+        <option value="warnings">warn+</option>
+        <option value="errors">errors</option>
+      </select>
+    </label>
+    <button class="btn secondary compact" id="refresh-logs">Refresh</button>
+    <button class="btn secondary compact" id="copy-logs">Copy</button>
+  </div>
 </div>
+
 <div class="log-view" id="log-view">Loading…</div>
 {% endblock %}
 {% block scripts %}
 <script>
-async function fetchJSON(url) { const r = await fetch(url); return r.json(); }
-async function loadLogs() {
-  const data = await fetchJSON('/logs/raw?lines=200');
-  document.getElementById('log-view').textContent =
-    (data && data.length) ? data.join('\n') : '(log is empty)';
+async function fetchJSON(url) {
+  const r = await fetch(url, {cache:'no-store'});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
 }
+async function loadLogs() {
+  const lines = document.getElementById('log-lines').value;
+  const level = document.getElementById('log-level').value;
+  const status = document.getElementById('log-status');
+  const dot = document.getElementById('log-dot');
+  try {
+    const data = await fetchJSON(`/logs/raw?lines=${lines}&level=${level}`);
+    const visible = (data.lines || []).slice().reverse();
+    const text = visible.length ? visible.join('\n') : '(no matching log lines)';
+    document.getElementById('log-view').textContent = text;
+    document.getElementById('log-path').textContent = data.path || '{{ log_path }}';
+    status.textContent = `${data.total || 0} lines · ${data.fresh_error_count || 0} fresh errors / 10m · ${new Date().toLocaleTimeString()}`;
+    dot.className = 'dot ' + ((data.fresh_error_count || 0) ? 'red' : 'green');
+  } catch (e) {
+    status.textContent = 'failed: ' + e.message;
+    dot.className = 'dot red';
+    document.getElementById('log-view').textContent = 'Could not load logs: ' + e.message;
+  }
+}
+document.getElementById('refresh-logs').addEventListener('click', loadLogs);
+document.getElementById('log-lines').addEventListener('change', loadLogs);
+document.getElementById('log-level').addEventListener('change', loadLogs);
+document.getElementById('copy-logs').addEventListener('click', async () => {
+  const text = document.getElementById('log-view').textContent;
+  try { await navigator.clipboard.writeText(text); document.getElementById('log-status').textContent = 'copied'; }
+  catch(e) { document.getElementById('log-status').textContent = 'copy failed'; }
+});
 loadLogs();
-setInterval(loadLogs, 5000);
+setInterval(loadLogs, 10000);
 </script>
 {% endblock %}

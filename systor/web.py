@@ -221,11 +221,12 @@ def create_app() -> Flask:
     def api_test_telegram():
         cfg = load_config()
         tg = cfg.get("telegram", {})
-        token = tg.get("bot_token", "")
-        chat = tg.get("chat_id", "")
+        body = request.get_json(silent=True) or {}
+        # Allow Settings page to test currently typed values before saving.
+        token = body.get("bot_token") or body.get("telegram_bot_token") or tg.get("bot_token", "")
+        chat = body.get("chat_id") or body.get("telegram_chat_id") or tg.get("chat_id", "")
         if not token or not chat:
             return jsonify({"ok": False, "error": "bot_token or chat_id not set"}), 400
-        body = request.get_json(silent=True) or {}
         msg = body.get("message", "🧪 systor test alert from web UI")
         ok, err = send_telegram(token, chat, msg)
         get_storage().log_notification("telegram", ok, err)
@@ -235,10 +236,11 @@ def create_app() -> Flask:
     def api_test_discord():
         cfg = load_config()
         dc = cfg.get("discord", {})
-        url = dc.get("webhook_url", "")
+        body = request.get_json(silent=True) or {}
+        # Allow Settings page to test currently typed values before saving.
+        url = body.get("webhook_url") or body.get("discord_webhook_url") or dc.get("webhook_url", "")
         if not url:
             return jsonify({"ok": False, "error": "webhook_url not set"}), 400
-        body = request.get_json(silent=True) or {}
         msg = body.get("message", "🧪 systor test alert from web UI")
         ok, err = send_discord(url, msg)
         get_storage().log_notification("discord", ok, err)
@@ -308,13 +310,42 @@ def create_app() -> Flask:
         cfg = load_config()
         log_file = cfg.get("logging", {}).get("file", "/var/log/systor/systor.log")
         lines = int(request.args.get("lines", 200))
-        return jsonify(read_log_tail(log_file, lines))
+        level = request.args.get("level", "all")
+        data = read_log_tail(log_file, lines)
+        if level == "errors":
+            data = [x for x in data if any(k in x for k in ("ERROR", "Traceback", "OperationalError", "Exception"))]
+        elif level == "warnings":
+            data = [x for x in data if any(k in x for k in ("WARNING", "ERROR", "Traceback", "OperationalError", "Exception"))]
+        return jsonify({
+            "ok": True,
+            "path": log_file,
+            "lines": data,
+            "total": len(data),
+            "fresh_error_count": count_recent_log_errors(log_file, minutes=10),
+        })
 
     @app.route("/health")
     def health():
         return jsonify({"ok": True, "ts": time.time()})
 
     return app
+
+
+def count_recent_log_errors(path: str, minutes: int = 10) -> int:
+    """Best-effort recent error count for the Logs page status chip."""
+    import datetime as _dt
+    cutoff = _dt.datetime.now() - _dt.timedelta(minutes=minutes)
+    count = 0
+    for line in read_log_tail(path, 2000):
+        if not any(k in line for k in ("ERROR", "Traceback", "OperationalError", "Exception")):
+            continue
+        try:
+            ts = _dt.datetime.strptime(line[:19], "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        if ts >= cutoff:
+            count += 1
+    return count
 
 
 def read_log_tail(path: str, lines: int = 200) -> list[str]:
