@@ -116,6 +116,7 @@ let appsTimer=null, appsLoading=false;
 const state = { rawRows: [], pages: { cpu:1, mem:1, disk:1, net:1, all:1 } };
 function bytesMB(n){ n=Number(n||0); if(n>=1024) return (n/1024).toFixed(2)+' GB'; return n.toFixed(2)+' MB'; }
 async function fetchJSON(url, opts){ const r=await fetch(url, Object.assign({cache:'no-store'}, opts||{})); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
+function esc(s){ return String(s ?? '').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function metricVal(row, metric){
   if(metric==='cpu') return Number(row.cpu_percent||0).toFixed(2)+'%';
   if(metric==='mem') return bytesMB(row.mem_mb||0);
@@ -137,8 +138,9 @@ function usageCell(row, metric){
 }
 function rowName(r){
   const pid = r.kind==='host' && r.pid ? `<span class="app-pid mono">pid ${r.pid}</span>` : '';
-  return `<div class="app-inline-cell"><strong class="app-inline-name">${r.name}</strong>${pid}</div>`;
+  return `<div class="app-inline-cell"><strong class="app-inline-name">${esc(r.name)}</strong>${pid}</div>`;
 }
+function kindPill(kind){ const text=esc(kind || 'app'); const cls=String(kind || 'app').replace(/[^a-z0-9_-]/gi,'').toLowerCase() || 'app'; return `<span class="kind-pill ${cls}">${text}</span>`; }
 function metricSort(metric){
   return (a,b)=>{
     const va = metric==='cpu' ? Number(a.cpu_percent||0) : metric==='mem' ? Number(a.mem_mb||0) : metric==='disk' ? Number(a.disk_in_mb||0)+Number(a.disk_out_mb||0) : Number(a.net_in_mb||0)+Number(a.net_out_mb||0);
@@ -162,7 +164,7 @@ function renderRows(metric, rows, bodyId, key, pagerId, titleId, pageSize, scope
   const body=document.getElementById(bodyId);
   if(!(rows||[]).length){ body.innerHTML=`<tr><td colspan="4" class="empty-cell">No apps found</td></tr>`; document.getElementById(titleId).textContent=`0 rows · ${scope}${note}`; renderPager(key, 0, pageSize, pagerId); return; }
   const { totalPages, pageRows } = pageSlice(rows, key, pageSize);
-  body.innerHTML = pageRows.map(r=>`<tr><td>${rowName(r)}</td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${metricVal(r, metric)}</td><td>${usageCell(r, metric)}</td></tr>`).join('');
+  body.innerHTML = pageRows.map(r=>`<tr><td>${rowName(r)}</td><td>${kindPill(r.kind)}</td><td class="text-right mono">${metricVal(r, metric)}</td><td>${usageCell(r, metric)}</td></tr>`).join('');
   document.getElementById(titleId).textContent = `${pageRows.length}/${rows.length} · ${scope} · ${state.pages[key]}/${totalPages}${note}`;
   renderPager(key, rows.length, pageSize, pagerId);
 }
@@ -171,7 +173,7 @@ function renderAllRows(rows, scope){
   const body = document.getElementById('apps-all-body');
   if(!rows.length){ body.innerHTML = '<tr><td colspan="5" class="empty-cell">No apps found</td></tr>'; document.getElementById('apps-all-meta').textContent='0 rows'; renderPager('all', 0, pageSize, 'all-pager'); return; }
   const { totalPages, pageRows } = pageSlice(rows, 'all', pageSize);
-  body.innerHTML = pageRows.map(r=>`<tr><td><div class="app-full-name">${rowName(r)}<span class="kind-pill ${r.kind}">${r.kind}</span></div></td><td class="text-right mono">${metricVal(r,'cpu')}</td><td class="text-right mono">${metricVal(r,'mem')}</td><td class="text-right mono">${metricVal(r,'disk')}</td><td class="text-right mono">${metricVal(r,'net')}</td></tr>`).join('');
+  body.innerHTML = pageRows.map(r=>`<tr><td><div class="app-full-name">${rowName(r)}${kindPill(r.kind)}</div></td><td class="text-right mono">${metricVal(r,'cpu')}</td><td class="text-right mono">${metricVal(r,'mem')}</td><td class="text-right mono">${metricVal(r,'disk')}</td><td class="text-right mono">${metricVal(r,'net')}</td></tr>`).join('');
   document.getElementById('apps-all-meta').textContent = `${rows.length} rows · ${scope} · page ${state.pages.all}/${totalPages}`;
   renderPager('all', rows.length, pageSize, 'all-pager');
 }

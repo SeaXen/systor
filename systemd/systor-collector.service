@@ -2,6 +2,8 @@
 Description=systor collector — system metrics poller + alerter
 After=network-online.target
 Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=120
 
 [Service]
 Type=simple
@@ -9,8 +11,8 @@ ExecStart=/usr/bin/python3 -m systor serve collector
 WorkingDirectory=/opt/systor
 Restart=always
 RestartSec=10
-StartLimitBurst=5
-StartLimitIntervalSec=120
+TimeoutStopSec=10
+KillMode=control-group
 StandardOutput=append:/var/log/systor/collector.log
 StandardError=append:/var/log/systor/collector.log
 

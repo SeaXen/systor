@@ -39,6 +39,7 @@ def _handle_term(signum, _frame):
     global _running
     log.info("web: received signal %d, shutting down", signum)
     _running = False
+    raise SystemExit(0)
 
 
 signal.signal(signal.SIGTERM, _handle_term)
@@ -48,6 +49,11 @@ signal.signal(signal.SIGINT, _handle_term)
 # Cached storage (lazy-init so we don't block on slow disks)
 _storage: Storage | None = None
 _storage_lock = threading.Lock()
+
+# Docker stats is the slowest Apps source. Cache briefly so 1s/3s UI refreshes
+# do not hammer dockerd/containerd while still keeping the page live.
+_docker_cache: dict = {"ts": 0.0, "rows": []}
+_docker_cache_lock = threading.Lock()
 
 
 def get_storage() -> Storage:
@@ -138,12 +144,20 @@ def _parse_docker_size_mb(text: str) -> float:
 
 
 def _docker_apps(limit: int = 24) -> list[dict]:
+    now = time.time()
+    with _docker_cache_lock:
+        cached = list(_docker_cache.get("rows") or [])
+        if float(_docker_cache.get("ts") or 0) > 0 and now - float(_docker_cache.get("ts") or 0) < 5:
+            return cached[:limit]
     try:
         if subprocess.run(["bash", "-lc", "command -v docker >/dev/null"], timeout=3).returncode != 0:
+            with _docker_cache_lock:
+                _docker_cache["ts"] = now
+                _docker_cache["rows"] = []
             return []
         out = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.Container}}\t{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}"], capture_output=True, text=True, timeout=12).stdout.splitlines()
         rows: list[dict] = []
-        for line in out[:limit]:
+        for line in out:
             parts = line.split("\t")
             if len(parts) < 6:
                 continue
@@ -163,9 +177,16 @@ def _docker_apps(limit: int = 24) -> list[dict]:
                 "disk_in_mb": _parse_docker_size_mb(blk_in_s),
                 "disk_out_mb": _parse_docker_size_mb(blk_out_s),
             })
-        return rows
+        with _docker_cache_lock:
+            _docker_cache["ts"] = now
+            _docker_cache["rows"] = rows
+        return rows[:limit]
     except Exception:
-        return []
+        if not cached:
+            with _docker_cache_lock:
+                _docker_cache["ts"] = now
+                _docker_cache["rows"] = []
+        return cached[:limit] if cached else []
 
 
 def _host_apps(limit: int = 24) -> list[dict]:
@@ -774,10 +795,15 @@ def create_app() -> Flask:
         return jsonify({"ok": ok, "collector": collector, "web": web}), code
 
     @app.route("/logs/raw")
+    @app.route("/api/logs")
     def api_logs_raw():
         cfg = load_config()
         log_file = cfg.get("logging", {}).get("file", "/var/log/systor/systor.log")
-        lines = int(request.args.get("lines", 200))
+        try:
+            lines = int(request.args.get("lines", request.args.get("limit", 200)))
+        except (TypeError, ValueError):
+            lines = 200
+        lines = max(1, min(2000, lines))
         level = request.args.get("level", "all")
         data = read_log_tail(log_file, lines)
         if level == "errors":
