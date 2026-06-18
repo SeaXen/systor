@@ -86,9 +86,12 @@
           <div class="notif-field-grid compact-top network-settings-grid">
             <label>Default time view</label>
             <select name="dashboard_default_hours">
+              <option value="0.25" {% if cfg.dashboard.default_hours == 0.25 %}selected{% endif %}>15m</option>
+              <option value="0.5" {% if cfg.dashboard.default_hours == 0.5 %}selected{% endif %}>30m</option>
               <option value="1" {% if cfg.dashboard.default_hours == 1 %}selected{% endif %}>1h</option>
               <option value="6" {% if cfg.dashboard.default_hours == 6 %}selected{% endif %}>6h</option>
               <option value="24" {% if cfg.dashboard.default_hours == 24 %}selected{% endif %}>24h</option>
+              <option value="72" {% if cfg.dashboard.default_hours == 72 %}selected{% endif %}>3d</option>
               <option value="168" {% if cfg.dashboard.default_hours == 168 %}selected{% endif %}>7d</option>
             </select>
             <label>Refresh</label>
@@ -131,10 +134,13 @@
             <input type="number" name="retention_days" value="{{ cfg.collector.retention_days }}" min="1" step="1">
             <label>Default rate view</label>
             <select name="network_default_hours">
+              <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
+              <option value="0.5" {% if cfg.network.default_hours == 0.5 %}selected{% endif %}>30m</option>
+              <option value="1" {% if cfg.network.default_hours == 1 %}selected{% endif %}>1h</option>
+              <option value="6" {% if cfg.network.default_hours == 6 %}selected{% endif %}>6h</option>
               <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
               <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
               <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
-              <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
             </select>
             <label>Default usage view</label>
             <select name="network_default_granularity">

@@ -301,7 +301,11 @@ def create_app() -> Flask:
     @app.route("/api/series")
     def api_series():
         metric = request.args.get("metric", "cpu_pct")
-        hours = int(request.args.get("hours", 6))
+        try:
+            hours = float(request.args.get("hours", 6))
+        except (TypeError, ValueError):
+            hours = 6.0
+        hours = max(0.25, min(24 * 31, hours))
         data = get_storage().series(metric, hours=hours)
         # downsample to <= 600 points for charts
         if len(data) > 600:
@@ -397,7 +401,11 @@ def create_app() -> Flask:
 
     @app.route("/api/network-series")
     def api_network_series():
-        hours = max(1, min(24 * 31, int(request.args.get("hours", 24))))
+        try:
+            hours = float(request.args.get("hours", 24))
+        except (TypeError, ValueError):
+            hours = 24.0
+        hours = max(0.25, min(24 * 31, hours))
         data = get_storage().network_series(hours=hours)
         if len(data) > 600:
             step = len(data) // 600 + 1
@@ -556,7 +564,7 @@ def create_app() -> Flask:
                 except (ValueError, TypeError): pass
             cfg.setdefault("network", {})
             if "network_default_hours" in data and data["network_default_hours"]:
-                try: cfg["network"]["default_hours"] = max(1, min(24 * 31, int(data["network_default_hours"])))
+                try: cfg["network"]["default_hours"] = max(0.25, min(24 * 31, float(data["network_default_hours"])))
                 except (ValueError, TypeError): pass
             if "network_auto_refresh_sec" in data and data["network_auto_refresh_sec"]:
                 try: cfg["network"]["auto_refresh_sec"] = max(1, int(data["network_auto_refresh_sec"]))
@@ -567,7 +575,7 @@ def create_app() -> Flask:
                 cfg["network"]["hide_virtual_default"] = _bool(data.get("network_hide_virtual_default"))
             cfg.setdefault("dashboard", {})
             if "dashboard_default_hours" in data and data["dashboard_default_hours"]:
-                try: cfg["dashboard"]["default_hours"] = max(1, min(24 * 31, int(data["dashboard_default_hours"])))
+                try: cfg["dashboard"]["default_hours"] = max(0.25, min(24 * 31, float(data["dashboard_default_hours"])))
                 except (ValueError, TypeError): pass
             if "dashboard_refresh_sec" in data and data["dashboard_refresh_sec"]:
                 try: cfg["dashboard"]["refresh_sec"] = max(1, int(data["dashboard_refresh_sec"]))
