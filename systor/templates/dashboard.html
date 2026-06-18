@@ -8,14 +8,23 @@
     <span>up <span id="uptime">—</span></span>
     <span><span id="dbmeta">— samples</span></span>
     <span id="updated">updated —</span>
+    <span id="load-state">idle</span>
   </div>
   <div class="dash-controls">
     <label>refresh
       <select id="refresh-sec" class="control-select">
-        <option value="1000">1s</option>
-        <option value="2000">2s</option>
         <option value="5000" selected>5s</option>
         <option value="10000">10s</option>
+        <option value="15000">15s</option>
+        <option value="30000">30s</option>
+        <option value="60000">1m</option>
+      </select>
+    </label>
+    <label>charts
+      <select id="chart-sec" class="control-select">
+        <option value="5000" selected>5s</option>
+        <option value="10000">10s</option>
+        <option value="15000">15s</option>
         <option value="30000">30s</option>
         <option value="60000">1m</option>
       </select>
@@ -29,6 +38,8 @@
       </select>
     </label>
     <button class="btn secondary compact" id="manual-refresh-btn">Refresh</button>
+    <button class="btn secondary compact" id="restart-collector-btn">Restart collector</button>
+    <button class="btn secondary compact" id="restart-web-btn">Restart web</button>
     <button class="btn secondary compact" id="pause-btn">Pause</button>
   </div>
 </div>
@@ -113,7 +124,6 @@ const COLORS = {
   blue: '#58a6ff', purple: '#bc8cff', cyan: '#22d3ee',
   dim: '#8b949e', grid: '#30363d', text: '#c9d1d9', card: '#161b22'
 };
-
 function fmt(n, unit) {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
   if (typeof n === 'number') {
@@ -164,10 +174,7 @@ function drawChart(canvas, series, opts = {}) {
   ctx.clearRect(0, 0, w, h);
   const allVals = series.flatMap(s => (s.data || []).map(p => p[1]));
   const bounds = niceBounds(allVals, opts.ymin, opts.ymax);
-  if (!bounds) {
-    ctx.fillStyle = COLORS.dim; ctx.font = '12px monospace';
-    ctx.fillText('waiting for data', 12, h / 2); return;
-  }
+  if (!bounds) { ctx.fillStyle = COLORS.dim; ctx.font = '12px monospace'; ctx.fillText('waiting for data', 12, h / 2); return; }
   const [lo, hi] = bounds;
   const padL = 34, padR = 10, padT = 8, padB = 18;
   const gw = w - padL - padR, gh = h - padT - padB;
@@ -193,50 +200,68 @@ function drawChart(canvas, series, opts = {}) {
       if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
     }
     if (started) ctx.stroke();
-    if (started && s.fill) {
-      ctx.lineTo(padL + gw, padT + gh); ctx.lineTo(padL, padT + gh); ctx.closePath();
-      ctx.fillStyle = s.color + '20'; ctx.fill();
-    }
+    if (started && s.fill) { ctx.lineTo(padL + gw, padT + gh); ctx.lineTo(padL, padT + gh); ctx.closePath(); ctx.fillStyle = s.color + '20'; ctx.fill(); }
     const last = [...data].reverse().find(p => p[1] !== null && p[1] !== undefined);
     if (last) { ctx.fillStyle = s.color; ctx.fillText(Number(last[1]).toFixed(hi > 100 ? 0 : 1), w - 42, padT + 10 + (s.labelOffset || 0)); }
   }
 }
-async function fetchJSON(url) {
-  const r = await fetch(url, {cache:'no-store'});
-  if (!r.ok) throw new Error(url + ' HTTP ' + r.status);
+async function fetchJSON(url, opts) {
+  const r = await fetch(url, opts || {cache:'no-store'});
+  if (!r.ok) {
+    let msg = 'HTTP ' + r.status;
+    try { const j = await r.json(); msg = j.error || j.message || msg; } catch (e) {}
+    throw new Error(msg);
+  }
   return r.json();
 }
-
 const SETTINGS_KEY = 'systor.dashboard';
-let settings = { refreshMs: 5000, rangeHours: 6, paused: false };
+let settings = { refreshMs: 5000, chartMs: 5000, rangeHours: 6, paused: false };
 try { settings = { ...settings, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch (e) {}
+settings.refreshMs = Math.max(5000, Number(settings.refreshMs) || 5000);
+settings.chartMs = Math.max(5000, Number(settings.chartMs) || 5000);
 function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+function setLoadState(text) { document.getElementById('load-state').textContent = text; }
 function setupControls() {
   const refreshSel = document.getElementById('refresh-sec');
+  const chartSel = document.getElementById('chart-sec');
   const rangeSel = document.getElementById('range-hours');
   const pauseBtn = document.getElementById('pause-btn');
   refreshSel.value = String(settings.refreshMs);
+  chartSel.value = String(settings.chartMs);
   rangeSel.value = String(settings.rangeHours);
   pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause';
-  refreshSel.addEventListener('change', () => { settings.refreshMs = parseInt(refreshSel.value); saveSettings(); restartTimers(); refreshAll(); });
+  refreshSel.addEventListener('change', () => { settings.refreshMs = Math.max(5000, parseInt(refreshSel.value)); saveSettings(); restartTimers(); refreshAll(); });
+  chartSel.addEventListener('change', () => { settings.chartMs = Math.max(5000, parseInt(chartSel.value)); saveSettings(); restartTimers(); refreshCharts(); });
   rangeSel.addEventListener('change', () => { settings.rangeHours = parseInt(rangeSel.value); saveSettings(); refreshCharts(); });
   pauseBtn.addEventListener('click', () => { settings.paused = !settings.paused; pauseBtn.textContent = settings.paused ? 'Resume' : 'Pause'; saveSettings(); restartTimers(); });
   document.getElementById('manual-refresh-btn').addEventListener('click', refreshAll);
+  document.getElementById('restart-collector-btn').addEventListener('click', async () => {
+    if (!confirm('Restart collector now?')) return;
+    const j = await fetchJSON('/api/restart-collector', { method:'POST' });
+    setLoadState('collector restarted');
+    alert(j.message || 'collector restarting');
+  });
+  document.getElementById('restart-web-btn').addEventListener('click', async () => {
+    if (!confirm('Restart dashboard web now?')) return;
+    const j = await fetchJSON('/api/restart-web', { method:'POST' });
+    setLoadState('web restarting');
+    alert(j.message || 'web restarting');
+  });
 }
-
 let snapTimer, chartTimer, alertTimer, procTimer;
+const inflight = { snap:false, charts:false, alerts:false, procs:false };
 function restartTimers() {
   clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer);
   if (settings.paused) return;
-  snapTimer  = setInterval(refresh,        settings.refreshMs);
-  chartTimer = setInterval(refreshCharts,  Math.max(settings.refreshMs, 15000));
-  alertTimer = setInterval(refreshAlerts,  Math.max(settings.refreshMs, 10000));
-  procTimer  = setInterval(refreshProcs,   30000);
+  snapTimer  = setInterval(refresh, settings.refreshMs);
+  chartTimer = setInterval(refreshCharts, settings.chartMs);
+  alertTimer = setInterval(refreshAlerts, Math.max(settings.refreshMs, 10000));
+  procTimer  = setInterval(refreshProcs, 30000);
 }
 function refreshAll() { refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); }
-
 async function refresh() {
-  if (settings.paused) return;
+  if (settings.paused || inflight.snap) return;
+  inflight.snap = true; setLoadState('loading snapshot…');
   try {
     const snap = await fetchJSON('/api/snapshot');
     document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
@@ -244,38 +269,32 @@ async function refresh() {
     const up = snap.uptime_sec || 0;
     document.getElementById('uptime').textContent = Math.floor(up / 3600) + 'h ' + Math.floor((up % 3600) / 60) + 'm';
     document.getElementById('dbmeta').textContent = (snap.db_stats.samples || 0) + ' samples';
-
     const cpu = snap.cpu || {};
     document.getElementById('cpu-pct').textContent = fmt(cpu.percent);
-    document.getElementById('load').textContent   = fmt(cpu.load_1m);
-    document.getElementById('load5').textContent  = fmt(cpu.load_5m);
+    document.getElementById('load').textContent = fmt(cpu.load_1m);
+    document.getElementById('load5').textContent = fmt(cpu.load_5m);
     document.getElementById('kpi-cpu-pct').className = 'stat-card ' + statusClass(cpu.percent, 50, 85);
-
-    document.getElementById('temp').textContent  = fmt(cpu.temp_c);
+    document.getElementById('temp').textContent = fmt(cpu.temp_c);
     document.getElementById('temp-sub').textContent = cpu.temp_c === null || cpu.temp_c === undefined ? 'sensor n/a' : 'CPU sensor';
     document.getElementById('kpi-temp').className = 'stat-card ' + statusClass(cpu.temp_c, 70, 85);
-
     const mem = snap.memory || {};
     const memPct = mem.total_mb ? Math.round(100 * mem.used_mb / mem.total_mb) : null;
-    document.getElementById('mem-pct').textContent  = memPct !== null ? memPct : '—';
-    document.getElementById('mem-used').textContent  = bytes((mem.used_mb || 0) * 1024 * 1024);
+    document.getElementById('mem-pct').textContent = memPct !== null ? memPct : '—';
+    document.getElementById('mem-used').textContent = bytes((mem.used_mb || 0) * 1024 * 1024);
     document.getElementById('mem-total').textContent = bytes((mem.total_mb || 0) * 1024 * 1024);
     document.getElementById('kpi-mem').className = 'stat-card ' + statusClass(memPct, 75, 90);
-
-    document.getElementById('swap-used').textContent  = mem.swap_used_mb || 0;
+    document.getElementById('swap-used').textContent = mem.swap_used_mb || 0;
     document.getElementById('swap-total').textContent = mem.swap_total_mb || 0;
     document.getElementById('kpi-swap').className = 'stat-card ' + statusClass(mem.swap_used_mb, 1024, 4096);
-
     const disks = snap.disks || [];
     if (disks.length) {
       const d = disks.reduce((a, b) => a.used_pct > b.used_pct ? a : b);
       document.getElementById('disk-mount').textContent = d.mount;
-      document.getElementById('disk-pct').textContent  = d.used_pct;
-      document.getElementById('disk-used').textContent  = d.used_gb.toFixed(1) + ' GB';
-      document.getElementById('disk-size').textContent  = d.size_gb.toFixed(1) + ' GB';
+      document.getElementById('disk-pct').textContent = d.used_pct;
+      document.getElementById('disk-used').textContent = d.used_gb.toFixed(1) + ' GB';
+      document.getElementById('disk-size').textContent = d.size_gb.toFixed(1) + ' GB';
       document.getElementById('kpi-disk-use').className = 'stat-card ' + statusClass(d.used_pct, 80, 90);
     }
-
     const dio = snap.disk_io || {};
     document.getElementById('disk-r-mbps').textContent = (dio.read_mbps || 0).toFixed(2);
     document.getElementById('disk-w-mbps').textContent = (dio.write_mbps || 0).toFixed(2);
@@ -283,18 +302,20 @@ async function refresh() {
     document.getElementById('disk-io-devs').textContent = devs.length ? devs.map(x => `${x.name} r${x.read_mbps}/w${x.write_mbps}`).join(' · ') : 'no disk delta yet';
     const ioHigh = Math.max(dio.read_mbps || 0, dio.write_mbps || 0);
     document.getElementById('kpi-disk-io').className = 'stat-card ' + statusClass(ioHigh, 50, 200);
-
     const net = snap.network || {};
     document.getElementById('net-rx').textContent = bytes(net.rx_bytes);
     document.getElementById('net-tx').textContent = bytes(net.tx_bytes);
-  } catch (e) { console.error(e); document.getElementById('updated').textContent = 'update failed'; }
+    setLoadState('snapshot ok');
+  } catch (e) { console.error(e); document.getElementById('updated').textContent = 'update failed'; setLoadState('snapshot failed'); }
+  finally { inflight.snap = false; }
 }
-
 async function getSeries(metric) {
   const d = await fetchJSON('/api/series?metric=' + metric + '&hours=' + settings.rangeHours);
   return d.data || [];
 }
 async function refreshCharts() {
+  if (settings.paused || inflight.charts) return;
+  inflight.charts = true; setLoadState('loading charts…');
   try {
     const [cpu, temp, mem, dRead, dWrite, load, disk] = await Promise.all([
       getSeries('cpu_pct'), getSeries('cpu_temp'), getSeries('mem_used_mb'),
@@ -303,35 +324,36 @@ async function refreshCharts() {
     drawChart(document.getElementById('chart-cpu-pct'), [{data: cpu, color: COLORS.purple, fill: true}], {ymin:0, ymax:100});
     drawChart(document.getElementById('chart-temp'), [{data: temp, color: COLORS.red, fill: true}], {ymin:null, ymax:null});
     drawChart(document.getElementById('chart-mem'), [{data: mem, color: COLORS.blue, fill: true}], {ymin:0, ymax:null});
-    drawChart(document.getElementById('chart-disk-io'), [
-      {data: dRead, color: COLORS.cyan, labelOffset: 0},
-      {data: dWrite, color: COLORS.red, labelOffset: 12}
-    ], {ymin:0, ymax:null});
+    drawChart(document.getElementById('chart-disk-io'), [{data: dRead, color: COLORS.cyan, labelOffset: 0}, {data: dWrite, color: COLORS.red, labelOffset: 12}], {ymin:0, ymax:null});
     drawChart(document.getElementById('chart-load'), [{data: load, color: COLORS.green, fill: true}], {ymin:0, ymax:null});
     drawChart(document.getElementById('chart-disk'), [{data: disk, color: COLORS.yellow, fill: true}], {ymin:0, ymax:100});
-  } catch (e) { console.error(e); }
+    setLoadState('charts ok');
+  } catch (e) { console.error(e); setLoadState('charts failed'); }
+  finally { inflight.charts = false; }
 }
-
 async function refreshAlerts() {
-  if (settings.paused) return;
+  if (settings.paused || inflight.alerts) return;
+  inflight.alerts = true;
   try {
     const alerts = await fetchJSON('/api/alerts?limit=20');
     const body = document.getElementById('alerts-body');
     if (!alerts.length) { body.innerHTML = '<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; }
     body.innerHTML = alerts.map(a => `<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join('');
   } catch (e) { console.error(e); }
+  finally { inflight.alerts = false; }
 }
 function procColor(v, warn, danger) { return v > danger ? COLORS.red : v > warn ? COLORS.yellow : COLORS.text; }
-function esc(s) { return String(s || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s) { return String(s || '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 async function refreshProcs() {
-  if (settings.paused) return;
+  if (settings.paused || inflight.procs) return;
+  inflight.procs = true;
   try {
     const [cpuTop, memTop] = await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'), fetchJSON('/api/top-processes?by=mem&n=10')]);
     document.getElementById('top-cpu-body').innerHTML = cpuTop.processes.length ? cpuTop.processes.map(p => `<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-cell">No data</td></tr>';
     document.getElementById('top-mem-body').innerHTML = memTop.processes.length ? memTop.processes.map(p => `<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-cell">No data</td></tr>';
   } catch (e) { console.error(e); }
+  finally { inflight.procs = false; }
 }
-
 setupControls();
 refreshAll();
 restartTimers();

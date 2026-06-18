@@ -64,6 +64,97 @@ def get_storage() -> Storage:
     return _storage
 
 
+def _find_exact_processes(args_variants: list[str]) -> list[dict]:
+    try:
+        out = subprocess.run(
+            ["ps", "-eo", "pid=,etimes=,args="],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        ).stdout.splitlines()
+        rows: list[dict] = []
+        for line in out:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(None, 2)
+            if len(parts) != 3:
+                continue
+            pid_txt, etimes_txt, args = parts
+            if args.strip() not in args_variants:
+                continue
+            try:
+                rows.append({"pid": int(pid_txt), "uptime_sec": int(etimes_txt), "args": args.strip()})
+            except ValueError:
+                continue
+        return rows
+    except Exception:
+        return []
+
+
+def _runtime_status() -> dict:
+    cfg = load_config()
+    py = sys.executable
+    web_rows = _find_exact_processes(["python3 -m systor serve web", f"{py} -m systor serve web"])
+    collector_rows = _find_exact_processes(["python3 -m systor serve collector", f"{py} -m systor serve collector"])
+
+    def _proc_row(rows: list[dict]) -> dict:
+        if not rows:
+            return {"running": False, "pid": None, "uptime_sec": None}
+        row = rows[0]
+        return {"running": True, "pid": row["pid"], "uptime_sec": row["uptime_sec"]}
+
+    cloudflare = {"running": False, "pid": None, "uptime_sec": None, "label": "cloudflared"}
+    tailscaled = {"running": False, "pid": None, "uptime_sec": None, "label": "tailscaled"}
+    try:
+        out = subprocess.run(["ps", "-eo", "pid=,etimes=,comm=,args="], capture_output=True, text=True, timeout=3).stdout.splitlines()
+        for line in out:
+            parts = line.strip().split(None, 3)
+            if len(parts) < 4:
+                continue
+            pid_txt, etimes_txt, comm, args = parts
+            try:
+                pid = int(pid_txt)
+                etimes = int(etimes_txt)
+            except ValueError:
+                continue
+            if not cloudflare["running"] and (comm == "cloudflared" or args.startswith("cloudflared ")):
+                cloudflare = {"running": True, "pid": pid, "uptime_sec": etimes, "label": "cloudflared"}
+            if not tailscaled["running"] and (comm == "tailscaled" or args.startswith("tailscaled ")):
+                tailscaled = {"running": True, "pid": pid, "uptime_sec": etimes, "label": "tailscaled"}
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "web": _proc_row(web_rows) | {"host": cfg.get("web", {}).get("host", "0.0.0.0"), "port": int(cfg.get("web", {}).get("port", 6677))},
+        "collector": _proc_row(collector_rows) | {"poll_interval_sec": int(cfg.get("collector", {}).get("poll_interval_sec", 30))},
+        "cloudflared": cloudflare,
+        "tailscaled": tailscaled,
+    }
+
+
+def _build_channel_test_message(channel: str) -> str:
+    snap = collect_snapshot()
+    cpu = snap.get("cpu", {}) or {}
+    mem = snap.get("memory", {}) or {}
+    disks = snap.get("disks", []) or []
+    worst_disk = max(disks, key=lambda d: d.get("used_pct", 0), default={})
+    top_cpu = (read_top_processes(n=1, by="cpu") or [{}])[0]
+    lines = [
+        f"Host: {snap.get('hostname', 'systor')}",
+        "State: TEST",
+        f"Metric: {channel.title()} test",
+        f"CPU: {cpu.get('percent', '?')}% · load1 {cpu.get('load_1m', '?')}",
+        f"RAM avail: {mem.get('available_mb', '?')} MB",
+    ]
+    if worst_disk:
+        lines.append(f"Disk: {worst_disk.get('mount', '?')} {worst_disk.get('used_pct', '?')}%")
+    if top_cpu.get("name"):
+        lines.append(f"Top CPU app: {top_cpu.get('name')} ({top_cpu.get('cpu_percent', 0)}% CPU, pid {top_cpu.get('pid')})")
+    return "\n".join(lines)
+
+
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["JSON_SORT_KEYS"] = False
@@ -167,6 +258,10 @@ def create_app() -> Flask:
             "cloudflare": cloudflare,
             "note": "0.0.0.0 means one listener serves localhost, LAN, and Tailscale. Cloudflare Tunnel works if its route targets this port.",
         })
+
+    @app.route("/api/runtime")
+    def api_runtime():
+        return jsonify(_runtime_status())
 
     @app.route("/api/system")
     def api_system():
@@ -277,10 +372,10 @@ def create_app() -> Flask:
         chat = str(body.get("chat_id") or body.get("telegram_chat_id") or tg.get("chat_id", "")).strip()
         if not token or not chat:
             return jsonify({"ok": False, "error": "bot_token or chat_id not set"}), 400
-        msg = body.get("message", "🧪 systor test alert from web UI")
+        msg = body.get("message") or _build_channel_test_message("telegram")
         ok, err = send_telegram(token, chat, msg)
         get_storage().log_notification("telegram", ok, err)
-        return jsonify({"ok": ok, "error": err})
+        return jsonify({"ok": ok, "error": err, "message": msg})
 
     @app.route("/api/test-discord", methods=["POST"])
     def api_test_discord():
@@ -291,10 +386,10 @@ def create_app() -> Flask:
         url = str(body.get("webhook_url") or body.get("discord_webhook_url") or dc.get("webhook_url", "")).strip()
         if not url:
             return jsonify({"ok": False, "error": "webhook_url not set"}), 400
-        msg = body.get("message", "🧪 systor test alert from web UI")
+        msg = body.get("message") or _build_channel_test_message("discord")
         ok, err = send_discord(url, msg)
         get_storage().log_notification("discord", ok, err)
-        return jsonify({"ok": ok, "error": err})
+        return jsonify({"ok": ok, "error": err, "message": msg})
 
     @app.route("/api/config", methods=["GET"])
     def api_config_get():
@@ -425,6 +520,35 @@ def create_app() -> Flask:
             ) + (" Fallback start used." if started_fallback else "")
         })
 
+    @app.route("/api/restart-web", methods=["POST"])
+    def api_restart_web():
+        runtime = _runtime_status()
+        current_pid = runtime.get("web", {}).get("pid")
+        host = runtime.get("web", {}).get("host", "0.0.0.0")
+        port = runtime.get("web", {}).get("port", 6677)
+        workdir = str(Path(__file__).resolve().parents[1])
+        if not current_pid:
+            return jsonify({"ok": False, "error": "web process not found"}), 404
+        script = (
+            f"cd {workdir} && "
+            f"sleep 1 && "
+            f"kill -9 {current_pid} >/dev/null 2>&1 || true && "
+            f"nohup {sys.executable} -m systor serve web >/dev/null 2>&1 &"
+        )
+        try:
+            subprocess.Popen(["bash", "-lc", script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
+            return jsonify({"ok": True, "message": f"Web restart scheduled for PID {current_pid} on {host}:{port}. Refresh this page in 2-3 seconds."})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/api/restart-all", methods=["POST"])
+    def api_restart_all():
+        collector = api_restart_collector().get_json()
+        web = api_restart_web().get_json()
+        ok = bool(collector.get("ok")) and bool(web.get("ok"))
+        code = 200 if ok else 500
+        return jsonify({"ok": ok, "collector": collector, "web": web}), code
+
     @app.route("/logs/raw")
     def api_logs_raw():
         cfg = load_config()
@@ -454,6 +578,19 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "message": f"Cleared {log_file}"})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
+
+    @app.route("/logs/download")
+    def logs_download():
+        cfg = load_config()
+        log_file = cfg.get("logging", {}).get("file", "/var/log/systor/systor.log")
+        p = Path(log_file)
+        if not p.exists():
+            return Response("log file not found\n", status=404, mimetype="text/plain")
+        return Response(
+            p.read_text(errors="replace"),
+            mimetype="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="{p.name}"'},
+        )
 
     @app.route("/health")
     def health():

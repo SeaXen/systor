@@ -318,6 +318,24 @@ tr:hover { background: var(--bg-hover); }
 }
 .settings-page .btn.secondary { background:#20262f; border-color:#3a4350; }
 .settings-page .btn.secondary:hover { background:#29313b; border-color:#4f79c7; }
+.runtime-chip-grid { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 10px; }
+.compact-top { margin-top: 8px; }
+.preset-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.slider-grid { display:grid; gap:10px; grid-template-columns:repeat(3, minmax(0,1fr)); }
+.slider-card { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px; }
+.slider-head { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--text-bright); margin-bottom:8px; }
+.slider-card input[type="range"] { width:100%; accent-color: var(--blue); }
+.kv-mini-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.kv-mini-grid > div { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.kv-mini-grid span { color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+.kv-mini-grid code { color:var(--text-bright); font-size:11px; font-family:var(--mono); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.history-list { display:grid; gap:8px; }
+.history-item { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:grid; gap:6px; }
+.history-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.history-body { font-size:12px; color:var(--text-bright); word-break:break-word; }
+.history-body.ok { color:var(--green); }
+.history-body.err { color:var(--red); }
+.access-item .btn { flex: 0 0 auto; }
 
 /* === Logs view === */
 .log-view {
@@ -349,4 +367,5 @@ tr:hover { background: var(--bg-hover); }
   .sticky-actions { top: 58px; align-items:flex-start; flex-direction:column; }
   .settings-grid { grid-template-columns: 1fr; }
   .notif-field-grid { grid-template-columns: 1fr; }
+  .slider-grid, .kv-mini-grid { grid-template-columns:1fr; }
 }

@@ -9,6 +9,7 @@
       <strong>Settings</strong>
       <span class="status-chip" id="save-state">ready</span>
       <span class="status-chip" id="access-summary">loading access…</span>
+      <span class="status-chip" id="svc-summary">loading services…</span>
       <span class="status-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary">telegram {% if cfg.telegram.enabled %}enabled{% else %}off{% endif %}</span>
       <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary">discord {% if cfg.discord.enabled %}enabled{% else %}off{% endif %}</span>
     </div>
@@ -16,6 +17,7 @@
       <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
       <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
       <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
+      <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
       <button type="submit" form="settings-form" class="btn compact">Save settings</button>
     </div>
   </div>
@@ -25,15 +27,62 @@
       <div class="settings-col">
         <div class="settings-card">
           <h3>Access</h3>
-          <div class="card-subtle">One bind on <code>0.0.0.0</code> serves localhost, LAN, and Tailscale. Cloudflare works if its tunnel routes to port <strong>{{ cfg.web.port }}</strong>.</div>
+          <div class="card-subtle">One bind on <code>0.0.0.0</code> can serve localhost, LAN, Tailscale, and a Cloudflare tunnel target on the same port.</div>
           <div class="access-list" id="access-list">
             <div class="access-item"><span class="kind">loading</span><span class="value">Checking access targets…</span></div>
           </div>
         </div>
 
         <div class="settings-card">
+          <h3>Runtime</h3>
+          <div class="status-row" id="service-row">
+            <span class="status-chip">loading runtime…</span>
+          </div>
+          <div class="runtime-chip-grid" id="runtime-chip-grid">
+            <span class="status-chip">web pid —</span>
+            <span class="status-chip">collector pid —</span>
+            <span class="status-chip">uptime —</span>
+          </div>
+          <div class="notif-field-grid compact-top">
+            <label>Poll interval</label>
+            <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
+            <label>Web bind host</label>
+            <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
+            <label>Web port</label>
+            <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
+          </div>
+          <div class="notif-actions">
+            <span class="inline-help">Restart collector applies new poll interval immediately. Restart web is only needed for host/port changes.</span>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <h3>Alert threshold presets</h3>
+          <div class="card-subtle">Quick presets plus lightweight sliders for CPU, RAM, and temperature.</div>
+          <div class="preset-chip-row">
+            <button type="button" class="btn secondary compact threshold-preset" data-preset="safe">Safe</button>
+            <button type="button" class="btn secondary compact threshold-preset" data-preset="balanced">Balanced</button>
+            <button type="button" class="btn secondary compact threshold-preset" data-preset="aggressive">Aggressive</button>
+          </div>
+          <div class="slider-grid">
+            <div class="slider-card">
+              <div class="slider-head"><strong>CPU load</strong><span id="cpu-load-slider-val">4.0</span></div>
+              <input id="cpu-load-slider" type="range" min="1" max="16" step="0.1">
+            </div>
+            <div class="slider-card">
+              <div class="slider-head"><strong>RAM free</strong><span id="mem-free-slider-val">500 MB</span></div>
+              <input id="mem-free-slider" type="range" min="128" max="4096" step="64">
+            </div>
+            <div class="slider-card">
+              <div class="slider-head"><strong>CPU temp</strong><span id="cpu-temp-slider-val">85 °C</span></div>
+              <input id="cpu-temp-slider" type="range" min="50" max="100" step="1">
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-card">
           <h3>Alert thresholds</h3>
-          <div class="card-subtle">Compact threshold table: enable, value, and required duration before alerting.</div>
+          <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
           {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
           {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
           {% if entry is mapping %}
@@ -87,17 +136,21 @@
             <span class="status-chip {% if cfg.telegram.bot_token and cfg.telegram.chat_id %}ok{% else %}warn{% endif %}">{% if cfg.telegram.bot_token and cfg.telegram.chat_id %}saved credentials{% else %}credentials missing{% endif %}</span>
             <span class="status-chip" id="tg-last-status">untested</span>
           </div>
-          <div class="card-subtle">Current saved Telegram test is failing with 404 if the bot token is wrong. Leave token blank to keep saved token.</div>
           <div class="notif-field-grid">
             <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
-            <div class="inline-help">Turn Telegram alerts on/off without removing saved values.</div>
+            <div class="inline-help">Leave token blank to keep the saved one.</div>
             <label>Bot token</label>
             <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
             <label>Chat ID</label>
             <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
           </div>
+          <div class="kv-mini-grid">
+            <div><span>Last error</span><code id="tg-last-error">—</code></div>
+            <div><span>Copy test payload</span><button type="button" class="btn secondary compact" id="copy-tg-payload">Copy payload</button></div>
+          </div>
           <div class="notif-actions">
-            <button type="button" class="btn secondary compact" id="test-tg">Test current Telegram</button>
+            <button type="button" class="btn secondary compact" id="test-tg">Test Telegram</button>
+            <button type="button" class="btn compact" id="save-test-tg">Save + test Telegram</button>
             <span id="test-tg-result" class="inline-help"></span>
           </div>
         </div>
@@ -109,35 +162,28 @@
             <span class="status-chip {% if cfg.discord.webhook_url %}ok{% else %}warn{% endif %}">{% if cfg.discord.webhook_url %}webhook saved{% else %}webhook missing{% endif %}</span>
             <span class="status-chip" id="dc-last-status">untested</span>
           </div>
-          <div class="card-subtle">Webhook is saved server-side and masked in the UI. Leave blank to keep current webhook.</div>
           <div class="notif-field-grid">
             <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}> Enabled</label>
-            <div class="inline-help">Discord webhook delivery is now working from the backend.</div>
+            <div class="inline-help">Leave webhook blank to keep the saved one.</div>
             <label>Webhook URL</label>
             <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
           </div>
+          <div class="kv-mini-grid">
+            <div><span>Last error</span><code id="dc-last-error">—</code></div>
+            <div><span>Copy test payload</span><button type="button" class="btn secondary compact" id="copy-dc-payload">Copy payload</button></div>
+          </div>
           <div class="notif-actions">
-            <button type="button" class="btn secondary compact" id="test-dc">Test current Discord</button>
+            <button type="button" class="btn secondary compact" id="test-dc">Test Discord</button>
+            <button type="button" class="btn compact" id="save-test-dc">Save + test Discord</button>
             <span id="test-dc-result" class="inline-help"></span>
           </div>
         </div>
 
         <div class="settings-card">
-          <h3>Runtime</h3>
-          <div class="status-row">
-            <span class="status-chip ok">web {{ cfg.web.host }}:{{ cfg.web.port }}</span>
-            <span class="status-chip">poll {{ cfg.collector.poll_interval_sec }}s</span>
-          </div>
-          <div class="notif-field-grid">
-            <label>Poll interval</label>
-            <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
-            <label>Web bind host</label>
-            <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
-            <label>Web port</label>
-            <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
-          </div>
-          <div class="notif-actions">
-            <span class="inline-help">Save & apply reloads thresholds now. Restart collector applies interval immediately. Restart web is only needed for host/port changes.</span>
+          <h3>Notification history</h3>
+          <div class="card-subtle">Latest delivery results from both channels.</div>
+          <div class="history-list" id="notify-history">
+            <div class="history-item"><span class="text-muted">loading…</span></div>
           </div>
         </div>
       </div>
@@ -154,7 +200,15 @@ function showFlash(type, msg, ms = 7000) {
   el.textContent = msg;
   if (ms) setTimeout(() => { el.textContent = ''; el.className = ''; }, ms);
 }
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s) { return String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtUptime(sec) {
+  if (sec === null || sec === undefined) return '—';
+  sec = Number(sec) || 0;
+  const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 function formToJSON(form) {
   const fd = new FormData(form);
   const data = Object.fromEntries(fd.entries());
@@ -180,6 +234,27 @@ async function fetchJSON(url, opts) {
   if (!r.ok) throw new Error(j.error || j.message || ('HTTP ' + r.status));
   return j;
 }
+function buildTestPayload(channel) {
+  const data = formToJSON(document.getElementById('settings-form'));
+  if (channel === 'telegram') {
+    return {
+      telegram_enabled: data.telegram_enabled,
+      telegram_bot_token: data.telegram_bot_token || '',
+      telegram_chat_id: data.telegram_chat_id || '',
+      message: 'auto-generated by /api/test-telegram if omitted'
+    };
+  }
+  return {
+    discord_enabled: data.discord_enabled,
+    discord_webhook_url: data.discord_webhook_url || '',
+    message: 'auto-generated by /api/test-discord if omitted'
+  };
+}
+async function copyPayload(channel) {
+  const payload = JSON.stringify(buildTestPayload(channel), null, 2);
+  await navigator.clipboard.writeText(payload);
+  showFlash('ok', channel + ' payload copied');
+}
 async function saveSettings(thenApply) {
   setSaveState('saving…');
   const data = formToJSON(document.getElementById('settings-form'));
@@ -191,7 +266,7 @@ async function saveSettings(thenApply) {
     showFlash('ok', j.message || 'Saved.');
   }
   setSaveState('saved', 'ok');
-  await refreshStatus();
+  await Promise.all([refreshStatus(), loadRuntime()]);
 }
 async function testChannel(channel) {
   const data = formToJSON(document.getElementById('settings-form'));
@@ -200,10 +275,7 @@ async function testChannel(channel) {
   resultEl.textContent = 'testing…';
   chip.textContent = 'testing…'; chip.className = 'status-chip';
   try {
-    const j = await fetchJSON('/api/test-' + channel, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ...data, message: `🧪 systor ${channel} test from Settings` })
-    });
+    const j = await fetchJSON('/api/test-' + channel, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
     if (j.ok) {
       resultEl.textContent = '✓ sent'; resultEl.style.color = 'var(--green)';
       chip.textContent = 'sent'; chip.className = 'status-chip ok';
@@ -222,15 +294,27 @@ async function testChannel(channel) {
   }
   await refreshStatus();
 }
+async function saveThenTest(channel) {
+  try {
+    await saveSettings(true);
+    await testChannel(channel);
+  } catch (e) {
+    showFlash('err', e.message || 'save failed');
+  }
+}
 async function loadAccess() {
   try {
     const j = await fetchJSON('/api/access');
     const list = [];
-    for (const u of j.localhost_urls || []) list.push(`<div class="access-item"><span class="kind">localhost</span><span class="value">${esc(u)}</span></div>`);
-    for (const u of j.lan_urls || []) list.push(`<div class="access-item"><span class="kind">LAN</span><span class="value">${esc(u)}</span></div>`);
-    for (const u of j.tailscale_urls || []) list.push(`<div class="access-item"><span class="kind">tailscale</span><span class="value">${esc(u)}</span></div>`);
-    list.push(`<div class="access-item"><span class="kind">cloudflare</span><span class="value">${j.cloudflare && j.cloudflare.running ? 'tunnel process detected' : 'not detected'}</span></div>`);
+    for (const u of j.localhost_urls || []) list.push(`<div class="access-item"><span class="kind">localhost</span><span class="value">${esc(u)}</span><button type="button" class="btn secondary compact copy-url" data-url="${esc(u)}">Copy</button></div>`);
+    for (const u of j.lan_urls || []) list.push(`<div class="access-item"><span class="kind">LAN</span><span class="value">${esc(u)}</span><button type="button" class="btn secondary compact copy-url" data-url="${esc(u)}">Copy</button></div>`);
+    for (const u of j.tailscale_urls || []) list.push(`<div class="access-item"><span class="kind">tailscale</span><span class="value">${esc(u)}</span><button type="button" class="btn secondary compact copy-url" data-url="${esc(u)}">Copy</button></div>`);
+    list.push(`<div class="access-item"><span class="kind">cloudflare</span><span class="value">${j.cloudflare && j.cloudflare.running ? 'tunnel process detected' : 'not detected'}</span><button type="button" class="btn secondary compact" disabled>Copy</button></div>`);
     document.getElementById('access-list').innerHTML = list.join('');
+    document.querySelectorAll('.copy-url').forEach(btn => btn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(btn.dataset.url || '');
+      showFlash('ok', 'URL copied');
+    }));
     document.getElementById('access-summary').textContent = `${(j.lan_urls||[]).length} LAN · ${(j.tailscale_urls||[]).length} TS · ${j.cloudflare && j.cloudflare.running ? 'CF on' : 'CF off'}`;
     document.getElementById('access-summary').className = 'status-chip ok';
   } catch (e) {
@@ -238,6 +322,39 @@ async function loadAccess() {
     document.getElementById('access-summary').textContent = 'access check failed';
     document.getElementById('access-summary').className = 'status-chip err';
   }
+}
+async function loadRuntime() {
+  try {
+    const j = await fetchJSON('/api/runtime');
+    const svc = [
+      `<span class="status-chip ${j.web.running ? 'ok' : 'err'}">web ${j.web.running ? 'up' : 'down'}</span>`,
+      `<span class="status-chip ${j.collector.running ? 'ok' : 'err'}">collector ${j.collector.running ? 'up' : 'down'}</span>`,
+      `<span class="status-chip ${j.cloudflared.running ? 'ok' : 'warn'}">cloudflared ${j.cloudflared.running ? 'on' : 'off'}</span>`,
+      `<span class="status-chip ${j.tailscaled.running ? 'ok' : 'warn'}">tailscaled ${j.tailscaled.running ? 'on' : 'off'}</span>`
+    ];
+    document.getElementById('service-row').innerHTML = svc.join('');
+    document.getElementById('svc-summary').textContent = `${j.web.running ? 'web up' : 'web down'} · ${j.collector.running ? 'collector up' : 'collector down'}`;
+    document.getElementById('svc-summary').className = 'status-chip ' + (j.web.running && j.collector.running ? 'ok' : 'err');
+    document.getElementById('runtime-chip-grid').innerHTML = [
+      `<span class="status-chip ok">web pid ${j.web.pid ?? '—'}</span>`,
+      `<span class="status-chip ok">collector pid ${j.collector.pid ?? '—'}</span>`,
+      `<span class="status-chip">web up ${fmtUptime(j.web.uptime_sec)}</span>`,
+      `<span class="status-chip">collector up ${fmtUptime(j.collector.uptime_sec)}</span>`
+    ].join('');
+  } catch (e) {
+    document.getElementById('service-row').innerHTML = `<span class="status-chip err">runtime failed: ${esc(e.message)}</span>`;
+    document.getElementById('svc-summary').textContent = 'runtime failed';
+    document.getElementById('svc-summary').className = 'status-chip err';
+  }
+}
+function renderHistory(rows) {
+  const box = document.getElementById('notify-history');
+  if (!rows.length) { box.innerHTML = '<div class="history-item"><span class="text-muted">No notification history yet.</span></div>'; return; }
+  box.innerHTML = rows.slice(0, 8).map(r => `
+    <div class="history-item">
+      <span class="history-head"><span class="badge ${r.success ? 'ok' : 'fail'}">${r.channel}</span><span class="text-muted">${new Date((r.ts||0)*1000).toLocaleTimeString()}</span></span>
+      <span class="history-body ${r.success ? 'ok' : 'err'}">${r.success ? 'sent' : esc(explainNotifyError(r.error || 'failed'))}</span>
+    </div>`).join('');
 }
 async function refreshStatus() {
   try {
@@ -248,31 +365,77 @@ async function refreshStatus() {
       const chip = document.getElementById('tg-last-status');
       chip.textContent = tg.success ? 'last sent' : 'last failed';
       chip.className = 'status-chip ' + (tg.success ? 'ok' : 'err');
+      document.getElementById('tg-last-error').textContent = tg.success ? '—' : explainNotifyError(tg.error);
       if (!tg.success) document.getElementById('test-tg-result').textContent = explainNotifyError(tg.error);
     }
     if (dc) {
       const chip = document.getElementById('dc-last-status');
       chip.textContent = dc.success ? 'last sent' : 'last failed';
       chip.className = 'status-chip ' + (dc.success ? 'ok' : 'err');
+      document.getElementById('dc-last-error').textContent = dc.success ? '—' : explainNotifyError(dc.error);
       if (!dc.success) document.getElementById('test-dc-result').textContent = explainNotifyError(dc.error);
     }
+    renderHistory(rows);
   } catch (e) {}
+}
+function syncPresetSliders() {
+  const cpuInput = document.querySelector('[name="threshold_cpu_load_1m_value"]');
+  const memInput = document.querySelector('[name="threshold_mem_free_mb_value"]');
+  const tempInput = document.querySelector('[name="threshold_cpu_temp_c_value"]');
+  const cpuSlider = document.getElementById('cpu-load-slider');
+  const memSlider = document.getElementById('mem-free-slider');
+  const tempSlider = document.getElementById('cpu-temp-slider');
+  const repaint = () => {
+    document.getElementById('cpu-load-slider-val').textContent = Number(cpuInput.value || 0).toFixed(1);
+    document.getElementById('mem-free-slider-val').textContent = `${parseInt(memInput.value || 0, 10)} MB`;
+    document.getElementById('cpu-temp-slider-val').textContent = `${parseInt(tempInput.value || 0, 10)} °C`;
+    cpuSlider.value = cpuInput.value || 4.0;
+    memSlider.value = memInput.value || 500;
+    tempSlider.value = tempInput.value || 85;
+  };
+  cpuSlider.addEventListener('input', () => { cpuInput.value = cpuSlider.value; repaint(); setSaveState('unsaved', 'warn'); });
+  memSlider.addEventListener('input', () => { memInput.value = memSlider.value; repaint(); setSaveState('unsaved', 'warn'); });
+  tempSlider.addEventListener('input', () => { tempInput.value = tempSlider.value; repaint(); setSaveState('unsaved', 'warn'); });
+  [cpuInput, memInput, tempInput].forEach(el => el.addEventListener('input', repaint));
+  document.querySelectorAll('.threshold-preset').forEach(btn => btn.addEventListener('click', () => {
+    const p = btn.dataset.preset;
+    if (p === 'safe') {
+      cpuInput.value = 6.0; tempInput.value = 90; memInput.value = 384;
+    } else if (p === 'aggressive') {
+      cpuInput.value = 3.0; tempInput.value = 80; memInput.value = 1024;
+    } else {
+      cpuInput.value = 4.0; tempInput.value = 85; memInput.value = 500;
+    }
+    repaint(); setSaveState('unsaved', 'warn');
+  }));
+  repaint();
 }
 document.getElementById('settings-form').addEventListener('submit', e => { e.preventDefault(); saveSettings(false); });
 document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
 document.getElementById('restart-collector').addEventListener('click', async () => {
   if (!confirm('Restart the collector now? It will be down briefly.')) return;
-  try { const j = await fetchJSON('/api/restart-collector', { method:'POST' }); showFlash('ok', j.message || 'collector restarting'); }
+  try { const j = await fetchJSON('/api/restart-collector', { method:'POST' }); showFlash('ok', j.message || 'collector restarting'); setTimeout(loadRuntime, 1500); }
+  catch(e) { showFlash('err', e.message); }
+});
+document.getElementById('restart-web').addEventListener('click', async () => {
+  if (!confirm('Restart the web dashboard now? The page will need a refresh.')) return;
+  try { const j = await fetchJSON('/api/restart-web', { method:'POST' }); showFlash('ok', j.message || 'web restarting', 9000); }
   catch(e) { showFlash('err', e.message); }
 });
 document.getElementById('reload-page').addEventListener('click', () => location.reload());
 document.getElementById('test-tg').addEventListener('click', () => testChannel('telegram'));
 document.getElementById('test-dc').addEventListener('click', () => testChannel('discord'));
+document.getElementById('save-test-tg').addEventListener('click', () => saveThenTest('telegram'));
+document.getElementById('save-test-dc').addEventListener('click', () => saveThenTest('discord'));
+document.getElementById('copy-tg-payload').addEventListener('click', () => copyPayload('telegram'));
+document.getElementById('copy-dc-payload').addEventListener('click', () => copyPayload('discord'));
 Array.from(document.querySelectorAll('#settings-form input, #settings-form select')).forEach(el => {
   el.addEventListener('change', () => setSaveState('unsaved', 'warn'));
   el.addEventListener('input', () => setSaveState('unsaved', 'warn'));
 });
+syncPresetSliders();
 loadAccess();
+loadRuntime();
 refreshStatus();
 </script>
 {% endblock %}
