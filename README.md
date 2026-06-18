@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="docs/systor-logo.png" alt="systor logo" width="140">
+</p>
+
 # systor
 
-**Lightweight Linux system monitor with a web dashboard, sustained-threshold alerts, and Telegram / Discord notifications.**
+**Lightweight Linux system monitor with a branded web dashboard, sustained-threshold alerts, and Telegram / Discord notifications.**
 
 Built for resource-constrained machines where Prometheus + Grafana is overkill, and where you still want clean dashboards and real alerts that don't fire on a single spike.
 
@@ -20,7 +24,7 @@ systor — system monitor
 - **Hot-reload config** — change thresholds in the UI, collector picks them up within one poll cycle
 - **SQLite storage** — 7 days raw + 90 days aggregated by default
 - **~15 MB RAM** — collector ~10 MB, web server ~20 MB peak
-- **No cron** — runs as a systemd user service, auto-restarts on crash
+- **No cron** — runs as systemd services, auto-restarts on crash and starts on boot
 - **Standalone** — no Hermes, no Docker, no external services
 - **CLI** — `systor status`, `systor setup telegram`, `systor test`
 
@@ -113,7 +117,7 @@ systor config show             # dump current config as JSON
    ├── collector.log
    └── web.log
 
-   systemd user services:
+   systemd services:
    ├── systor-collector.service   ← polls every 30s
    └── systor-web.service         ← Flask on port 6677
 ```

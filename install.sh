@@ -60,30 +60,13 @@ else
 fi
 
 echo "==> Installing systemd services"
-USER_NAME="${SUDO_USER:-root}"
-USER_UID=$(id -u "$USER_NAME")
-mkdir -p "/home/$USER_NAME/.config/systemd/user" 2>/dev/null || true
-
-# If user-level services (recommended for non-root), install in ~/.config/systemd/user/
-if [[ "$USER_NAME" != "root" ]]; then
-  mkdir -p "/home/$USER_NAME/.config/systemd/user"
-  cp "$SRC_DIR/systemd/systor-collector.service" "/home/$USER_NAME/.config/systemd/user/"
-  cp "$SRC_DIR/systemd/systor-web.service"      "/home/$USER_NAME/.config/systemd/user/"
-  chown -R "$USER_NAME:" "/home/$USER_NAME/.config/systemd/user/systor-"*.service
-  echo "  Installed user services in /home/$USER_NAME/.config/systemd/user/"
-  echo ""
-  echo "  Enable with:"
-  echo "    sudo loginctl enable-linger $USER_NAME   # run user services at boot"
-  echo "    sudo -u $USER_NAME systemctl --user daemon-reload"
-  echo "    sudo -u $USER_NAME systemctl --user enable --now systor-collector systor-web"
-else
-  # System-level (root)
-  cp "$SRC_DIR/systemd/systor-collector.service" /etc/systemd/system/
-  cp "$SRC_DIR/systemd/systor-web.service"      /etc/systemd/system/
-  systemctl daemon-reload
-  systemctl enable --now systor-collector systor-web
-  echo "  Installed + started system services"
-fi
+# Always install as system services so boot-autostart works on a fresh device
+# with just: sudo ./install.sh
+cp "$SRC_DIR/systemd/systor-collector.service" /etc/systemd/system/
+cp "$SRC_DIR/systemd/systor-web.service"      /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now systor-collector systor-web
+echo "  Installed + enabled system services for boot autostart"
 
 echo ""
 echo "==> Done!"
@@ -93,5 +76,5 @@ echo "    Config:        $CONF_DIR/config.yaml"
 echo ""
 echo "Quick checks:"
 echo "    systor status"
-echo "    sudo -u $USER_NAME systemctl --user status systor-collector"
-echo "    sudo -u $USER_NAME systemctl --user status systor-web"
+echo "    systemctl status systor-collector"
+echo "    systemctl status systor-web"

@@ -175,6 +175,8 @@
               <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
               <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
             </select>
+            <label>Rows per card</label>
+            <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
           </div>
         </div>
 

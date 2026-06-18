@@ -4,13 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}systor{% endblock %}</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.3">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.5">
 </head>
 <body>
 <div class="header">
   <div class="header-left">
-    <h1>systor<span>.</span></h1>
-    <div class="sub">system monitor</div>
+    <div class="brand-row">
+      <img class="brand-logo" src="{{ url_for('static', filename='img/systor-logo.png') }}?v=1" alt="systor logo">
+      <div>
+        <h1>systor<span>.</span></h1>
+        <div class="sub" id="global-header-meta">system monitor</div>
+      </div>
+    </div>
   </div>
   <div class="actions">
     <nav class="page-tabs">
@@ -27,5 +33,22 @@
   {% block content %}{% endblock %}
 </div>
 {% block scripts %}{% endblock %}
+<script>
+(function(){
+  const el = document.getElementById('global-header-meta');
+  if(!el) return;
+  function fmt(n, unit){ if(n===null||n===undefined||Number.isNaN(Number(n))) return '—'; const v=Number(n); const s=Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2); return s+(unit?' '+unit:''); }
+  async function getJSON(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+  async function update(){
+    try{
+      const [snap, runtime] = await Promise.all([getJSON('/api/snapshot'), getJSON('/api/runtime')]);
+      const cpu=snap.cpu||{}, mem=snap.memory||{}, web=runtime.web||{}, collector=runtime.collector||{}, st=runtime.storage||{};
+      const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null;
+      el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(st.total_mb,'MB')}</strong></span>`;
+    } catch(e) { /* keep fallback text */ }
+  }
+  update(); setInterval(update, 15000);
+})();
+</script>
 </body>
 </html>

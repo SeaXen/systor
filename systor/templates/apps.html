@@ -17,14 +17,6 @@
           <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker</option>
         </select>
       </label>
-      <label>sort
-        <select id="apps-sort" class="control-select">
-          <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
-          <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
-          <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
-          <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
-        </select>
-      </label>
       <label>refresh
         <select id="apps-refresh-sec" class="control-select">
           <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
@@ -36,47 +28,194 @@
           <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
         </select>
       </label>
+      <label>rows
+        <select id="apps-limit" class="control-select">
+          {% for n in [6,8,10,12,15,20] %}
+          <option value="{{ n }}" {% if (cfg.apps.default_limit or 10) == n %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button class="btn secondary compact" id="apps-refresh">Refresh</button>
     </div>
   </div>
 
-  <div class="network-grid network-kpis network-kpis-6">
-    <div class="stat-card compact-stat compact-row-card"><div class="label">Host apps</div><div class="value" id="host-count">—</div></div>
-    <div class="stat-card compact-stat compact-row-card"><div class="label">Docker apps</div><div class="value" id="docker-count">—</div></div>
+  <div class="apps-top-grid">
     <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Host CPU</div><div class="value rx-text" id="host-cpu">—</div></div>
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Host RAM</div><div class="value" id="host-mem">—</div></div>
     <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Docker CPU</div><div class="value rx-text" id="docker-cpu">—</div></div>
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Docker RAM</div><div class="value" id="docker-mem">—</div></div>
   </div>
 
-  <div class="table-card compact-table">
-    <h3><span>Apps usage</span><span class="network-mini" id="apps-title-meta">0 rows</span></h3>
-    <table class="apps-table aligned-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Kind</th>
-          <th class="text-right">CPU%</th>
-          <th class="text-right">RAM</th>
-          <th class="text-right">Network</th>
-          <th class="text-right">Disk</th>
-          <th>Usage chart</th>
-        </tr>
-      </thead>
-      <tbody id="apps-body"><tr><td colspan="7" class="empty-cell">Loading…</td></tr></tbody>
-    </table>
+  <div class="apps-metric-grid">
+    <div class="table-card compact-table apps-metric-card">
+      <div class="apps-card-head">
+        <h3><span>Top CPU apps</span><span class="network-mini" id="cpu-title-meta">—</span></h3>
+        <div class="apps-pager" id="cpu-pager"></div>
+      </div>
+      <table class="apps-table aligned-table small-metric-table compact-apps-table">
+        <thead><tr><th>App</th><th>Kind</th><th class="text-right">CPU%</th><th>Usage</th></tr></thead>
+        <tbody id="apps-cpu-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="table-card compact-table apps-metric-card">
+      <div class="apps-card-head">
+        <h3><span>Top RAM apps</span><span class="network-mini" id="mem-title-meta">—</span></h3>
+        <div class="apps-pager" id="mem-pager"></div>
+      </div>
+      <table class="apps-table aligned-table small-metric-table compact-apps-table">
+        <thead><tr><th>App</th><th>Kind</th><th class="text-right">RAM</th><th>Usage</th></tr></thead>
+        <tbody id="apps-mem-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="table-card compact-table apps-metric-card">
+      <div class="apps-card-head">
+        <h3><span>Top Disk apps</span><span class="network-mini" id="disk-title-meta">—</span></h3>
+        <div class="apps-pager" id="disk-pager"></div>
+      </div>
+      <table class="apps-table aligned-table small-metric-table compact-apps-table">
+        <thead><tr><th>App</th><th>Kind</th><th class="text-right">Disk</th><th>Usage</th></tr></thead>
+        <tbody id="apps-disk-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="table-card compact-table apps-metric-card">
+      <div class="apps-card-head">
+        <h3><span>Top Network apps</span><span class="network-mini" id="net-title-meta">—</span></h3>
+        <div class="apps-pager" id="net-pager"></div>
+      </div>
+      <table class="apps-table aligned-table small-metric-table compact-apps-table">
+        <thead><tr><th>App</th><th>Kind</th><th class="text-right">Network</th><th>Usage</th></tr></thead>
+        <tbody id="apps-net-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
   </div>
+
+  <details class="table-card compact-table apps-all-card" id="apps-all-wrap">
+    <summary class="apps-all-summary">
+      <span><strong>Show all apps</strong></span>
+      <span class="network-mini" id="apps-all-meta">full list</span>
+    </summary>
+    <div class="apps-all-controls">
+      <label>rows
+        <select id="apps-all-limit" class="control-select">
+          {% for n in [10,20,25,50,100] %}
+          <option value="{{ n }}" {% if n == 25 %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="apps-pager" id="all-pager"></div>
+    </div>
+    <table class="apps-table aligned-table compact-apps-table apps-full-table">
+      <thead><tr><th>App</th><th>Kind</th><th class="text-right">CPU%</th><th class="text-right">RAM</th><th class="text-right">Disk</th><th class="text-right">Network</th></tr></thead>
+      <tbody id="apps-all-body"><tr><td colspan="6" class="empty-cell">Loading…</td></tr></tbody>
+    </table>
+  </details>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
 let appsTimer=null, appsLoading=false;
+const state = { rawRows: [], pages: { cpu:1, mem:1, disk:1, net:1, all:1 } };
 function bytesMB(n){ n=Number(n||0); if(n>=1024) return (n/1024).toFixed(2)+' GB'; return n.toFixed(2)+' MB'; }
 async function fetchJSON(url, opts){ const r=await fetch(url, Object.assign({cache:'no-store'}, opts||{})); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
-function usageCell(row){ const cpu=Math.min(100, Number(row.cpu_percent||0)); const mem=Math.min(100, Number(row.mem_percent||0) || Math.min(100, Number(row.mem_mb||0)/50)); const net=Math.min(100, (Number(row.net_in_mb||0)+Number(row.net_out_mb||0))*2); const disk=Math.min(100, (Number(row.disk_in_mb||0)+Number(row.disk_out_mb||0))*2); return `<div class="app-usage-bars"><div class="app-bar-row"><span class="rx-text">CPU</span><div class="app-bar"><i class="cpu" style="width:${cpu}%"></i></div></div><div class="app-bar-row"><span class="tx-text">RAM</span><div class="app-bar"><i class="mem" style="width:${mem}%"></i></div></div><div class="app-bar-row"><span class="rx-text">NET</span><div class="app-bar"><i class="net" style="width:${net}%"></i></div></div><div class="app-bar-row"><span class="tx-text">DSK</span><div class="app-bar"><i class="disk" style="width:${disk}%"></i></div></div></div>`; }
-async function loadApps(){ const scope=document.getElementById('apps-scope').value; const sort=document.getElementById('apps-sort').value; const j=await fetchJSON(`/api/apps?scope=${scope}&sort=${sort}&limit=30`); document.getElementById('host-count').textContent=j.host_count; document.getElementById('docker-count').textContent=j.docker_count; document.getElementById('host-cpu').textContent=(j.summary.host_cpu||0).toFixed(2)+'%'; document.getElementById('host-mem').textContent=bytesMB(j.summary.host_mem_mb||0); document.getElementById('docker-cpu').textContent=(j.summary.docker_cpu||0).toFixed(2)+'%'; document.getElementById('docker-mem').textContent=bytesMB(j.summary.docker_mem_mb||0); document.getElementById('apps-title-meta').textContent=`${j.rows.length} rows · ${scope} · sort ${sort}`; const body=document.getElementById('apps-body'); if(!(j.rows||[]).length){ body.innerHTML='<tr><td colspan="7" class="empty-cell">No apps found</td></tr>'; return; } body.innerHTML=j.rows.map(r=>`<tr><td><div class="app-name-cell"><strong>${r.name}</strong>${r.kind==='host'&&r.pid?`<span class="text-muted mono">pid ${r.pid}</span>`:''}</div></td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${Number(r.cpu_percent||0).toFixed(2)}</td><td class="text-right mono">${bytesMB(r.mem_mb||0)}</td><td class="text-right mono">${bytesMB((r.net_in_mb||0)+(r.net_out_mb||0))}</td><td class="text-right mono">${bytesMB((r.disk_in_mb||0)+(r.disk_out_mb||0))}</td><td>${usageCell(r)}</td></tr>`).join(''); }
+function metricVal(row, metric){
+  if(metric==='cpu') return Number(row.cpu_percent||0).toFixed(2)+'%';
+  if(metric==='mem') return bytesMB(row.mem_mb||0);
+  if(metric==='disk') return bytesMB((row.disk_in_mb||0)+(row.disk_out_mb||0));
+  return bytesMB((row.net_in_mb||0)+(row.net_out_mb||0));
+}
+function usageCell(row, metric){
+  const cpu=Math.min(100, Number(row.cpu_percent||0));
+  const mem=Math.min(100, Number(row.mem_percent||0) || Math.min(100, Number(row.mem_mb||0)/50));
+  const diskMb=(Number(row.disk_in_mb||0)+Number(row.disk_out_mb||0));
+  const disk=Math.min(100, diskMb*2);
+  const netMb=(Number(row.net_in_mb||0)+Number(row.net_out_mb||0));
+  const net=Math.min(100, netMb*2);
+  const val = metric==='cpu' ? `${Number(row.cpu_percent||0).toFixed(1)}%` : metric==='mem' ? bytesMB(row.mem_mb||0) : metric==='disk' ? bytesMB(diskMb) : bytesMB(netMb);
+  const cls = metric==='cpu' ? 'cpu' : metric==='mem' ? 'mem' : metric==='disk' ? 'disk' : 'net';
+  const width = metric==='cpu' ? cpu : metric==='mem' ? mem : metric==='disk' ? disk : net;
+  const label = metric==='cpu' ? 'CPU' : metric==='mem' ? 'RAM' : metric==='disk' ? 'DSK' : 'NET';
+  return `<div class="single-app-bar"><span class="${cls==='cpu'?'rx-text':cls==='mem'?'tx-text':cls==='disk'?'disk-text':'net-text'}">${label}</span><strong>${val}</strong><div class="app-bar"><i class="${cls}" style="width:${width}%"></i></div></div>`;
+}
+function rowName(r){
+  const pid = r.kind==='host' && r.pid ? `<span class="app-pid mono">${r.pid}</span>` : '';
+  return `<div class="app-inline-cell">${pid}<strong class="app-inline-name">${r.name}</strong></div>`;
+}
+function metricSort(metric){
+  return (a,b)=>{
+    const va = metric==='cpu' ? Number(a.cpu_percent||0) : metric==='mem' ? Number(a.mem_mb||0) : metric==='disk' ? Number(a.disk_in_mb||0)+Number(a.disk_out_mb||0) : Number(a.net_in_mb||0)+Number(a.net_out_mb||0);
+    const vb = metric==='cpu' ? Number(b.cpu_percent||0) : metric==='mem' ? Number(b.mem_mb||0) : metric==='disk' ? Number(b.disk_in_mb||0)+Number(b.disk_out_mb||0) : Number(b.net_in_mb||0)+Number(b.net_out_mb||0);
+    return vb - va;
+  };
+}
+function pageSlice(rows, key, pageSize){
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  state.pages[key] = Math.min(totalPages, Math.max(1, state.pages[key] || 1));
+  const start = (state.pages[key]-1) * pageSize;
+  return { totalPages, pageRows: rows.slice(start, start + pageSize) };
+}
+function renderPager(key, totalRows, pageSize, mountId){
+  const mount = document.getElementById(mountId);
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const page = Math.min(totalPages, Math.max(1, state.pages[key] || 1));
+  mount.innerHTML = `<button class="pager-btn" ${page<=1?'disabled':''} data-page-key="${key}" data-page-dir="-1">‹</button><span class="pager-text">${page}/${totalPages}</span><button class="pager-btn" ${page>=totalPages?'disabled':''} data-page-key="${key}" data-page-dir="1">›</button>`;
+}
+function renderRows(metric, rows, bodyId, key, pagerId, titleId, pageSize, scope, note=''){
+  const body=document.getElementById(bodyId);
+  if(!(rows||[]).length){ body.innerHTML=`<tr><td colspan="4" class="empty-cell">No apps found</td></tr>`; document.getElementById(titleId).textContent=`0 rows · ${scope}${note}`; renderPager(key, 0, pageSize, pagerId); return; }
+  const { totalPages, pageRows } = pageSlice(rows, key, pageSize);
+  body.innerHTML = pageRows.map(r=>`<tr><td>${rowName(r)}</td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${metricVal(r, metric)}</td><td>${usageCell(r, metric)}</td></tr>`).join('');
+  document.getElementById(titleId).textContent = `${rows.length} rows · ${scope} · page ${state.pages[key]}/${totalPages}${note}`;
+  renderPager(key, rows.length, pageSize, pagerId);
+}
+function renderAllRows(rows, scope){
+  const pageSize = Number(document.getElementById('apps-all-limit').value || 25);
+  const body = document.getElementById('apps-all-body');
+  if(!rows.length){ body.innerHTML = '<tr><td colspan="6" class="empty-cell">No apps found</td></tr>'; document.getElementById('apps-all-meta').textContent='0 rows'; renderPager('all', 0, pageSize, 'all-pager'); return; }
+  const { totalPages, pageRows } = pageSlice(rows, 'all', pageSize);
+  body.innerHTML = pageRows.map(r=>`<tr><td>${rowName(r)}</td><td><span class="kind-pill ${r.kind}">${r.kind}</span></td><td class="text-right mono">${metricVal(r,'cpu')}</td><td class="text-right mono">${metricVal(r,'mem')}</td><td class="text-right mono">${metricVal(r,'disk')}</td><td class="text-right mono">${metricVal(r,'net')}</td></tr>`).join('');
+  document.getElementById('apps-all-meta').textContent = `${rows.length} rows · ${scope} · page ${state.pages.all}/${totalPages}`;
+  renderPager('all', rows.length, pageSize, 'all-pager');
+}
+function repaintFromRows(scope, summary){
+  const rows = state.rawRows || [];
+  const pageSize = Number(document.getElementById('apps-limit').value || 10);
+  const cpuRows = [...rows].sort(metricSort('cpu'));
+  const memRows = [...rows].sort(metricSort('mem'));
+  const diskRows = [...rows].sort(metricSort('disk'));
+  const netRows = [...rows].sort(metricSort('net'));
+  renderRows('cpu', cpuRows, 'apps-cpu-body', 'cpu', 'cpu-pager', 'cpu-title-meta', pageSize, scope);
+  renderRows('mem', memRows, 'apps-mem-body', 'mem', 'mem-pager', 'mem-title-meta', pageSize, scope);
+  renderRows('disk', diskRows, 'apps-disk-body', 'disk', 'disk-pager', 'disk-title-meta', pageSize, scope);
+  renderRows('net', netRows, 'apps-net-body', 'net', 'net-pager', 'net-title-meta', pageSize, scope, ' · best for docker');
+  renderAllRows(rows, scope);
+  document.getElementById('host-cpu').textContent=(summary.host_cpu||0).toFixed(2)+'%';
+  document.getElementById('host-mem').textContent=bytesMB(summary.host_mem_mb||0);
+  document.getElementById('docker-cpu').textContent=(summary.docker_cpu||0).toFixed(2)+'%';
+  document.getElementById('docker-mem').textContent=bytesMB(summary.docker_mem_mb||0);
+}
+async function loadApps(){
+  const scope=document.getElementById('apps-scope').value;
+  const j = await fetchJSON(`/api/apps?scope=${scope}&sort=raw&limit=1000`);
+  state.rawRows = j.rows || [];
+  state.summary = j.summary || {};
+  document.getElementById('apps-meta').textContent=`host ${j.host_count} · docker ${j.docker_count} · full table below`;
+  repaintFromRows(scope, state.summary);
+}
 function resetAppsTimer(){ clearInterval(appsTimer); const sec=Number(document.getElementById('apps-refresh-sec').value||15); appsTimer=setInterval(()=>{ if(!appsLoading) refreshApps(); }, sec*1000); }
 async function refreshApps(){ if(appsLoading) return; appsLoading=true; document.getElementById('apps-updated').textContent='loading…'; try{ await loadApps(); document.getElementById('apps-updated').textContent='updated '+new Date().toLocaleTimeString(); } catch(e){ document.getElementById('apps-updated').textContent='error: '+e.message; } finally { appsLoading=false; } }
-document.getElementById('apps-refresh').addEventListener('click', refreshApps); document.getElementById('apps-scope').addEventListener('change', refreshApps); document.getElementById('apps-sort').addEventListener('change', refreshApps); document.getElementById('apps-refresh-sec').addEventListener('change', resetAppsTimer); refreshApps(); resetAppsTimer();
+document.addEventListener('click', (ev)=>{
+  const btn = ev.target.closest('[data-page-key]');
+  if(!btn) return;
+  const key = btn.getAttribute('data-page-key');
+  const dir = Number(btn.getAttribute('data-page-dir') || 0);
+  state.pages[key] = Math.max(1, (state.pages[key] || 1) + dir);
+  repaintFromRows(document.getElementById('apps-scope').value, state.summary || {});
+});
+document.getElementById('apps-refresh').addEventListener('click', refreshApps);
+document.getElementById('apps-scope').addEventListener('change', ()=>{ state.pages={ cpu:1, mem:1, disk:1, net:1, all:1 }; refreshApps(); });
+document.getElementById('apps-limit').addEventListener('change', ()=>{ state.pages.cpu=1; state.pages.mem=1; state.pages.disk=1; state.pages.net=1; repaintFromRows(document.getElementById('apps-scope').value, state.summary || {}); });
+document.getElementById('apps-all-limit').addEventListener('change', ()=>{ state.pages.all=1; repaintFromRows(document.getElementById('apps-scope').value, state.summary || {}); });
+document.getElementById('apps-refresh-sec').addEventListener('change', resetAppsTimer);
+refreshApps(); resetAppsTimer();
 </script>
 {% endblock %}

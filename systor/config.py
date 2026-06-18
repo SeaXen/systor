@@ -55,6 +55,7 @@ DEFAULT_CONFIG: dict = {
         "auto_refresh_sec": 15,
         "default_scope": "all",
         "default_sort": "cpu",
+        "default_limit": 10,
     },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
@@ -143,6 +144,7 @@ def _apply_env(cfg: dict) -> None:
         "SYSTOR_DASHBOARD_REFRESH_SEC":  ("dashboard", "refresh_sec", int, None),
         "SYSTOR_DASHBOARD_CHART_SEC":    ("dashboard", "chart_refresh_sec", int, None),
         "SYSTOR_APPS_REFRESH_SEC":       ("apps", "auto_refresh_sec", int, None),
+        "SYSTOR_APPS_LIMIT":             ("apps", "default_limit", int, None),
         "SYSTOR_WEB_PORT":               ("web", "port", int, None),
         "SYSTOR_WEB_HOST":               ("web", "host", str, None),
     }

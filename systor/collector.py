@@ -106,26 +106,26 @@ def _build_alert_body(subject: str, metric_key: str, kind: str, value, threshold
     host = snap.get("hostname", "host")
     cpu = snap.get("cpu", {}) or {}
     mem = snap.get("memory", {}) or {}
+    state_emoji = "🚨" if kind == 'alert' else "✅"
     parts = [
-        f"Host: {host}",
-        f"State: {'ALERT' if kind == 'alert' else 'RECOVERED'}",
-        f"Metric: {subject}",
-        f"Detail: {msg}",
+        f"{state_emoji} {host}",
+        f"<b>{subject}</b>",
+        f"{msg}",
     ]
     if metric_key == "disk":
         if worst_disk:
-            parts.append(f"Disk: {worst_disk.get('mount', '?')} · {worst_disk.get('used_gb', '?')}/{worst_disk.get('size_gb', '?')} GB used")
+            parts.append(f"💽 {worst_disk.get('mount', '?')} · {worst_disk.get('used_gb', '?')}/{worst_disk.get('size_gb', '?')} GB")
     elif metric_key == "cpu_load":
-        parts.append(f"CPU now: {cpu.get('percent', '?')}% · load1 {cpu.get('load_1m', '?')}")
+        parts.append(f"🧠 CPU {cpu.get('percent', '?')}% · 1m {cpu.get('load_1m', '?')} · 5m {cpu.get('load_5m', '?')}")
     elif metric_key == "cpu_temperature":
-        parts.append(f"CPU temp now: {cpu.get('temp_c', '?')}°C")
+        parts.append(f"🌡️ CPU temp {cpu.get('temp_c', '?')}°C")
     elif metric_key == "memory":
-        parts.append(f"RAM avail: {mem.get('available_mb', '?')} MB · used {mem.get('used_mb', '?')} MB")
+        parts.append(f"🧮 RAM free {mem.get('available_mb', '?')} MB · used {mem.get('used_mb', '?')} MB")
     elif metric_key == "swap":
-        parts.append(f"Swap used: {mem.get('swap_used_mb', '?')} MB")
+        parts.append(f"📦 Swap used {mem.get('swap_used_mb', '?')} MB")
     cause = _top_cause_line(metric_key)
     if cause and kind == "alert":
-        parts.append(cause)
+        parts.append(f"🔥 {cause.replace('Top CPU app: ','').replace('Top memory app: ','')}")
     return "\n".join(parts)
 
 

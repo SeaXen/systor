@@ -241,17 +241,23 @@ def _build_channel_test_message(channel: str) -> str:
     disks = snap.get("disks", []) or []
     worst_disk = max(disks, key=lambda d: d.get("used_pct", 0), default={})
     top_cpu = (read_top_processes(n=1, by="cpu") or [{}])[0]
-    lines = [
-        f"Host: {snap.get('hostname', 'systor')}",
-        "State: TEST",
-        f"Metric: {channel.title()} test",
-        f"CPU: {cpu.get('percent', '?')}% · load1 {cpu.get('load_1m', '?')}",
-        f"RAM avail: {mem.get('available_mb', '?')} MB",
-    ]
-    if worst_disk:
-        lines.append(f"Disk: {worst_disk.get('mount', '?')} {worst_disk.get('used_pct', '?')}%")
-    if top_cpu.get("name"):
-        lines.append(f"Top CPU app: {top_cpu.get('name')} ({top_cpu.get('cpu_percent', 0)}% CPU, pid {top_cpu.get('pid')})")
+    host = snap.get('hostname', 'systor')
+    cpu_line = f"🧠 CPU {cpu.get('percent', '?')}% · load {cpu.get('load_1m', '?')}"
+    ram_line = f"🧮 RAM free {mem.get('available_mb', '?')} MB"
+    disk_line = f"💽 Disk {worst_disk.get('mount', '?')} {worst_disk.get('used_pct', '?')}%" if worst_disk else ""
+    app_line = f"🔥 {top_cpu.get('name')} {top_cpu.get('cpu_percent', 0)}% CPU" if top_cpu.get('name') else ""
+    if channel == 'telegram':
+        lines = [f"🧪 <b>Systor Telegram test</b>", f"🏷️ {host}", cpu_line, ram_line]
+        if disk_line:
+            lines.append(disk_line)
+        if app_line:
+            lines.append(app_line)
+        return "\n".join(lines)
+    lines = ["🧪 **Systor Discord test**", f"🏷️ **{host}**", cpu_line, ram_line]
+    if disk_line:
+        lines.append(disk_line)
+    if app_line:
+        lines.append(app_line)
     return "\n".join(lines)
 
 
@@ -397,7 +403,7 @@ def create_app() -> Flask:
     def api_apps():
         scope = request.args.get("scope", "all")
         sort_by = request.args.get("sort", "cpu")
-        limit = max(1, min(60, int(request.args.get("limit", 24))))
+        limit = max(1, min(1000, int(request.args.get("limit", 24))))
         host_rows = _host_apps(limit=limit)
         docker_rows = _docker_apps(limit=limit)
         rows = []
@@ -405,13 +411,14 @@ def create_app() -> Flask:
             rows.extend(host_rows)
         if scope in ("all", "docker"):
             rows.extend(docker_rows)
-        sort_key = {
-            "cpu": lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)),
-            "mem": lambda r: (r.get("mem_mb", 0), r.get("cpu_percent", 0)),
-            "net": lambda r: ((r.get("net_in_mb", 0) + r.get("net_out_mb", 0)), r.get("cpu_percent", 0)),
-            "disk": lambda r: ((r.get("disk_in_mb", 0) + r.get("disk_out_mb", 0)), r.get("cpu_percent", 0)),
-        }.get(sort_by, lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)))
-        rows.sort(key=sort_key, reverse=True)
+        if sort_by != "raw":
+            sort_key = {
+                "cpu": lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)),
+                "mem": lambda r: (r.get("mem_mb", 0), r.get("cpu_percent", 0)),
+                "net": lambda r: ((r.get("net_in_mb", 0) + r.get("net_out_mb", 0)), r.get("cpu_percent", 0)),
+                "disk": lambda r: ((r.get("disk_in_mb", 0) + r.get("disk_out_mb", 0)), r.get("cpu_percent", 0)),
+            }.get(sort_by, lambda r: (r.get("cpu_percent", 0), r.get("mem_mb", 0)))
+            rows.sort(key=sort_key, reverse=True)
         rows = rows[:limit]
         return jsonify({
             "ok": True,
@@ -550,6 +557,9 @@ def create_app() -> Flask:
             cfg.setdefault("apps", {})
             if "apps_auto_refresh_sec" in data and data["apps_auto_refresh_sec"]:
                 try: cfg["apps"]["auto_refresh_sec"] = max(1, int(data["apps_auto_refresh_sec"]))
+                except (ValueError, TypeError): pass
+            if "apps_default_limit" in data and data["apps_default_limit"]:
+                try: cfg["apps"]["default_limit"] = max(4, min(30, int(data["apps_default_limit"])))
                 except (ValueError, TypeError): pass
             if "apps_default_scope" in data and data["apps_default_scope"] in ("all", "host", "docker"):
                 cfg["apps"]["default_scope"] = data["apps_default_scope"]
