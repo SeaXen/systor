@@ -1,221 +1,278 @@
 {% extends "base.html" %}
 {% block title %}systor · Settings{% endblock %}
 {% block content %}
-<div class="page-title">Settings</div>
-<div id="flash"></div>
+<div class="settings-page">
+  <div id="flash"></div>
 
-<form id="settings-form">
-<div class="section">
-  <h3>Alert Thresholds</h3>
-  <div class="text-muted" style="font-size:12px;margin-bottom:14px">
-    For each metric: enable the alert, set the threshold value, and how long it must stay
-    above/below that value (in minutes) before the notification fires.
-  </div>
-
-  {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
-  {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
-  {% if entry is mapping %}
-    {% set enabled = entry.get("enabled", true) %}
-    {% set value = entry.get("value", default_value) %}
-    {% set duration = entry.get("duration_min", default_min) %}
-  {% else %}
-    {% set enabled = true %}
-    {% set value = entry %}
-    {% set duration = default_min %}
-  {% endif %}
-  <div class="form-row">
-    <label>
-      <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
-      <span class="threshold-title">{{ label }}</span>
-    </label>
-    <div class="input-group">
-      <span class="text-muted" style="font-size:12px">
-        {% if higher_is_worse %}alert when &gt;{% else %}alert when &lt;{% endif %}
-      </span>
-      <input type="number" step="any" name="threshold_{{ metric_key }}_value"
-             value="{{ value }}" placeholder="{{ default_value }}">
-      <span class="suffix">{{ unit }}</span>
-      <span class="text-muted" style="font-size:12px;margin-left:8px">for</span>
-      <input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration"
-             value="{{ duration }}" placeholder="{{ default_min }}">
-      <span class="suffix">minutes</span>
+  <div class="sticky-actions">
+    <div class="meta">
+      <strong>Settings</strong>
+      <span class="status-chip" id="save-state">ready</span>
+      <span class="status-chip" id="access-summary">loading access…</span>
+      <span class="status-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary">telegram {% if cfg.telegram.enabled %}enabled{% else %}off{% endif %}</span>
+      <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary">discord {% if cfg.discord.enabled %}enabled{% else %}off{% endif %}</span>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
+      <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
+      <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
+      <button type="submit" form="settings-form" class="btn compact">Save settings</button>
     </div>
   </div>
-  {%- endmacro %}
 
-  {{ threshold_row("cpu_load_1m",   "CPU load (1m avg)",   "",   4.0, 2, True) }}
-  {{ threshold_row("cpu_temp_c",    "CPU temperature",     "°C", 85.0, 3, True) }}
-  {{ threshold_row("mem_free_mb",   "Memory free (drop below)", "MB",  500, 2, False) }}
-  {{ threshold_row("swap_used_mb",  "Swap used",           "MB", 4096, 2, True) }}
-  {{ threshold_row("disk_used_pct", "Disk used",           "%",   90, 5, True) }}
+  <form id="settings-form">
+    <div class="settings-grid">
+      <div class="settings-col">
+        <div class="settings-card">
+          <h3>Access</h3>
+          <div class="card-subtle">One bind on <code>0.0.0.0</code> serves localhost, LAN, and Tailscale. Cloudflare works if its tunnel routes to port <strong>{{ cfg.web.port }}</strong>.</div>
+          <div class="access-list" id="access-list">
+            <div class="access-item"><span class="kind">loading</span><span class="value">Checking access targets…</span></div>
+          </div>
+        </div>
 
-  <div class="form-row">
-    <label>Cooldown between alerts</label>
-    <div class="input-group">
-      <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30">
-      <span class="suffix">seconds (per metric)</span>
-      <div class="hint" style="width:100%">After an alert fires, wait this long before sending another for the same metric.</div>
-    </div>
-  </div>
-</div>
+        <div class="settings-card">
+          <h3>Alert thresholds</h3>
+          <div class="card-subtle">Compact threshold table: enable, value, and required duration before alerting.</div>
+          {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
+          {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
+          {% if entry is mapping %}
+            {% set enabled = entry.get("enabled", true) %}
+            {% set value = entry.get("value", default_value) %}
+            {% set duration = entry.get("duration_min", default_min) %}
+          {% else %}
+            {% set enabled = true %}
+            {% set value = entry %}
+            {% set duration = default_min %}
+          {% endif %}
+          <tr>
+            <td>
+              <label class="threshold-name">
+                <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
+                <span>{{ label }}</span>
+              </label>
+            </td>
+            <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
+            <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
+            <td class="text-muted">{{ unit }}</td>
+            <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
+            <td class="text-muted">min</td>
+          </tr>
+          {%- endmacro %}
+          <table class="threshold-table">
+            <thead>
+              <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
+            </thead>
+            <tbody>
+              {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
+              {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
+              {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
+              {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
+              {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
+            </tbody>
+          </table>
+          <div class="notif-actions">
+            <label class="inline-help">Cooldown</label>
+            <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
+            <span class="inline-help">seconds between repeats per metric</span>
+          </div>
+        </div>
+      </div>
 
-<div class="section">
-  <h3>Telegram</h3>
-  <div class="text-muted" style="font-size:12px;margin-bottom:12px">
-    {% if cfg.telegram.bot_token and cfg.telegram.chat_id %}Saved credentials detected. Leave token blank to keep current value.{% else %}Bot token and chat ID are required for Telegram alerts.{% endif %}
-  </div>
-  <div class="form-row">
-    <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}>
-      <span class="threshold-title">Enabled</span>
-    </label>
-    <div></div>
-  </div>
-  <div class="form-row">
-    <label>Bot token</label>
-    <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
-  </div>
-  <div class="form-row">
-    <label>Chat ID</label>
-    <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
-  </div>
-  <div class="btn-row">
-    <button type="button" class="btn secondary" id="test-tg">Send test</button>
-    <span id="test-tg-result" class="text-muted" style="font-size:12px"></span>
-  </div>
-</div>
+      <div class="settings-col">
+        <div class="settings-card">
+          <h3>Telegram</h3>
+          <div class="status-row">
+            <span class="status-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-enabled-chip">{% if cfg.telegram.enabled %}enabled{% else %}disabled{% endif %}</span>
+            <span class="status-chip {% if cfg.telegram.bot_token and cfg.telegram.chat_id %}ok{% else %}warn{% endif %}">{% if cfg.telegram.bot_token and cfg.telegram.chat_id %}saved credentials{% else %}credentials missing{% endif %}</span>
+            <span class="status-chip" id="tg-last-status">untested</span>
+          </div>
+          <div class="card-subtle">Current saved Telegram test is failing with 404 if the bot token is wrong. Leave token blank to keep saved token.</div>
+          <div class="notif-field-grid">
+            <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
+            <div class="inline-help">Turn Telegram alerts on/off without removing saved values.</div>
+            <label>Bot token</label>
+            <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
+            <label>Chat ID</label>
+            <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
+          </div>
+          <div class="notif-actions">
+            <button type="button" class="btn secondary compact" id="test-tg">Test current Telegram</button>
+            <span id="test-tg-result" class="inline-help"></span>
+          </div>
+        </div>
 
-<div class="section">
-  <h3>Discord (webhook)</h3>
-  <div class="text-muted" style="font-size:12px;margin-bottom:12px">
-    {% if cfg.discord.webhook_url %}Webhook saved. Leave field blank to keep current webhook.{% else %}Paste a Discord webhook URL, save, then send test.{% endif %}
-  </div>
-  <div class="form-row">
-    <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}>
-      <span class="threshold-title">Enabled</span>
-    </label>
-    <div></div>
-  </div>
-  <div class="form-row">
-    <label>Webhook URL</label>
-    <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
-  </div>
-  <div class="btn-row">
-    <button type="button" class="btn secondary" id="test-dc">Send test</button>
-    <span id="test-dc-result" class="text-muted" style="font-size:12px"></span>
-  </div>
-</div>
+        <div class="settings-card">
+          <h3>Discord webhook</h3>
+          <div class="status-row">
+            <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-enabled-chip">{% if cfg.discord.enabled %}enabled{% else %}disabled{% endif %}</span>
+            <span class="status-chip {% if cfg.discord.webhook_url %}ok{% else %}warn{% endif %}">{% if cfg.discord.webhook_url %}webhook saved{% else %}webhook missing{% endif %}</span>
+            <span class="status-chip" id="dc-last-status">untested</span>
+          </div>
+          <div class="card-subtle">Webhook is saved server-side and masked in the UI. Leave blank to keep current webhook.</div>
+          <div class="notif-field-grid">
+            <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}> Enabled</label>
+            <div class="inline-help">Discord webhook delivery is now working from the backend.</div>
+            <label>Webhook URL</label>
+            <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
+          </div>
+          <div class="notif-actions">
+            <button type="button" class="btn secondary compact" id="test-dc">Test current Discord</button>
+            <span id="test-dc-result" class="inline-help"></span>
+          </div>
+        </div>
 
-<div class="section">
-  <h3>Collector &amp; Web</h3>
-  <div class="form-row">
-    <label>Poll interval</label>
-    <div class="input-group">
-      <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
-      <span class="suffix">seconds</span>
-      <div class="hint" style="width:100%">How often the collector samples metrics. 30s is a good default. Save & apply reloads thresholds; restart collector applies interval immediately.</div>
-    </div>
-  </div>
-  <div class="form-row">
-    <label>Web bind host</label>
-    <div class="input-group">
-      <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
-      <div class="hint" style="width:100%">
-        <code>0.0.0.0</code> = accessible from LAN. <code>127.0.0.1</code> = local only.
-        Restart web service to apply.
+        <div class="settings-card">
+          <h3>Runtime</h3>
+          <div class="status-row">
+            <span class="status-chip ok">web {{ cfg.web.host }}:{{ cfg.web.port }}</span>
+            <span class="status-chip">poll {{ cfg.collector.poll_interval_sec }}s</span>
+          </div>
+          <div class="notif-field-grid">
+            <label>Poll interval</label>
+            <input type="number" name="poll_interval_sec" value="{{ cfg.collector.poll_interval_sec }}" min="5" step="5">
+            <label>Web bind host</label>
+            <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
+            <label>Web port</label>
+            <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
+          </div>
+          <div class="notif-actions">
+            <span class="inline-help">Save & apply reloads thresholds now. Restart collector applies interval immediately. Restart web is only needed for host/port changes.</span>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="form-row">
-    <label>Web port</label>
-    <div class="input-group">
-      <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
-    </div>
-  </div>
+  </form>
 </div>
-
-<div class="btn-row" style="margin-bottom:24px">
-  <button type="submit" class="btn">Save settings</button>
-  <button type="button" class="btn secondary" id="apply-now">Save &amp; apply</button>
-  <button type="button" class="btn secondary" id="restart-collector">Restart collector</button>
-</div>
-</form>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function showFlash(type, msg, ms = 6000) {
+function showFlash(type, msg, ms = 7000) {
   const el = document.getElementById('flash');
   el.className = 'flash ' + type;
   el.textContent = msg;
   if (ms) setTimeout(() => { el.textContent = ''; el.className = ''; }, ms);
 }
-
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function formToJSON(form) {
   const fd = new FormData(form);
   const data = Object.fromEntries(fd.entries());
-  // Checkbox normalization
-  ['telegram_enabled', 'discord_enabled'].forEach(k => {
-    data[k] = fd.has(k) ? 'true' : 'false';
-  });
-  // Threshold enabled checkboxes
+  ['telegram_enabled', 'discord_enabled'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
   ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
     data[`threshold_${k}_enabled`] = fd.has(`threshold_${k}_enabled`) ? 'true' : 'false';
   });
   return data;
 }
-
-async function saveSettings(thenApply) {
-  const data = formToJSON(document.getElementById('settings-form'));
-  const r = await fetch('/settings', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(data)
-  });
+function setSaveState(text, cls='') {
+  const el = document.getElementById('save-state');
+  el.textContent = text; el.className = 'status-chip ' + cls;
+}
+function explainNotifyError(err) {
+  const s = String(err || 'failed');
+  if (s.includes('404') && s.includes('Not Found')) return s + ' · likely wrong Telegram bot token';
+  if (s.includes('403') && s.includes('1010')) return s + ' · blocked by Cloudflare/WAF';
+  return s;
+}
+async function fetchJSON(url, opts) {
+  const r = await fetch(url, opts || {cache:'no-store'});
   const j = await r.json();
-  if (!j.ok) { showFlash('err', j.message || 'Save failed'); return; }
+  if (!r.ok) throw new Error(j.error || j.message || ('HTTP ' + r.status));
+  return j;
+}
+async function saveSettings(thenApply) {
+  setSaveState('saving…');
+  const data = formToJSON(document.getElementById('settings-form'));
+  const j = await fetchJSON('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
   if (thenApply) {
-    const r2 = await fetch('/api/apply', { method: 'POST' });
-    const j2 = await r2.json();
-    showFlash(j2.ok ? 'ok' : 'err', (j.message || 'Saved.') + ' · ' + (j2.message || ''));
+    const j2 = await fetchJSON('/api/apply', { method:'POST' });
+    showFlash('ok', (j.message || 'Saved.') + ' · ' + (j2.message || 'Applied.'));
   } else {
     showFlash('ok', j.message || 'Saved.');
   }
+  setSaveState('saved', 'ok');
+  await refreshStatus();
 }
-
-document.getElementById('settings-form').addEventListener('submit', e => {
-  e.preventDefault();
-  saveSettings(false);
-});
+async function testChannel(channel) {
+  const data = formToJSON(document.getElementById('settings-form'));
+  const resultEl = document.getElementById(channel === 'telegram' ? 'test-tg-result' : 'test-dc-result');
+  const chip = document.getElementById(channel === 'telegram' ? 'tg-last-status' : 'dc-last-status');
+  resultEl.textContent = 'testing…';
+  chip.textContent = 'testing…'; chip.className = 'status-chip';
+  try {
+    const j = await fetchJSON('/api/test-' + channel, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ...data, message: `🧪 systor ${channel} test from Settings` })
+    });
+    if (j.ok) {
+      resultEl.textContent = '✓ sent'; resultEl.style.color = 'var(--green)';
+      chip.textContent = 'sent'; chip.className = 'status-chip ok';
+      showFlash('ok', channel + ' test sent');
+    } else {
+      const msg = explainNotifyError(j.error);
+      resultEl.textContent = '✗ ' + msg; resultEl.style.color = 'var(--red)';
+      chip.textContent = 'failed'; chip.className = 'status-chip err';
+      showFlash('err', channel + ' failed: ' + msg);
+    }
+  } catch (e) {
+    const msg = explainNotifyError(e.message);
+    resultEl.textContent = '✗ ' + msg; resultEl.style.color = 'var(--red)';
+    chip.textContent = 'failed'; chip.className = 'status-chip err';
+    showFlash('err', channel + ' failed: ' + msg);
+  }
+  await refreshStatus();
+}
+async function loadAccess() {
+  try {
+    const j = await fetchJSON('/api/access');
+    const list = [];
+    for (const u of j.localhost_urls || []) list.push(`<div class="access-item"><span class="kind">localhost</span><span class="value">${esc(u)}</span></div>`);
+    for (const u of j.lan_urls || []) list.push(`<div class="access-item"><span class="kind">LAN</span><span class="value">${esc(u)}</span></div>`);
+    for (const u of j.tailscale_urls || []) list.push(`<div class="access-item"><span class="kind">tailscale</span><span class="value">${esc(u)}</span></div>`);
+    list.push(`<div class="access-item"><span class="kind">cloudflare</span><span class="value">${j.cloudflare && j.cloudflare.running ? 'tunnel process detected' : 'not detected'}</span></div>`);
+    document.getElementById('access-list').innerHTML = list.join('');
+    document.getElementById('access-summary').textContent = `${(j.lan_urls||[]).length} LAN · ${(j.tailscale_urls||[]).length} TS · ${j.cloudflare && j.cloudflare.running ? 'CF on' : 'CF off'}`;
+    document.getElementById('access-summary').className = 'status-chip ok';
+  } catch (e) {
+    document.getElementById('access-list').innerHTML = `<div class="access-item"><span class="kind">error</span><span class="value">${esc(e.message)}</span></div>`;
+    document.getElementById('access-summary').textContent = 'access check failed';
+    document.getElementById('access-summary').className = 'status-chip err';
+  }
+}
+async function refreshStatus() {
+  try {
+    const rows = await fetchJSON('/api/notifications?limit=20');
+    const tg = rows.find(x => x.channel === 'telegram');
+    const dc = rows.find(x => x.channel === 'discord');
+    if (tg) {
+      const chip = document.getElementById('tg-last-status');
+      chip.textContent = tg.success ? 'last sent' : 'last failed';
+      chip.className = 'status-chip ' + (tg.success ? 'ok' : 'err');
+      if (!tg.success) document.getElementById('test-tg-result').textContent = explainNotifyError(tg.error);
+    }
+    if (dc) {
+      const chip = document.getElementById('dc-last-status');
+      chip.textContent = dc.success ? 'last sent' : 'last failed';
+      chip.className = 'status-chip ' + (dc.success ? 'ok' : 'err');
+      if (!dc.success) document.getElementById('test-dc-result').textContent = explainNotifyError(dc.error);
+    }
+  } catch (e) {}
+}
+document.getElementById('settings-form').addEventListener('submit', e => { e.preventDefault(); saveSettings(false); });
 document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
 document.getElementById('restart-collector').addEventListener('click', async () => {
-  if (!confirm('Restart the collector now? It will be down for ~1 second.')) return;
-  const r = await fetch('/api/restart-collector', { method: 'POST' });
-  const j = await r.json();
-  showFlash(j.ok ? 'ok' : 'err', j.message || (j.error || 'failed'));
+  if (!confirm('Restart the collector now? It will be down briefly.')) return;
+  try { const j = await fetchJSON('/api/restart-collector', { method:'POST' }); showFlash('ok', j.message || 'collector restarting'); }
+  catch(e) { showFlash('err', e.message); }
 });
-document.getElementById('test-tg').addEventListener('click', async () => {
-  const data = formToJSON(document.getElementById('settings-form'));
-  const r = await fetch('/api/test-telegram', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ ...data, message: '🧪 systor test alert from Settings' })
-  });
-  const j = await r.json();
-  const el = document.getElementById('test-tg-result');
-  el.textContent = j.ok ? '✓ sent' : '✗ ' + (j.error || 'failed');
-  el.style.color = j.ok ? 'var(--green)' : 'var(--red)';
+document.getElementById('reload-page').addEventListener('click', () => location.reload());
+document.getElementById('test-tg').addEventListener('click', () => testChannel('telegram'));
+document.getElementById('test-dc').addEventListener('click', () => testChannel('discord'));
+Array.from(document.querySelectorAll('#settings-form input, #settings-form select')).forEach(el => {
+  el.addEventListener('change', () => setSaveState('unsaved', 'warn'));
+  el.addEventListener('input', () => setSaveState('unsaved', 'warn'));
 });
-document.getElementById('test-dc').addEventListener('click', async () => {
-  const data = formToJSON(document.getElementById('settings-form'));
-  const r = await fetch('/api/test-discord', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ ...data, message: '🧪 systor test alert from Settings' })
-  });
-  const j = await r.json();
-  const el = document.getElementById('test-dc-result');
-  el.textContent = j.ok ? '✓ sent' : '✗ ' + (j.error || 'failed');
-  el.style.color = j.ok ? 'var(--green)' : 'var(--red)';
-});
+loadAccess();
+refreshStatus();
 </script>
 {% endblock %}

@@ -20,6 +20,7 @@ import signal
 import sys
 import threading
 import time
+import subprocess
 from functools import wraps
 from pathlib import Path
 
@@ -117,6 +118,55 @@ def create_app() -> Flask:
     def api_notifications():
         limit = int(request.args.get("limit", 50))
         return jsonify(get_storage().recent_notifications(limit=limit))
+
+    @app.route("/api/access")
+    def api_access():
+        """Best-effort access surface summary for localhost/LAN/Tailscale/tunnel."""
+        cfg = load_config()
+        host = cfg.get("web", {}).get("host", "0.0.0.0")
+        port = int(cfg.get("web", {}).get("port", 6677))
+        lan_ips = []
+        try:
+            all_ipv4 = [x for x in subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=3).stdout.split() if "." in x]
+            preferred = ""
+            try:
+                route_probe = subprocess.run(["bash", "-lc", "ip -4 route get 1.1.1.1 | sed -n 's/.* src \\([^ ]*\\).*/\\1/p'"], capture_output=True, text=True, timeout=3).stdout.strip()
+                if route_probe and route_probe != "127.0.0.1":
+                    preferred = route_probe
+            except Exception:
+                preferred = ""
+            if preferred:
+                lan_ips.append(preferred)
+            for ip in all_ipv4:
+                if ip.startswith("100.") or ip == "127.0.0.1" or ip in lan_ips:
+                    continue
+                if ip.startswith("192.168.") or ip.startswith("10."):
+                    lan_ips.append(ip)
+        except Exception:
+            pass
+        tailscale_ips = []
+        try:
+            if subprocess.run(["bash", "-lc", "command -v tailscale >/dev/null"], timeout=3).returncode == 0:
+                tailscale_ips = [x for x in subprocess.run(["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=5).stdout.split() if x]
+        except Exception:
+            pass
+        cloudflare = {"running": False, "process": ""}
+        try:
+            out = subprocess.run(["pgrep", "-af", "cloudflared"], capture_output=True, text=True, timeout=3).stdout.strip().splitlines()
+            if out:
+                cloudflare = {"running": True, "process": out[0][:240]}
+        except Exception:
+            pass
+        return jsonify({
+            "ok": True,
+            "bind_host": host,
+            "port": port,
+            "localhost_urls": [f"http://127.0.0.1:{port}", f"http://localhost:{port}"],
+            "lan_urls": [f"http://{ip}:{port}" for ip in lan_ips if not ip.startswith("100.") and ip != "127.0.0.1"],
+            "tailscale_urls": [f"http://{ip}:{port}" for ip in tailscale_ips],
+            "cloudflare": cloudflare,
+            "note": "0.0.0.0 means one listener serves localhost, LAN, and Tailscale. Cloudflare Tunnel works if its route targets this port.",
+        })
 
     @app.route("/api/system")
     def api_system():
@@ -323,6 +373,17 @@ def create_app() -> Flask:
             "total": len(data),
             "fresh_error_count": count_recent_log_errors(log_file, minutes=10),
         })
+
+    @app.route("/api/logs/clear", methods=["POST"])
+    def api_logs_clear():
+        cfg = load_config()
+        log_file = cfg.get("logging", {}).get("file", "/var/log/systor/systor.log")
+        try:
+            Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+            Path(log_file).write_text("")
+            return jsonify({"ok": True, "message": f"Cleared {log_file}"})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
 
     @app.route("/health")
     def health():

@@ -26,6 +26,7 @@
     </label>
     <button class="btn secondary compact" id="refresh-logs">Refresh</button>
     <button class="btn secondary compact" id="copy-logs">Copy</button>
+    <button class="btn secondary compact" id="clear-logs">Clear file</button>
   </div>
 </div>
 
@@ -64,6 +65,22 @@ document.getElementById('copy-logs').addEventListener('click', async () => {
   const text = document.getElementById('log-view').textContent;
   try { await navigator.clipboard.writeText(text); document.getElementById('log-status').textContent = 'copied'; }
   catch(e) { document.getElementById('log-status').textContent = 'copy failed'; }
+});
+document.getElementById('clear-logs').addEventListener('click', async () => {
+  if (!confirm('Clear the log file on disk now?')) return;
+  const status = document.getElementById('log-status');
+  status.textContent = 'clearing…';
+  try {
+    const r = await fetch('/api/logs/clear', { method:'POST' });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || j.message || ('HTTP ' + r.status));
+    document.getElementById('log-view').textContent = '(log file cleared)';
+    status.textContent = 'cleared · ' + new Date().toLocaleTimeString();
+    document.getElementById('log-dot').className = 'dot green';
+  } catch (e) {
+    status.textContent = 'clear failed: ' + e.message;
+    document.getElementById('log-dot').className = 'dot red';
+  }
 });
 loadLogs();
 setInterval(loadLogs, 10000);
