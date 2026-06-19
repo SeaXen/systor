@@ -1049,7 +1049,12 @@ tr:hover { background: var(--bg-hover); }
   .speed-presets-inline .speed-preset-btn,.speed-preset-row-side .speed-preset-btn{height:28px!important;min-height:28px!important;padding:0 6px!important;font-size:11px!important;border-radius:8px!important}
   .speed-phase-steps{margin-top:4px!important}
   .speed-phase-chip{min-height:28px!important;padding:4px 6px!important}
-  .speed-current-card{padding:8px!important;border-radius:12px!important}
-  .speed-current-kpis{gap:6px!important}
-  .speed-main-kpi,.speed-mini-kpi{min-height:68px!important;padding:8px 10px!important}
+  .speed-current-card{padding:6px!important;border-radius:11px!important}
+  .speed-current-kpis{gap:5px!important}
+  .speed-main-kpi,.speed-mini-kpi{min-height:46px!important;padding:6px 8px!important;border-radius:9px!important}
+  .speed-main-kpi strong{font-size:13px!important;line-height:1!important}
+  .speed-main-kpi .label,.speed-mini-kpi span{font-size:9px!important;letter-spacing:.45px!important}
+  .speed-main-kpi .unit{font-size:9px!important}
+  .speed-mini-kpi strong{font-size:11px!important;line-height:1!important}
+  .speed-current-meta-line{gap:6px!important}
 }
