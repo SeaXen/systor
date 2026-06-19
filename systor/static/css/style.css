@@ -493,19 +493,31 @@ tr:hover { background: var(--bg-hover); }
 .empty-cell { text-align:center; color:var(--text-muted); padding:14px; }
 
 @media (max-width: 760px) {
-  .header { padding: 10px 12px; }
+  .header { padding: 8px 10px; }
   .header-left { flex:0 1 auto; }
   #global-header-meta { display:none !important; }
-  .header .actions { gap:6px; }
-  .page-tabs { gap:5px; }
-  .page-tab { min-width:34px; width:34px; height:34px; padding:0; justify-content:center; display:inline-flex; align-items:center; border-radius:10px; }
+  .header .actions { gap:5px; }
+  .page-tabs { gap:4px; }
+  .page-tab { min-width:32px; width:32px; height:32px; padding:0; justify-content:center; display:inline-flex; align-items:center; border-radius:9px; }
   .tab-icon { display:inline-block; }
   .tab-label { display:none; }
-  .brand-logo { width:26px; height:26px; border-radius:8px; }
-  .header h1 { font-size:16px; }
-  .container { padding: 10px; }
-  .dash-toolbar { align-items:flex-start; flex-direction:column; }
+  .brand-logo { width:24px; height:24px; border-radius:7px; }
+  .header h1 { font-size:15px; }
+  .brand-row { gap:7px; }
+  .container { padding: 8px; }
+  .dash-toolbar { align-items:flex-start; flex-direction:column; gap:8px; margin-bottom:10px; }
   .dash-status, .dash-controls { max-width:100%; overflow-x:auto; }
+  .dash-status { gap:8px; font-size:11px; }
+  .dash-status strong { font-size:12px; }
+  .dash-controls { gap:6px; flex-wrap:wrap; }
+  .dash-controls label { gap:4px; font-size:9px; }
+  .control-select { height:24px; font-size:11px; padding:0 20px 0 7px; }
+  .btn.compact { height:24px; padding:0 8px; font-size:11px; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+  .stat-card { padding: 8px 10px 8px 11px; }
+  .stat-card .label { font-size:10px; }
+  .stat-card .value { font-size:20px; }
+  #kpi-load .value.small-value,#kpi-disk-io .value.small-value,#kpi-net .value.small-value{font-size:13px;}
   .chart-card canvas { height: 120px !important; }
   .chart-grid-5 { grid-template-columns:1fr; }
   .chart-grid-6 { grid-template-columns:1fr; }
