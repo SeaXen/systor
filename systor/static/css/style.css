@@ -84,7 +84,7 @@ code, pre, .mono { font-family: var(--mono); }
 .tab-label { display:inline; }
 
 /* === Container === */
-.container { padding: 14px 18px 20px; max-width: 1800px; margin: 0 auto; }
+.container { padding: 10px 18px 18px; max-width: 1800px; margin: 0 auto; }
 .page-title { font-size: 18px; font-weight: 600; color: var(--text-bright); margin-bottom: 18px; }
 
 /* === Dashboard one-line operator bar === */
@@ -92,9 +92,9 @@ code, pre, .mono { font-family: var(--mono); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 8px 10px;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 7px 9px;
   background: rgba(22,27,34,0.72);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -178,7 +178,7 @@ code, pre, .mono { font-family: var(--mono); }
 .stat-card.purple .value { color: var(--purple); }
 
 /* === Chart rows === */
-.chart-row, .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.chart-row, .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 @media (max-width: 1100px) { .chart-row, .chart-grid { grid-template-columns: 1fr; } }
 .chart-card {
   background: var(--bg-card); border: 1px solid var(--border);
@@ -195,13 +195,13 @@ code, pre, .mono { font-family: var(--mono); }
 .legend .cyan { background: var(--cyan); }
 .legend .red { background: var(--red); }
 
-.table-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px; }
+.table-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px; }
 @media (max-width: 1100px) { .table-grid { grid-template-columns:1fr; } }
 
 /* === Tables / Lists === */
 .table-card {
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 8px; overflow: hidden; margin-bottom: 12px;
+  border-radius: 8px; overflow: hidden; margin-bottom: 10px;
 }
 .table-card h3 {
   font-size: 13px; font-weight: 600; padding: 9px 12px;
@@ -276,17 +276,17 @@ tr:hover { background: var(--bg-hover); }
 .flash.info { background: rgba(88,166,255,0.12); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); }
 
 /* === Compact settings page === */
-.settings-page { display:flex; flex-direction:column; gap:12px; }
+.settings-page { display:flex; flex-direction:column; gap:10px; }
 .sticky-actions {
   position: sticky; top: 66px; z-index: 8;
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
-  padding:8px 10px; background:rgba(22,27,34,.94); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:7px 9px; background:rgba(22,27,34,.94); border:1px solid var(--border);
   border-radius:8px; backdrop-filter: blur(4px);
 }
 .sticky-actions .meta { display:flex; align-items:center; gap:10px; color:var(--text-muted); font-size:12px; white-space:nowrap; overflow-x:auto; }
 .sticky-actions .actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
-.settings-grid { display:grid; grid-template-columns: 1.05fr .95fr; gap:12px; }
-.settings-col { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.settings-grid { display:grid; grid-template-columns: 1.05fr .95fr; gap:10px; }
+.settings-col { display:flex; flex-direction:column; gap:10px; min-width:0; }
 .settings-card { background:linear-gradient(180deg, rgba(22,27,34,.72), rgba(22,27,34,.50)); border:1px solid #2a3139; border-radius:8px; padding:11px 12px; box-shadow:none; }
 .settings-card h3 { font-size:12px; text-transform:uppercase; letter-spacing:.7px; color:var(--text-bright); margin-bottom:8px; }
 .card-subtle { color:var(--text-muted); font-size:12px; margin-bottom:10px; }
@@ -341,7 +341,6 @@ tr:hover { background: var(--bg-hover); }
 .network-settings-grid { grid-template-columns: 132px 170px; }
 .settings-card .compact-top input[name="poll_interval_sec"],
 .settings-card .compact-top input[name="web_port"],
-.settings-card .compact-top input[name="retention_days"],
 .settings-card .compact-top select,
 .settings-card .compact-top input[name="web_host"] { max-width: 220px; }
 .preset-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
@@ -356,8 +355,8 @@ tr:hover { background: var(--bg-hover); }
 .history-list { display:grid; gap:8px; }
 .history-item { background:rgba(11,15,20,.48); border:1px solid #252c35; border-radius:6px; padding:7px 9px; display:grid; gap:6px; }
 
-.network-layout { display:grid; grid-template-columns: 1fr; gap:12px; }
-.network-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:10px; }
+.network-layout { display:grid; grid-template-columns: 1fr; gap:10px; }
+.network-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:8px; }
 .network-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .network-kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .network-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
@@ -371,7 +370,7 @@ tr:hover { background: var(--bg-hover); }
 .compact-stat .sub { margin-top: 2px; }
 .compact-row-card { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:48px; }
 .compact-row-card .label { margin:0; white-space:nowrap; }
-.compact-row-card .value { margin-left:auto; font-weight:700; font-size:15px; }
+.compact-row-card .value { margin-left:auto; font-weight:700; font-size:16px; }
 .load1-text { color:#3fb950; font-weight:700; }
 .load5-text { color:#d29922; font-weight:700; }
 .load15-text { color:#58a6ff; font-weight:700; }
@@ -380,9 +379,9 @@ tr:hover { background: var(--bg-hover); }
 .disk-text { color:#d29922 !important; }
 .rx-card { border-color: rgba(34,211,238,.22); }
 .tx-card { border-color: rgba(255,107,138,.22); }
-.chart-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; flex-wrap:wrap; }
+.chart-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; flex-wrap:wrap; }
 .chart-head h3 { margin:0; }
-.chart-meta { color:var(--text); font-size:12px; font-weight:700; white-space:nowrap; }
+.chart-meta { color:var(--text); font-size:11px; font-weight:700; white-space:nowrap; }
 .chart-meta .text-muted { font-weight:500; }
 .chart-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .chart-grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -406,8 +405,8 @@ tr:hover { background: var(--bg-hover); }
 .disk-chip { color:#d29922; }
 .header-sep { color:var(--text-muted); font-weight:700; }
 
-.apps-layout { display:grid; gap:12px; }
-.apps-top-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.apps-layout { display:grid; gap:10px; }
+.apps-top-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 .apps-metric-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .apps-metric-card h3 { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .apps-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
@@ -537,3 +536,17 @@ tr:hover { background: var(--bg-hover); }
 .card-sub-empty{min-height:10px;color:transparent;}
 #kpi-load .sub,#kpi-disk-io .sub,#kpi-net .sub{display:none;}
 #kpi-load .value.small-value,#kpi-disk-io .value.small-value,#kpi-net .value.small-value{font-size:14px;}
+
+
+#kpis .stat-card { grid-template-areas: "label value" ". sub"; }
+#kpis .stat-card .sub { grid-column: 2; justify-self: end; text-align: right; white-space: nowrap; }
+.network-kpis .compact-row-card { min-height: 56px; }
+.network-kpis .compact-row-card .label { font-size: 11px; }
+.network-kpis .compact-row-card .value { font-size: 19px; }
+.apps-summary-card { min-height: 56px; }
+.apps-summary-card .label { margin-bottom: 0; }
+.apps-summary-card .value.small-value { font-size: 14px; }
+.apps-summary-card .sub { grid-column: 2; justify-self: end; text-align: right; }
+.network-apps-table th:nth-child(3), .network-apps-table td:nth-child(3) { width: 92px; }
+.network-apps-table th:nth-child(4), .network-apps-table td:nth-child(4),
+.network-apps-table th:nth-child(5), .network-apps-table td:nth-child(5) { width: 100px; }

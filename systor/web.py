@@ -207,12 +207,25 @@ def _parse_docker_size_mb(text: str) -> float:
     text = (text or "").strip()
     if not text:
         return 0.0
-    m = re.match(r"([0-9.]+)\s*([KMGTP]?i?B)", text)
+    m = re.match(r"([0-9.]+)\s*([kKmMgGtTpP]?i?[bB])", text)
     if not m:
         return 0.0
     num = float(m.group(1))
     unit = m.group(2)
-    factor = {"B": 1 / (1024 * 1024), "KiB": 1 / 1024, "MiB": 1, "GiB": 1024, "TiB": 1024 * 1024, "KB": 1 / 1024, "MB": 1, "GB": 1024, "TB": 1024 * 1024}.get(unit, 0)
+    norm = unit.lower()
+    factor = {
+        "b": 1 / (1024 * 1024),
+        "kib": 1 / 1024,
+        "kb": 1 / 1024,
+        "mib": 1,
+        "mb": 1,
+        "gib": 1024,
+        "gb": 1024,
+        "tib": 1024 * 1024,
+        "tb": 1024 * 1024,
+        "pib": 1024 * 1024 * 1024,
+        "pb": 1024 * 1024 * 1024,
+    }.get(norm, 0)
     return round(num * factor, 3)
 
 
@@ -476,7 +489,7 @@ def create_app() -> Flask:
     @app.route("/api/network-usage")
     def api_network_usage():
         granularity = request.args.get("granularity", "day")
-        limit = max(1, min(180, int(request.args.get("limit", 30))))
+        limit = max(1, min(5000, int(request.args.get("limit", 30))))
         data = get_storage().network_usage_buckets(granularity=granularity, limit=limit)
         return jsonify({"ok": True, "granularity": granularity, "limit": limit, "data": data, "stats": get_storage().stats()})
 
@@ -521,6 +534,8 @@ def create_app() -> Flask:
                 "host_mem_mb": round(sum(r.get("mem_mb", 0) for r in host_rows), 2),
                 "docker_cpu": round(sum(r.get("cpu_percent", 0) for r in docker_rows), 2),
                 "docker_mem_mb": round(sum(r.get("mem_mb", 0) for r in docker_rows), 2),
+                "host_count": len(host_rows),
+                "docker_count": len(docker_rows),
             }
         })
 
@@ -618,9 +633,6 @@ def create_app() -> Flask:
             # Update poll interval
             if "poll_interval_sec" in data and data["poll_interval_sec"]:
                 try: cfg["collector"]["poll_interval_sec"] = max(1, int(data["poll_interval_sec"]))
-                except (ValueError, TypeError): pass
-            if "retention_days" in data and data["retention_days"]:
-                try: cfg["collector"]["retention_days"] = max(1, int(float(data["retention_days"])))
                 except (ValueError, TypeError): pass
             cfg.setdefault("network", {})
             if "network_default_hours" in data and data["network_default_hours"]:

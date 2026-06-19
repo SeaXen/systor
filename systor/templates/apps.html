@@ -40,10 +40,16 @@
   </div>
 
   <div class="apps-top-grid">
-    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Host CPU</div><div class="value rx-text" id="host-cpu">—</div></div>
-    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Host RAM</div><div class="value" id="host-mem">—</div></div>
-    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Docker CPU</div><div class="value rx-text" id="docker-cpu">—</div></div>
-    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Docker RAM</div><div class="value" id="docker-mem">—</div></div>
+    <div class="stat-card compact-stat apps-summary-card rx-card">
+      <div class="label">Host</div>
+      <div class="value small-value compact-kpi-lines"><div><span class="rx-text">CPU</span> <span id="host-cpu">—</span></div><div><span class="tx-text">RAM</span> <span id="host-mem">—</span></div></div>
+      <div class="sub" id="host-sub">— apps</div>
+    </div>
+    <div class="stat-card compact-stat apps-summary-card tx-card">
+      <div class="label">Docker</div>
+      <div class="value small-value compact-kpi-lines"><div><span class="rx-text">CPU</span> <span id="docker-cpu">—</span></div><div><span class="tx-text">RAM</span> <span id="docker-mem">—</span></div></div>
+      <div class="sub" id="docker-sub">— containers</div>
+    </div>
   </div>
 
   <div class="apps-metric-grid">
@@ -193,6 +199,8 @@ function repaintFromRows(scope, summary){
   document.getElementById('host-mem').textContent=bytesMB(summary.host_mem_mb||0);
   document.getElementById('docker-cpu').textContent=(summary.docker_cpu||0).toFixed(2)+'%';
   document.getElementById('docker-mem').textContent=bytesMB(summary.docker_mem_mb||0);
+  document.getElementById('host-sub').textContent=`${summary.host_count || 0} apps`;
+  document.getElementById('docker-sub').textContent=`${summary.docker_count || 0} containers`;
 }
 async function loadApps(){
   const scope=document.getElementById('apps-scope').value;

@@ -132,10 +132,8 @@
 
         <div class="settings-card">
           <h3>Network page defaults</h3>
-          <div class="card-subtle">Retention applies to all raw history. Network page defaults control its period, bucket view, refresh load, and interface filtering.</div>
+          <div class="card-subtle">Network page defaults control its period, bucket view, refresh load, and interface filtering.</div>
           <div class="notif-field-grid compact-top network-settings-grid">
-            <label>History retention</label>
-            <input type="number" name="retention_days" value="{{ cfg.collector.retention_days }}" min="1" step="1">
             <label>Default rate view</label>
             <select name="network_default_hours">
               <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
