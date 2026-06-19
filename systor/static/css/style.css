@@ -1026,9 +1026,10 @@ tr:hover { background: var(--bg-hover); }
 @media (max-width:700px){.speed-go-panel{height:96px!important;min-height:96px!important;padding:10px 12px!important}.speed-live-core{font-size:30px!important}.speed-go-server{font-size:13px!important}.speed-stop-btn{height:32px!important}}
 
 /* v1.3 GO visual restore: make hero button visibly active again */
-.speed-go-panel{background:linear-gradient(180deg,#1f6feb 0%,#1a56c7 55%,#174ea6 100%)!important;border:1px solid rgba(88,166,255,.55)!important;box-shadow:0 10px 28px rgba(31,111,235,.28),inset 0 1px 0 rgba(255,255,255,.08)!important}
-.speed-go-panel:hover{background:linear-gradient(180deg,#2b7fff 0%,#1f6feb 55%,#1b58bf 100%)!important;border-color:rgba(136,196,255,.7)!important}
+.speed-live-runner,.speed-live-hero{background:linear-gradient(180deg,#0f3f8f 0%,#103574 38%,#0c2344 100%)!important;border:1px solid rgba(88,166,255,.30)!important;box-shadow:0 12px 30px rgba(18,61,128,.25),inset 0 1px 0 rgba(255,255,255,.06)!important}
+.speed-go-panel{background:transparent!important;border:0!important;box-shadow:none!important}
+.speed-go-panel:hover{background:transparent!important;border-color:transparent!important}
 .speed-go-panel,.speed-go-btn{color:#ffffff!important}.speed-go-panel .speed-go-label-top{color:#dbeafe!important}.speed-go-panel .speed-go-server{color:#ffffff!important}.speed-go-panel .speed-live-core{color:#ffffff!important;text-shadow:0 1px 0 rgba(0,0,0,.18)!important}
-.speed-go-btn:disabled,.speed-go-panel:disabled{opacity:1!important;filter:none!important;background:linear-gradient(180deg,#1c4f9a 0%,#183f77 100%)!important;border-color:rgba(88,166,255,.28)!important;box-shadow:0 8px 22px rgba(19,42,84,.28)!important}
-.speed-go-btn:disabled .speed-go-label-top,.speed-go-btn:disabled .speed-go-server,.speed-go-btn:disabled .speed-live-core{color:#cfe0ff!important}
-.speed-stop-btn{background:rgba(22,27,34,.88)!important;border:1px solid #364152!important;color:#e6edf3!important}.speed-stop-btn:hover{background:#242b35!important;border-color:#4a5a70!important}
+.speed-go-btn:disabled,.speed-go-panel:disabled{opacity:1!important;filter:none!important;background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+.speed-go-btn:disabled .speed-go-label-top,.speed-go-btn:disabled .speed-go-server,.speed-go-btn:disabled .speed-live-core{color:#e8f1ff!important}
+.speed-stop-btn{background:rgba(12,22,38,.34)!important;border:1px solid rgba(156,193,255,.22)!important;color:#eef5ff!important}.speed-stop-btn:hover{background:rgba(14,28,48,.48)!important;border-color:rgba(156,193,255,.40)!important}
