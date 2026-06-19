@@ -646,6 +646,20 @@ def create_app() -> Flask:
                 except (ValueError, TypeError): pass
             if "network_default_granularity" in data and data["network_default_granularity"] in ("day", "week", "month"):
                 cfg["network"]["default_granularity"] = data["network_default_granularity"]
+            if "network_default_bar_days" in data and data["network_default_bar_days"]:
+                val = str(data["network_default_bar_days"]).strip()
+                if val == "all": cfg["network"]["default_bar_days"] = "all"
+                else:
+                    try: cfg["network"]["default_bar_days"] = max(1, int(val))
+                    except (ValueError, TypeError): pass
+            if "network_default_table_days" in data and data["network_default_table_days"]:
+                val = str(data["network_default_table_days"]).strip()
+                if val == "all": cfg["network"]["default_table_days"] = "all"
+                else:
+                    try: cfg["network"]["default_table_days"] = max(1, int(val))
+                    except (ValueError, TypeError): pass
+            if "network_default_iface" in data:
+                cfg["network"]["default_iface"] = str(data.get("network_default_iface") or "all").strip() or "all"
             if "network_hide_virtual_default" in data:
                 cfg["network"]["hide_virtual_default"] = _bool(data.get("network_hide_virtual_default"))
             cfg.setdefault("dashboard", {})

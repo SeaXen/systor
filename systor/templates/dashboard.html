@@ -155,7 +155,7 @@ const SERVER_DEFAULTS = {
 };
 const COLORS = {
   green: '#3fb950', yellow: '#d29922', red: '#f85149',
-  blue: '#58a6ff', purple: '#bc8cff', cyan: '#22d3ee', tx: '#ff6b8a',
+  blue: '#58a6ff', purple: '#bc8cff', cyan: '#22d3ee', tx: '#ff6b8a', cpu:'#22d3ee', ram:'#ff6b8a', disk:'#f6c453', disk2:'#ffb347',
   dim: '#8b949e', grid: '#30363d', text: '#c9d1d9'
 };
 const tooltip = document.createElement('div');
@@ -247,16 +247,16 @@ async function refreshCharts(){
     ]);
     const netRx=(netSeries.data||[]).map(p=>[p.ts,p.rx_mbps]);
     const netTx=(netSeries.data||[]).map(p=>[p.ts,p.tx_mbps]);
-    drawChart(document.getElementById('chart-cpu-pct'),[{name:'CPU',unit:'%',data:cpu,color:COLORS.purple,fill:true}],{ymin:0,ymax:100});
+    drawChart(document.getElementById('chart-cpu-pct'),[{name:'CPU',unit:'%',data:cpu,color:COLORS.cpu,fill:true}],{ymin:0,ymax:100});
     drawChart(document.getElementById('chart-temp'),[{name:'Temp',unit:'°C',data:temp,color:COLORS.red,fill:true}],{ymin:null,ymax:null});
-    drawChart(document.getElementById('chart-mem'),[{name:'Used',unit:'MB',data:mem,color:COLORS.blue,fill:true}],{ymin:0,ymax:null});
-    drawChart(document.getElementById('chart-disk-io'),[{name:'RX read',unit:'MB/s',data:dRead,color:COLORS.cyan},{name:'TX write',unit:'MB/s',data:dWrite,color:COLORS.tx}],{ymin:0,ymax:null});
+    drawChart(document.getElementById('chart-mem'),[{name:'RAM',unit:'MB',data:mem,color:COLORS.ram,fill:true}],{ymin:0,ymax:null});
+    drawChart(document.getElementById('chart-disk-io'),[{name:'Read',unit:'MB/s',data:dRead,color:COLORS.disk,fill:true},{name:'Write',unit:'MB/s',data:dWrite,color:COLORS.disk2}],{ymin:0,ymax:null});
     drawChart(document.getElementById('chart-load'),[{name:'1m',unit:'',data:load1,color:COLORS.green,fill:true},{name:'5m',unit:'',data:load5,color:COLORS.yellow},{name:'15m',unit:'',data:load15,color:COLORS.blue}],{ymin:0,ymax:null});
     drawChart(document.getElementById('chart-net'),[{name:'RX',unit:'MB/s',data:netRx,color:COLORS.cyan,fill:true},{name:'TX',unit:'MB/s',data:netTx,color:COLORS.tx}],{ymin:0,ymax:null});
-    document.getElementById('meta-cpu-pct').innerHTML=`<strong>latest ${fmt(lastVal(cpu),'%')}</strong> · avg ${fmt(avgVal(cpu),'%')} · peak ${fmt(maxVal(cpu),'%')}`;
+    document.getElementById('meta-cpu-pct').innerHTML=`<span class="cpu-text"><strong>latest ${fmt(lastVal(cpu),'%')}</strong></span> · avg ${fmt(avgVal(cpu),'%')} · peak ${fmt(maxVal(cpu),'%')}`;
     document.getElementById('meta-temp').innerHTML=`<strong>latest ${fmt(lastVal(temp),'°C')}</strong> · avg ${fmt(avgVal(temp),'°C')} · peak ${fmt(maxVal(temp),'°C')}`;
-    document.getElementById('meta-mem').innerHTML=`<strong>latest ${fmt(lastVal(mem),'MB')}</strong> · avg ${fmt(avgVal(mem),'MB')} · peak ${fmt(maxVal(mem),'MB')}`;
-    document.getElementById('meta-disk-io').innerHTML=`<span class="rx-text"><strong>read ${fmt(lastVal(dRead),'MB/s')}</strong></span> · avg ${fmt(avgVal(dRead),'MB/s')} · <span class="tx-text"><strong>write ${fmt(lastVal(dWrite),'MB/s')}</strong></span> · avg ${fmt(avgVal(dWrite),'MB/s')}`;
+    document.getElementById('meta-mem').innerHTML=`<span class="ram-text"><strong>latest ${fmt(lastVal(mem),'MB')}</strong></span> · avg ${fmt(avgVal(mem),'MB')} · peak ${fmt(maxVal(mem),'MB')}`;
+    document.getElementById('meta-disk-io').innerHTML=`<span class="disk-text"><strong>read ${fmt(lastVal(dRead),'MB/s')}</strong></span> · avg ${fmt(avgVal(dRead),'MB/s')} · <span class="disk2-text"><strong>write ${fmt(lastVal(dWrite),'MB/s')}</strong></span> · avg ${fmt(avgVal(dWrite),'MB/s')}`;
     document.getElementById('meta-load').innerHTML=`1m ${fmt(lastVal(load1))} avg ${fmt(avgVal(load1))} · 5m ${fmt(lastVal(load5))} avg ${fmt(avgVal(load5))} · 15m ${fmt(lastVal(load15))} avg ${fmt(avgVal(load15))}`;
     document.getElementById('meta-net-chart').innerHTML=`<span class="rx-text"><strong>RX ${fmt(lastVal(netRx),'MB/s')}</strong></span> · avg ${fmt(avgVal(netRx),'MB/s')} · <span class="tx-text"><strong>TX ${fmt(lastVal(netTx),'MB/s')}</strong></span> · avg ${fmt(avgVal(netTx),'MB/s')}`;
     setLoadState('charts '+new Date().toLocaleTimeString());

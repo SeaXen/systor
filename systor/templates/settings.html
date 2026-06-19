@@ -164,6 +164,22 @@
               <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
               <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
             </select>
+            <label>Default bar days</label>
+            <select name="network_default_bar_days">
+              {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
+              <option value="{{ n }}" {% if (cfg.network.default_bar_days or 90) == n %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+              <option value="all" {% if cfg.network.default_bar_days == 'all' %}selected{% endif %}>all</option>
+            </select>
+            <label>Default table days</label>
+            <select name="network_default_table_days">
+              {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
+              <option value="{{ n }}" {% if (cfg.network.default_table_days or 90) == n %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+              <option value="all" {% if cfg.network.default_table_days == 'all' %}selected{% endif %}>all</option>
+            </select>
+            <label>Default iface</label>
+            <input type="text" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0">
             <label>Hide docker/bridge/veth by default</label>
             <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
           </div>

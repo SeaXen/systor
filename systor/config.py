@@ -43,6 +43,9 @@ DEFAULT_CONFIG: dict = {
     "network": {
         "default_hours": 24,
         "default_granularity": "day",
+        "default_bar_days": 90,
+        "default_table_days": 90,
+        "default_iface": "all",
         "auto_refresh_sec": 15,
         "hide_virtual_default": True,
     },
