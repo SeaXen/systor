@@ -61,6 +61,25 @@ def send_discord(webhook_url: str, text: str, timeout: int = 10) -> tuple[bool, 
         return False, str(e)
 
 
+def _lines(text: str) -> list[str]:
+    return [ln.strip() for ln in str(text or '').splitlines() if ln.strip()]
+
+
+def _format_telegram(subject: str, body: str) -> str:
+    lines = _lines(body)
+    out = [f"<b>{html.escape(subject)}</b>"]
+    for ln in lines:
+        out.append(html.escape(ln))
+    return "\n".join(out)
+
+
+def _format_discord(subject: str, body: str) -> str:
+    lines = _lines(body)
+    out = [f"**{subject}**"]
+    out.extend(lines)
+    return "\n".join(out)
+
+
 class Notifier:
     """Wraps config + sends via all enabled channels. Returns list of (channel, ok, err)."""
 
@@ -69,8 +88,8 @@ class Notifier:
 
     def notify(self, subject: str, body: str) -> list[tuple[str, bool, str | None]]:
         results: list[tuple[str, bool, str | None]] = []
-        tg_text = f"<b>{html.escape(subject)}</b>\n{html.escape(body)}"
-        dc_text = f"**{subject}**\n{body}"
+        tg_text = _format_telegram(subject, body)
+        dc_text = _format_discord(subject, body)
 
         tg = self.cfg.get("telegram", {})
         if tg.get("enabled"):

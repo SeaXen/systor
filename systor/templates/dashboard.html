@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}systor · Dashboard{% endblock %}
 {% block content %}
+<p class="page-help" role="note">Live system overview. Numbers update every refresh cycle. Hover any chart for per-sample values.</p>
+
 <div class="dash-toolbar">
   <div class="dash-status">
     <span class="dot green"></span>
@@ -143,7 +145,7 @@
   <h3><span>Recent Alerts</span></h3>
   <table>
     <thead><tr><th>Time</th><th>Severity</th><th>Metric</th><th>Message</th></tr></thead>
-    <tbody id="alerts-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
+    <tbody id="dash-alerts-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
   </table>
 </div>
 {% endblock %}
@@ -262,7 +264,7 @@ async function refreshCharts(){
   }catch(e){ console.error(e); setLoadState('charts error'); }
   finally{ inflight.charts=false; }
 }
-async function refreshAlerts(){ if(settings.paused||inflight.alerts) return; inflight.alerts=true; try{ const alerts=await fetchJSON('/api/alerts?limit=20'); const body=document.getElementById('alerts-body'); if(!alerts.length){ body.innerHTML='<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; } body.innerHTML=alerts.map(a=>`<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join(''); }catch(e){ console.error(e); } finally { inflight.alerts=false; } }
+async function refreshAlerts(){ if(settings.paused||inflight.alerts) return; inflight.alerts=true; try{ const alerts=await fetchJSON('/api/alerts?limit=20'); const body=document.getElementById('dash-alerts-body'); if(!alerts.length){ body.innerHTML='<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; } body.innerHTML=alerts.map(a=>`<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join(''); }catch(e){ console.error(e); } finally { inflight.alerts=false; } }
 function procColor(v,warn,danger){ return v>danger?COLORS.red:v>warn?COLORS.yellow:COLORS.text; }
 function esc(s){ return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 async function refreshProcs(){ if(settings.paused||inflight.procs) return; inflight.procs=true; try{ const [cpuTop,memTop]=await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'),fetchJSON('/api/top-processes?by=mem&n=10')]); document.getElementById('top-cpu-body').innerHTML=cpuTop.processes.length?cpuTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; document.getElementById('top-mem-body').innerHTML=memTop.processes.length?memTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; }catch(e){ console.error(e); } finally { inflight.procs=false; } }

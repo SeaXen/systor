@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import signal
+import shutil
 import sys
 import threading
 import time
@@ -55,6 +56,184 @@ _storage_lock = threading.Lock()
 # do not hammer dockerd/containerd while still keeping the page live.
 _docker_cache: dict = {"ts": 0.0, "rows": []}
 _docker_cache_lock = threading.Lock()
+
+_speed_live_lock = threading.Lock()
+_speed_live_proc: subprocess.Popen | None = None
+_speed_live_state: dict = {
+    "running": False,
+    "phase": "idle",
+    "progress": 0,
+    "target": "",
+    "server_id": "",
+    "ping_ms": None,
+    "jitter_ms": None,
+    "packet_loss": None,
+    "dl_mbps": None,
+    "ul_mbps": None,
+    "ok": None,
+    "status": "idle",
+    "cancel_requested": False,
+    "result_url": "",
+    "run_type": "manual",
+    "started_ts": 0,
+    "ended_ts": 0,
+}
+
+
+def _speed_live_copy() -> dict:
+    with _speed_live_lock:
+        return dict(_speed_live_state)
+
+
+def _speed_live_update(**kwargs):
+    with _speed_live_lock:
+        _speed_live_state.update(kwargs)
+
+
+def _speed_live_reset(server_id: str = "", target: str = "", run_type: str = "manual"):
+    with _speed_live_lock:
+        _speed_live_state.clear()
+        _speed_live_state.update({
+            "running": False,
+            "phase": "idle",
+            "progress": 0,
+            "target": target or "",
+            "server_id": str(server_id or ""),
+            "ping_ms": None,
+            "jitter_ms": None,
+            "packet_loss": None,
+            "dl_mbps": None,
+            "ul_mbps": None,
+            "ok": None,
+            "status": "idle",
+            "cancel_requested": False,
+            "result_url": "",
+            "run_type": run_type or "manual",
+            "started_ts": 0,
+            "ended_ts": 0,
+        })
+
+
+def _speed_live_env() -> dict:
+    env = dict(os.environ)
+    env.setdefault("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin")
+    env.setdefault("LANG", "C.UTF-8")
+    env.setdefault("LC_ALL", "C.UTF-8")
+    env.setdefault("HOME", "/root")
+    return env
+
+
+def _speed_live_parse_line(line: str):
+    line = (line or "").strip()
+    if not line:
+        return
+    m = re.search(r"Server:\s+(.+?)\s+\(id:\s*(\d+)\)", line)
+    if m:
+        _speed_live_update(target=m.group(1).replace(" - ", " · "), server_id=m.group(2))
+        return
+    m = re.search(r"Idle Latency:\s*([0-9.]+)\s*ms\s*\(jitter:\s*([0-9.]+)ms", line)
+    if m:
+        _speed_live_update(phase="ping", progress=25, ping_ms=float(m.group(1)), jitter_ms=float(m.group(2)), status="ping complete")
+        return
+    m = re.search(r"Download:\s+([0-9.]+)\s+Mbps.*?(\d+)%", line)
+    if m:
+        _speed_live_update(phase="download", progress=75, dl_mbps=float(m.group(1)), status="download running")
+        return
+    m = re.search(r"Upload:\s+([0-9.]+)\s+Mbps.*?(\d+)%", line)
+    if m:
+        _speed_live_update(phase="upload", progress=75, ul_mbps=float(m.group(1)), status="upload running")
+        return
+    m = re.search(r"Download:\s+([0-9.]+)\s+Mbps\s+\(data used:", line)
+    if m:
+        _speed_live_update(phase="download", progress=75, dl_mbps=float(m.group(1)), status="download complete")
+        return
+    m = re.search(r"Upload:\s+([0-9.]+)\s+Mbps\s+\(data used:", line)
+    if m:
+        _speed_live_update(phase="upload", progress=75, ul_mbps=float(m.group(1)), status="upload complete")
+        return
+    m = re.search(r"Packet Loss:\s*([0-9.]+)%", line)
+    if m:
+        _speed_live_update(packet_loss=float(m.group(1)))
+        return
+    m = re.search(r"Result URL:\s*(https?://\S+)", line)
+    if m:
+        _speed_live_update(result_url=m.group(1))
+
+
+def _speed_live_finalize(returncode: int):
+    global _speed_live_proc
+    snap = _speed_live_copy()
+    cancelled = bool(snap.get("cancel_requested"))
+    ok = (returncode == 0) and not cancelled
+    if ok:
+        row = {
+            "ts": int(snap.get("started_ts") or time.time()),
+            "provider": "ookla",
+            "mode": "wan",
+            "target": snap.get("target") or f"server {snap.get('server_id') or 'auto'}",
+            "server_id": snap.get("server_id") or "",
+            "run_type": snap.get("run_type") or "manual",
+            "ping_ms": snap.get("ping_ms"),
+            "jitter_ms": snap.get("jitter_ms"),
+            "packet_loss": snap.get("packet_loss"),
+            "dl_mbps": snap.get("dl_mbps"),
+            "ul_mbps": snap.get("ul_mbps"),
+            "ok": True,
+            "note": snap.get("result_url") or "live ookla run",
+            "raw_json": json.dumps(snap)[:16000],
+        }
+        get_storage().log_speedtest(row)
+        _speed_live_update(ok=True, running=False, phase="complete", progress=100, status="done · results updated", ended_ts=int(time.time()))
+    elif cancelled:
+        _speed_live_update(ok=False, running=False, phase="stopped", progress=0, status="stopped", ended_ts=int(time.time()))
+    else:
+        _speed_live_update(ok=False, running=False, phase="failed", progress=100, status=f"failed · exit {returncode}", ended_ts=int(time.time()))
+    with _speed_live_lock:
+        _speed_live_proc = None
+
+
+def _speed_live_worker(server_id: str, run_type: str = "manual"):
+    global _speed_live_proc
+    sid = re.sub(r"[^0-9]", "", str(server_id or ""))
+    cmd = ["speedtest", "--accept-license", "--accept-gdpr"]
+    if sid:
+        cmd += ["-s", sid]
+    pretty_target = f"server {sid}" if sid else "auto"
+    _speed_live_update(running=True, phase="starting", progress=6, status="starting…", server_id=sid, target=pretty_target, run_type=run_type or "manual", started_ts=int(time.time()))
+    if not shutil.which("speedtest"):
+        _speed_live_update(running=False, ok=False, phase="failed", progress=0, status="failed · Ookla CLI not installed", ended_ts=int(time.time()))
+        return
+    wrapped = ["script", "-q", "-c", " ".join(cmd), "/dev/null"]
+    proc = subprocess.Popen(wrapped, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=_speed_live_env(), bufsize=1)
+    with _speed_live_lock:
+        _speed_live_proc = proc
+    buf = ""
+    try:
+        while True:
+            ch = proc.stdout.read(1) if proc.stdout else ""
+            if ch == "" and proc.poll() is not None:
+                break
+            if not ch:
+                continue
+            if ch in "\r\n":
+                if buf.strip():
+                    _speed_live_parse_line(buf)
+                buf = ""
+            else:
+                buf += ch
+        if buf.strip():
+            _speed_live_parse_line(buf)
+        rc = proc.wait(timeout=5)
+    except Exception as e:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        _speed_live_update(ok=False, running=False, phase="failed", progress=100, status=f"failed · {e}", ended_ts=int(time.time()))
+        with _speed_live_lock:
+            _speed_live_proc = None
+        return
+    _speed_live_finalize(rc)
 
 
 def get_storage() -> Storage:
@@ -234,8 +413,9 @@ def _docker_apps(limit: int = 24) -> list[dict]:
     now = time.time()
     with _docker_cache_lock:
         cached = list(_docker_cache.get("rows") or [])
-        if float(_docker_cache.get("ts") or 0) > 0 and now - float(_docker_cache.get("ts") or 0) < 5:
-            return cached[:limit]
+        cached_ts = float(_docker_cache.get("ts") or 0)
+    if cached_ts > 0 and now - cached_ts < 10:
+        return cached[:limit]
     try:
         if subprocess.run(["bash", "-lc", "command -v docker >/dev/null"], timeout=3).returncode != 0:
             with _docker_cache_lock:
@@ -350,23 +530,17 @@ def _build_channel_test_message(channel: str) -> str:
     worst_disk = max(disks, key=lambda d: d.get("used_pct", 0), default={})
     top_cpu = (read_top_processes(n=1, by="cpu") or [{}])[0]
     host = snap.get('hostname', 'systor')
-    cpu_line = f"🧠 CPU {cpu.get('percent', '?')}% · load {cpu.get('load_1m', '?')}"
-    ram_line = f"🧮 RAM free {mem.get('available_mb', '?')} MB"
-    disk_line = f"💽 Disk {worst_disk.get('mount', '?')} {worst_disk.get('used_pct', '?')}%" if worst_disk else ""
-    app_line = f"🔥 {top_cpu.get('name')} {top_cpu.get('cpu_percent', 0)}% CPU" if top_cpu.get('name') else ""
-    if channel == 'telegram':
-        lines = [f"🧪 <b>Systor Telegram test</b>", f"🏷️ {host}", cpu_line, ram_line]
-        if disk_line:
-            lines.append(disk_line)
-        if app_line:
-            lines.append(app_line)
-        return "\n".join(lines)
-    lines = ["🧪 **Systor Discord test**", f"🏷️ **{host}**", cpu_line, ram_line]
-    if disk_line:
-        lines.append(disk_line)
-    if app_line:
-        lines.append(app_line)
-    return "\n".join(lines)
+    lines = [
+        f"🖥️ {host}",
+        f"🧠 CPU {cpu.get('percent', '?')}% · load {cpu.get('load_1m', '?')}",
+        f"🧮 RAM free {mem.get('available_mb', '?')} MB · used {mem.get('used_mb', '?')} MB",
+    ]
+    if worst_disk:
+        lines.append(f"💽 Disk {worst_disk.get('mount', '?')} {worst_disk.get('used_pct', '?')}%")
+    if top_cpu.get('name'):
+        lines.append(f"🔥 Top app {top_cpu.get('name')} · {top_cpu.get('cpu_percent', 0)}% CPU")
+    prefix = "🧪 Systor Telegram test" if channel == 'telegram' else "🧪 Systor Discord test"
+    return "\n".join([prefix, *lines])
 
 
 def _looks_masked_secret(value: str) -> bool:
@@ -377,13 +551,36 @@ def _looks_masked_secret(value: str) -> bool:
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["JSON_SORT_KEYS"] = False
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
+    app.static_folder = "static"
+
+    @app.after_request
+    def _static_cache_headers(response):
+        try:
+            path = request.path or ""
+        except Exception:
+            path = ""
+        if path.startswith("/static/") or path.endswith((".css", ".js", ".png", ".svg", ".ico", ".webp", ".woff2")):
+            response.headers["Cache-Control"] = "public, max-age=300"
+        return response
 
     # ---------- API: live snapshot ----------
     @app.route("/api/snapshot")
     def api_snapshot():
         s = collect_snapshot()
         s["db_stats"] = get_storage().stats()
-        return jsonify(s)
+        body = jsonify(s).get_data()
+        import hashlib
+        etag = '"' + hashlib.md5(body).hexdigest()[:16] + '"'
+        if request.headers.get("If-None-Match") == etag:
+            resp = Response(status=304)
+            resp.headers["ETag"] = etag
+            resp.headers["Cache-Control"] = "private, max-age=2"
+            return resp
+        resp = Response(body, mimetype="application/json")
+        resp.headers["ETag"] = etag
+        resp.headers["Cache-Control"] = "private, max-age=2"
+        return resp
 
     @app.route("/api/series")
     def api_series():
@@ -527,7 +724,39 @@ def create_app() -> Flask:
             seen.add(prov)
             latest.append(row)
         port = int((cfg.get("speed", {}) or {}).get("iperf_port", 5201))
-        return jsonify({"ok": True, "latest": latest, "iperf": iperf_status(port), "local_ips": local_ipv4s(), "config": cfg})
+        return jsonify({"ok": True, "latest": latest, "iperf": iperf_status(port), "local_ips": local_ipv4s(), "config": cfg, "live": _speed_live_copy()})
+
+    @app.route("/api/speed/live/start", methods=["POST"])
+    def api_speed_live_start():
+        body = request.get_json(silent=True) or {}
+        server_id = str(body.get("server_id") or "").strip()
+        target = str(body.get("target") or "").strip()
+        run_type = str(body.get("run_type") or "manual").strip().lower()
+        snap = _speed_live_copy()
+        if snap.get("running"):
+            return jsonify({"ok": False, "error": "speedtest already running", "live": snap}), 409
+        _speed_live_reset(server_id=server_id, target=target, run_type=run_type)
+        th = threading.Thread(target=_speed_live_worker, args=(server_id, run_type), daemon=True)
+        th.start()
+        time.sleep(0.2)
+        return jsonify({"ok": True, "live": _speed_live_copy()})
+
+    @app.route("/api/speed/live/status")
+    def api_speed_live_status():
+        return jsonify({"ok": True, "live": _speed_live_copy()})
+
+    @app.route("/api/speed/live/stop", methods=["POST"])
+    def api_speed_live_stop():
+        global _speed_live_proc
+        with _speed_live_lock:
+            proc = _speed_live_proc
+            _speed_live_state["cancel_requested"] = True
+        if proc and proc.poll() is None:
+            try:
+                proc.kill()
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e), "live": _speed_live_copy()}), 500
+        return jsonify({"ok": True, "live": _speed_live_copy()})
 
     @app.route("/api/speed/options")
     def api_speed_options():
@@ -549,6 +778,28 @@ def create_app() -> Flask:
         for row in rows:
             get_storage().log_speedtest(row)
         return jsonify({"ok": True, "rows": rows})
+
+    @app.route("/api/speed/log", methods=["POST"])
+    def api_speed_log():
+        body = request.get_json(silent=True) or {}
+        row = {
+            "ts": int(body.get("ts") or time.time()),
+            "provider": str(body.get("provider") or "cloudflare").strip().lower(),
+            "target": str(body.get("target") or "browser test"),
+            "mode": str(body.get("mode") or "browser"),
+            "server_id": str(body.get("server_id") or ""),
+            "run_type": str(body.get("run_type") or "manual"),
+            "ping_ms": body.get("ping_ms"),
+            "jitter_ms": body.get("jitter_ms"),
+            "packet_loss": body.get("packet_loss"),
+            "dl_mbps": body.get("dl_mbps"),
+            "ul_mbps": body.get("ul_mbps"),
+            "note": str(body.get("note") or "browser speed test"),
+            "ok": bool(body.get("ok", True)),
+            "raw_json": json.dumps(body)[:16000],
+        }
+        get_storage().log_speedtest(row)
+        return jsonify({"ok": True, "row": row})
 
     @app.route("/api/speed/iperf/start", methods=["POST"])
     def api_speed_iperf_start():
@@ -745,7 +996,7 @@ def create_app() -> Flask:
                 cfg["apps"]["default_sort"] = data["apps_default_sort"]
             cfg.setdefault("speed", {})
             if "speed_page_refresh_sec" in data and data["speed_page_refresh_sec"]:
-                try: cfg["speed"]["page_refresh_sec"] = max(1, int(data["speed_page_refresh_sec"]))
+                try: cfg["speed"]["page_refresh_sec"] = max(0, int(data["speed_page_refresh_sec"]))
                 except (ValueError, TypeError): pass
             if "speed_default_provider" in data and data["speed_default_provider"] in ("ookla", "librespeed", "notion", "cloudflare"):
                 cfg["speed"]["default_provider"] = data["speed_default_provider"]

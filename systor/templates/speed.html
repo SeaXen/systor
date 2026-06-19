@@ -1,142 +1,150 @@
 {% extends "base.html" %}
 {% block title %}systor · Speed{% endblock %}
 {% block content %}
-<div class="speed-layout speed-layout-v2">
-  <div class="dash-toolbar">
+<p class="page-help" role="note">Run real network speed tests. Stop cancels the active run. Saved schedule runs automatically in background.</p>
+
+<div class="speed-simple-page">
+  <div class="dash-toolbar speed-simple-toolbar">
     <div class="dash-status">
       <span class="dot green"></span>
       <strong>Speed</strong>
       <span id="speed-updated">loading…</span>
-      <span id="speed-meta">WAN + LAN browser test</span>
+      <span id="speed-meta">Official Ookla CLI from this host · regional fixed-ID presets may depend on Ookla availability</span>
     </div>
-    <div class="dash-controls speed-run-controls">
-      <label>run
-        <select id="speed-run-provider" class="control-select">
-          <option value="ookla">ookla</option>
-          <option value="librespeed">librespeed</option>
-          <option value="notion">notion probe</option>
-          <option value="cloudflare">cloudflare probe</option>
-          <option value="all">all</option>
-        </select>
-      </label>
-      <label id="speed-run-server-wrap">server
-        <select id="speed-run-server" class="control-select"><option value="">auto</option></select>
-      </label>
-      <label>refresh
-        <select id="speed-refresh-sec" class="control-select">
-          <option value="1">1s</option>
-          <option value="3">3s</option>
-          <option value="5" {% if (cfg.speed.page_refresh_sec or 15) == 5 %}selected{% endif %}>5s</option>
-          <option value="10" {% if (cfg.speed.page_refresh_sec or 15) == 10 %}selected{% endif %}>10s</option>
-          <option value="15" {% if (cfg.speed.page_refresh_sec or 15) == 15 %}selected{% endif %}>15s</option>
-          <option value="30" {% if (cfg.speed.page_refresh_sec or 15) == 30 %}selected{% endif %}>30s</option>
-        </select>
-      </label>
-      <button class="btn secondary compact" id="speed-run-one">Run selected</button>
-      <button class="btn secondary compact" id="speed-run-all">Run all</button>
-      <button class="btn secondary compact" id="speed-refresh">Refresh</button>
-      <button class="btn secondary compact" id="speed-open-cf">Open Cloudflare</button>
+    <div class="dash-controls speed-simple-controls">
+      <div class="speed-inline-field"><select id="ookla-server-select" class="control-select" aria-label="Server">
+          <option value="">auto</option>
+        </select></div>
+      <div class="speed-inline-field"><select id="speed-poll-select" class="control-select" aria-label="Poll interval">
+          <option value="0">off</option>
+          <option value="15">15s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
+        </select></div>
+      <button class="btn secondary compact" id="speed-run-btn">Run speedtest</button>
+      <button class="btn secondary compact" id="speed-refresh-btn">Refresh</button>
     </div>
   </div>
 
-  <div class="stat-grid compact-grid speed-kpis speed-kpis-5" id="speed-kpis">
-    <div class="stat-card cyan" id="speed-card-ookla"><div class="label">Ookla CLI</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="ookla-dl">—</span></div><div><span class="ul-text">UL</span> <span id="ookla-ul">—</span></div></div><div class="sub" id="ookla-sub">waiting</div></div>
-    <div class="stat-card cyan" id="speed-card-librespeed"><div class="label">LibreSpeed CLI</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="librespeed-dl">—</span></div><div><span class="ul-text">UL</span> <span id="librespeed-ul">—</span></div></div><div class="sub" id="librespeed-sub">waiting</div></div>
-    <div class="stat-card cyan" id="speed-card-notion"><div class="label">Notion probe</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="notion-dl">—</span></div><div><span class="ul-text">UL</span> <span id="notion-ul">—</span></div></div><div class="sub" id="notion-sub">fixed endpoint</div></div>
-    <div class="stat-card cyan" id="speed-card-cloudflare"><div class="label">Cloudflare probe</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="cloudflare-dl">—</span></div><div><span class="ul-text">UL</span> <span id="cloudflare-ul">—</span></div></div><div class="sub" id="cloudflare-sub">browser site usually better</div></div>
-    <div class="stat-card cyan" id="speed-card-lan"><div class="label">Local LAN browser</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">PORT</span> <span id="lan-port">—</span></div><div><span class="ul-text">MODE</span> <span id="lan-mode">iframe</span></div></div><div class="sub" id="lan-sub">LibreSpeed on NAS</div></div>
-  </div>
-
-  <div class="table-grid speed-mid-grid">
-    <div class="chart-card speed-browser-card">
-      <div class="chart-head"><h3><strong>Local LAN browser speed test</strong></h3><div class="chart-meta"><span class="dl-text"><strong>LibreSpeed local</strong></span> · <span id="local-browser-meta">NAS browser path</span></div></div>
-      <div class="speed-browser-actions">
-        <button class="btn secondary compact" id="speed-open-local">Open local test</button>
-        <button class="btn secondary compact" id="speed-reload-local">Reload local frame</button>
-        <button class="btn secondary compact" id="speed-start-iperf">Start iperf3 server</button>
+  
+  <div class="speed-simple-grid">
+    <div class="chart-card speed-current-card">
+      <div class="speed-live-runner speed-live-hero" id="speed-live-runner">
+        <div class="speed-live-top speed-live-top-v4">
+          <div class="speed-live-left">
+            <div class="speed-live-fill"></div>
+          </div>
+          <div class="speed-go-stack">
+            <button class="speed-go-btn speed-go-panel" id="speed-go-btn" type="button" aria-label="Run speedtest">
+              <span class="speed-go-label-top">SERVER</span>
+              <span class="speed-go-server" id="speed-live-target">MS Online · Dhaka, Bangladesh</span>
+              <span class="speed-live-core" id="speed-live-core">GO</span>
+              <span class="speed-go-sub" id="speed-go-label-top">MS Online</span>
+            </button>
+            <button class="btn secondary compact speed-stop-btn" id="speed-stop-btn" type="button">Stop</button>
+          </div>
+        </div>
+        <div class="speed-presets-inline" id="speed-preset-row">
+          <button class="btn secondary compact speed-preset-btn" data-server-id="33496" data-server-label="MS Online · Dhaka, Bangladesh">Local · MS</button>
+          <button class="btn secondary compact speed-preset-btn" data-server-id="73779" data-server-label="VOLO NET · Dhaka, Bangladesh">Local · VOLO</button>
+          <button class="btn secondary compact speed-preset-btn" data-server-id="70157" data-server-label="Carnival Internet · Dhaka, Bangladesh">Local · Carnival</button>
+          <button class="btn secondary compact speed-preset-btn" data-server-id="13623" data-server-label="Singtel · Singapore, Singapore">SG · Singtel</button>
+          <button class="btn secondary compact speed-preset-btn" data-server-id="1755" data-server-label="Vodafone Albania · Tirana, Albania">EU · Albania</button>
+          <button class="btn secondary compact speed-preset-btn" data-server-id="4227" data-server-label="Telecom Personal · Santa Fe, Argentina">LATAM · Argentina</button>
+        </div>
+        <div class="speed-phase-steps speed-phase-rail" id="speed-phase-steps">
+          <div class="speed-phase-chip" id="phase-ping">Ping</div>
+          <div class="speed-phase-chip" id="phase-jitter">Jitter</div>
+          <div class="speed-phase-chip" id="phase-download">Download</div>
+          <div class="speed-phase-chip" id="phase-upload">Upload</div>
+        </div>
+        <div class="speed-stage-progress"><i id="speed-stage-fill"></i></div>
+        <div class="speed-live-foot">
+          <span class="speed-live-phase" id="speed-live-phase">idle</span>
+          <span class="speed-run-status" id="speed-run-status">ready</span>
+        </div>
       </div>
-      <iframe id="local-speed-frame" class="speed-browser-frame" src="about:blank" loading="lazy"></iframe>
-      <div class="speed-frame-note">This runs in the browser against your NAS LibreSpeed server, so it can test laptop ↔ NAS LAN speed without CLI on the laptop.</div>
+      <div class="speed-current-kpis">
+        <div class="speed-main-kpi dl">
+          <span class="label">Download</span>
+          <strong id="cur-dl">—</strong>
+          <span class="unit">Mbps</span>
+        </div>
+        <div class="speed-main-kpi ul">
+          <span class="label">Upload</span>
+          <strong id="cur-ul">—</strong>
+          <span class="unit">Mbps</span>
+        </div>
+        <div class="speed-mini-kpis speed-mini-kpis-4">
+          <div class="speed-mini-kpi"><span>Ping</span><strong id="cur-ping">—</strong></div>
+          <div class="speed-mini-kpi"><span>Jitter</span><strong id="cur-jitter">—</strong></div>
+          <div class="speed-mini-kpi"><span>Loss</span><strong id="cur-loss">—</strong></div>
+          <div class="speed-mini-kpi"><span>Server</span><strong id="cur-server">—</strong></div>
+        </div>
+      </div>
     </div>
 
-    <div class="table-card compact-table speed-side-stack">
-      <h3><span>Auto speed monitor</span><span class="network-mini" id="speed-auto-meta">inline controls</span></h3>
-      <div class="speed-auto-form" id="speed-auto-form">
-        <label><input type="checkbox" class="checkbox" id="auto-enabled-input"> auto run</label>
-        <label>provider
-          <select id="auto-provider-input" class="control-select">
-            <option value="ookla">ookla</option>
-            <option value="librespeed">librespeed</option>
-            <option value="notion">notion</option>
-            <option value="cloudflare">cloudflare</option>
-          </select>
-        </label>
-        <label>interval
+    <div class="speed-right-col">
+            <div class="table-card compact-table speed-schedule-card">
+        <h3><span>Scheduler</span><span class="network-mini" id="speed-schedule-meta">loading…</span></h3>
+      <div class="speed-schedule-form">
+        <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-enabled-input"> <span>Enable scheduled speedtest</span></label>
+        <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-notify-input"> <span>Notify on bad result</span></label>
+        <label>run every (min)
           <input type="number" id="auto-interval-input" min="5" step="5">
         </label>
-        <label><input type="checkbox" class="checkbox" id="auto-notify-input"> notify</label>
-        <label>min DL
+        <label>minimum DL
           <input type="number" id="auto-min-dl-input" min="0" step="0.1">
         </label>
-        <label>min UL
+        <label>minimum UL
           <input type="number" id="auto-min-ul-input" min="0" step="0.1">
         </label>
-        <label>default provider
-          <select id="default-provider-input" class="control-select">
-            <option value="ookla">ookla</option>
-            <option value="librespeed">librespeed</option>
-            <option value="notion">notion</option>
-            <option value="cloudflare">cloudflare</option>
-          </select>
+        <label>saved server id
+          <input type="text" id="ookla-server-id-input" placeholder="auto">
         </label>
-        <label>page refresh
+        <label>status poll
           <select id="speed-page-refresh-input" class="control-select">
-            <option value="1">1s</option>
-            <option value="3">3s</option>
-            <option value="5">5s</option>
-            <option value="10">10s</option>
+            <option value="0">off</option>
             <option value="15">15s</option>
             <option value="30">30s</option>
+            <option value="60">60s</option>
           </select>
         </label>
-        <label>LibreSpeed server ID
-          <input type="text" id="librespeed-server-input" placeholder="auto">
-        </label>
-        <label>Ookla server ID
-          <input type="text" id="ookla-server-input" placeholder="auto">
-        </label>
-        <label>local LibreSpeed port
-          <input type="number" id="local-ls-port-input" min="1" max="65535" step="1">
+        <label>history rows/page
+          <select id="history-page-size-input" class="control-select">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
         </label>
       </div>
-      <div class="speed-auto-actions">
-        <button class="btn compact" id="speed-save-auto">Save + apply</button>
-        <span class="inline-help" id="speed-save-auto-result">—</span>
+      <div class="speed-schedule-actions">
+        <button class="btn compact" id="speed-save-settings">Save + apply</button>
+        <span class="inline-help" id="speed-save-result">—</span>
       </div>
-      <div class="history-item compact-speed-note">
-        <div class="history-head"><strong>Reality</strong><span class="text-muted">important</span></div>
-        <div class="history-body">Ookla + LibreSpeed CLI are server-side WAN tests from the NAS. The embedded LibreSpeed frame is the real browser-based LAN test path.</div>
-      </div>
+      <div class="speed-schedule-current" id="speed-schedule-current"></div>
+    </div>
     </div>
   </div>
 
   <div class="chart-card">
-    <div class="chart-head"><h3><strong>Speed history</strong></h3><div class="chart-meta" id="speed-chart-meta"><span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span></div></div>
+    <div class="chart-head">
+      <h3><strong>History chart</strong></h3>
+      <div class="chart-meta" id="speed-chart-meta"><span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span></div>
+    </div>
     <canvas id="speed-history-chart"></canvas>
   </div>
 
   <div class="table-card compact-table speed-history-card">
     <div class="speed-history-head">
-      <h3><span>Full history</span><span class="network-mini" id="speed-history-meta">loading…</span></h3>
+      <h3><span>History</span><span class="network-mini" id="speed-history-meta">loading…</span></h3>
       <div class="dash-controls speed-history-controls">
         <label>provider
           <select id="speed-history-provider" class="control-select">
             <option value="all">all</option>
             <option value="ookla">ookla</option>
             <option value="speedtest">legacy speedtest</option>
-            <option value="librespeed">librespeed</option>
-            <option value="notion">notion</option>
-            <option value="cloudflare">cloudflare</option>
           </select>
         </label>
         <label>type
@@ -151,8 +159,22 @@
       </div>
     </div>
     <table class="apps-table aligned-table compact-apps-table speed-history-table">
-      <thead><tr><th>Time</th><th>Provider</th><th>Type</th><th>Target</th><th>Server</th><th class="text-right dl-text">DL</th><th class="text-right ul-text">UL</th><th class="text-right">Ping</th><th class="text-right">Jitter</th><th>Status</th></tr></thead>
-      <tbody id="speed-history-body"><tr><td colspan="10" class="empty-cell">Loading…</td></tr></tbody>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Provider</th>
+          <th>Type</th>
+          <th>Target</th>
+          <th>Server</th>
+          <th class="text-right dl-text">DL</th>
+          <th class="text-right ul-text">UL</th>
+          <th class="text-right">Ping</th>
+          <th class="text-right">Jitter</th>
+          <th class="text-right">Loss</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="speed-history-body"><tr><td colspan="11" class="empty-cell">Loading…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -160,57 +182,450 @@
 
 {% block scripts %}
 <script>
+const SPEED_CFG = {{ (cfg.speed or {}) | tojson }};
 const SPEED_COL = { dl:'#22d3ee', ul:'#ff6b8a', grid:'#30363d', dim:'#8b949e' };
-let speedTimer = null, speedBusy = false;
-let speedOptions = { ookla: [], librespeed: [] };
-let historyState = { page:1, limit:25, provider:'all', run_type:'all', total:0 };
+let speedTimer = null;
+let speedBusy = false;
+let speedOptions = [];
+let historyState = {
+  page: 1,
+  limit: Number(SPEED_CFG.history_page_size || 25),
+  provider: 'all',
+  run_type: 'all',
+  total: 0,
+};
 
-function fmtMbps(v){ return (v===null||v===undefined||Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(Number(v)>=100?0:Number(v)>=10?1:2)+' Mbps'; }
-function fmtMs(v){ return (v===null||v===undefined||Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(1)+' ms'; }
-function esc(s){ return String(s ?? '').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-async function fetchJSON(url, opts){ const r=await fetch(url, Object.assign({cache:'no-store'}, opts||{})); const j=await r.json(); if(!r.ok) throw new Error(j.error || j.message || ('HTTP '+r.status)); return j; }
-function niceStep(v){ if(!Number.isFinite(v)||v<=0) return 1; const p=Math.pow(10, Math.floor(Math.log10(v))); const n=v/p; const m=n<=1?1:n<=2?2:n<=5?5:10; return m*p; }
-function niceMax(v){ const step=niceStep((Number(v)||0)/4 || 1); return Math.max(step, Math.ceil((Number(v)||0)/step)*step); }
-function providerBadge(p){ const cls = ({ookla:'ookla', speedtest:'legacy', librespeed:'librespeed', notion:'notion', cloudflare:'cloudflare'})[p] || 'other'; return `<span class="provider-badge ${cls}">${esc(p)}</span>`; }
-function runTypeBadge(t){ const cls = t === 'auto' ? 'auto' : 'manual'; return `<span class="provider-badge ${cls}">${esc(t || 'manual')}</span>`; }
-function drawLine(canvas, dl, ul){ const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(150,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); const all=[...dl.map(x=>Number(x[1]||0)), ...ul.map(x=>Number(x[1]||0))]; if(!all.length){ ctx.fillStyle=SPEED_COL.dim; ctx.font='12px monospace'; ctx.fillText('waiting for speed history',12,h/2); return; } const max=niceMax(Math.max(...all,0.01)); const padL=40,padR=10,padT=8,padB=20,gw=w-padL-padR,gh=h-padT-padB; ctx.strokeStyle=SPEED_COL.grid; ctx.fillStyle=SPEED_COL.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.fillText((max-(max/3)*i).toFixed(max>100?0:1),2,y+3); }
-  function line(points,color){ if(!points.length) return; ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=1.8; points.forEach((p,i)=>{ const x=padL+(points.length>1?gw*i/(points.length-1):gw/2); const y=padT+gh-((Number(p[1]||0)/max)*gh); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.stroke(); }
-  line(dl,SPEED_COL.dl); line(ul,SPEED_COL.ul);
+function esc(s){
+  return String(s ?? '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
-function setCard(prefix, row){ const dlEl=document.getElementById(prefix+'-dl'); const ulEl=document.getElementById(prefix+'-ul'); const subEl=document.getElementById(prefix+'-sub'); if(!dlEl || !ulEl || !subEl) return; dlEl.textContent = row && row.dl_mbps!==null && row.dl_mbps!==undefined ? Number(row.dl_mbps).toFixed(Number(row.dl_mbps)>=100?0:1) : '—'; ulEl.textContent = row && row.ul_mbps!==null && row.ul_mbps!==undefined ? Number(row.ul_mbps).toFixed(Number(row.ul_mbps)>=100?0:1) : '—'; let note = 'waiting'; if(row){ const sid = row.server_id ? (' · #' + row.server_id) : ''; note = `${row.ok ? 'ok' : 'fail'} · ${row.target || row.note || '—'}${sid} · ${fmtMs(row.ping_ms)}`; if(row.jitter_ms!==null && row.jitter_ms!==undefined) note += ` · jitter ${fmtMs(row.jitter_ms)}`; } subEl.textContent = note; document.getElementById('speed-card-'+prefix).className='stat-card ' + (row && row.ok ? 'cyan' : 'red'); }
-function pickLatest(rows, names){ for(const n of names){ const hit=(rows||[]).find(r => r.provider===n); if(hit) return hit; } return null; }
-function currentLocalLibrespeedUrl(){ const port = Number(document.getElementById('local-ls-port-input')?.value || {{ cfg.speed.local_librespeed_port or 8077 }}); const proto = window.location.protocol === 'https:' ? 'https:' : 'http:'; return `${proto}//${window.location.hostname}:${port}/`; }
-function reloadLocalFrame(){ const url=currentLocalLibrespeedUrl(); const frame=document.getElementById('local-speed-frame'); frame.src=url; document.getElementById('local-browser-meta').textContent=url; document.getElementById('lan-port').textContent=String(document.getElementById('local-ls-port-input')?.value || {{ cfg.speed.local_librespeed_port or 8077 }}); }
-async function loadOptions(){ const j=await fetchJSON('/api/speed/options'); speedOptions.ookla = j.ookla_servers || []; speedOptions.librespeed = j.librespeed_servers || []; updateRunServerSelect(); }
-function updateRunServerSelect(){ const prov=document.getElementById('speed-run-provider').value; const wrap=document.getElementById('speed-run-server-wrap'); const sel=document.getElementById('speed-run-server'); let rows=[]; if(prov==='ookla') rows=speedOptions.ookla; else if(prov==='librespeed') rows=speedOptions.librespeed; else rows=[]; wrap.style.display = rows.length ? 'flex' : 'none'; const current=sel.value; sel.innerHTML = '<option value="">auto</option>' + rows.map(r=>`<option value="${esc(r.id)}">${esc(r.label)}</option>`).join(''); if([...sel.options].some(o=>o.value===current)) sel.value=current; }
-async function loadStatus(){ const j=await fetchJSON('/api/speed/status'); const latest=j.latest || []; setCard('ookla', pickLatest(latest,['ookla','speedtest'])); setCard('librespeed', pickLatest(latest,['librespeed'])); setCard('notion', pickLatest(latest,['notion'])); setCard('cloudflare', pickLatest(latest,['cloudflare'])); const ip=j.iperf || {}; const ips=j.local_ips || []; document.getElementById('lan-sub').textContent = (ips[0] || window.location.hostname) + ' · LibreSpeed local'; const sc=(j.config||{}).speed || {}; const norm=(v)=> (v==='speedtest' ? 'ookla' : (v || 'ookla')); document.getElementById('auto-enabled-input').checked = !!sc.auto_enabled; document.getElementById('auto-provider-input').value = norm(sc.auto_provider); document.getElementById('auto-interval-input').value = sc.auto_interval_min || 180; document.getElementById('auto-notify-input').checked = !!sc.notify_enabled; document.getElementById('auto-min-dl-input').value = sc.min_download_mbps ?? 50; document.getElementById('auto-min-ul-input').value = sc.min_upload_mbps ?? 20; document.getElementById('default-provider-input').value = norm(sc.default_provider); document.getElementById('speed-page-refresh-input').value = String(sc.page_refresh_sec || 15); document.getElementById('librespeed-server-input').value = sc.librespeed_server_id || ''; document.getElementById('ookla-server-input').value = sc.ookla_server_id || ''; document.getElementById('local-ls-port-input').value = sc.local_librespeed_port || 8077; document.getElementById('speed-run-provider').value = norm(sc.default_provider); document.getElementById('lan-port').textContent = String(sc.local_librespeed_port || 8077); document.getElementById('speed-auto-meta').textContent = `${sc.auto_enabled ? 'auto on' : 'auto off'} · ${sc.auto_interval_min || 180} min`; reloadLocalFrame(); updateRunServerSelect(); }
-async function loadHistory(){ const q = new URLSearchParams({ limit:String(historyState.limit), offset:String((historyState.page-1)*historyState.limit), provider:historyState.provider, run_type:historyState.run_type }); const j=await fetchJSON('/api/speedtests?'+q.toString()); const rows=j.rows || []; historyState.total = Number(j.total || rows.length); const totalPages = Math.max(1, Math.ceil(historyState.total / historyState.limit)); document.getElementById('speed-history-meta').textContent = `${historyState.total} rows · page ${historyState.page}/${totalPages}`; document.getElementById('speed-history-prev').disabled = historyState.page <= 1; document.getElementById('speed-history-next').disabled = historyState.page >= totalPages; const body=document.getElementById('speed-history-body'); if(!rows.length){ body.innerHTML='<tr><td colspan="10" class="empty-cell">No speed history for this filter</td></tr>'; drawLine(document.getElementById('speed-history-chart'), [], []); document.getElementById('speed-chart-meta').innerHTML='<span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span>'; return; } body.innerHTML = rows.map(r=>`<tr class="speed-row ${esc((r.provider||'other').replace(/[^a-z0-9_-]/gi,''))}"><td class="mono">${new Date((r.ts||0)*1000).toLocaleString()}</td><td>${providerBadge(r.provider)}</td><td>${runTypeBadge(r.run_type || 'manual')}</td><td title="${esc(r.note||'')}">${esc(r.target || r.note || '—')}</td><td class="mono">${esc(r.server_id || 'auto')}</td><td class="text-right mono dl-text">${fmtMbps(r.dl_mbps)}</td><td class="text-right mono ul-text">${fmtMbps(r.ul_mbps)}</td><td class="text-right mono">${fmtMs(r.ping_ms)}</td><td class="text-right mono">${fmtMs(r.jitter_ms)}</td><td><span class="badge ${r.ok ? 'ok' : 'fail'}">${r.ok ? 'ok' : 'fail'}</span></td></tr>`).join(''); const chartRows=[...rows].reverse(); const dl=chartRows.filter(r=>r.dl_mbps!==null&&r.dl_mbps!==undefined).map(r=>[r.ts, Number(r.dl_mbps)]); const ul=chartRows.filter(r=>r.ul_mbps!==null&&r.ul_mbps!==undefined).map(r=>[r.ts, Number(r.ul_mbps)]); drawLine(document.getElementById('speed-history-chart'), dl, ul); const lastDl=dl.length ? dl[dl.length-1][1] : null; const lastUl=ul.length ? ul[ul.length-1][1] : null; document.getElementById('speed-chart-meta').innerHTML=`<span class="dl-text"><strong>DL ${fmtMbps(lastDl)}</strong></span> · <span class="ul-text"><strong>UL ${fmtMbps(lastUl)}</strong></span>`; }
-async function refreshAll(){ if(speedBusy) return; speedBusy=true; document.getElementById('speed-updated').textContent='loading…'; try{ await Promise.all([loadStatus(), loadHistory()]); document.getElementById('speed-updated').textContent='updated '+new Date().toLocaleTimeString(); } catch(e){ document.getElementById('speed-updated').textContent='error: '+e.message; } finally{ speedBusy=false; } }
-async function runSelected(provider){ const server_id = document.getElementById('speed-run-server-wrap').style.display !== 'none' ? document.getElementById('speed-run-server').value : ''; document.getElementById('speed-updated').textContent='running '+provider+'…'; await fetchJSON('/api/speed/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({provider, server_id, run_type:'manual'})}); historyState.page=1; await refreshAll(); }
-function resetTimer(){ clearInterval(speedTimer); const sec=Number(document.getElementById('speed-refresh-sec').value||15); speedTimer=setInterval(refreshAll, Math.max(1000, sec*1000)); }
-async function saveAutoSettings(){ const payload = { speed_auto_enabled: document.getElementById('auto-enabled-input').checked ? 'true' : 'false', speed_auto_provider: document.getElementById('auto-provider-input').value, speed_auto_interval_min: document.getElementById('auto-interval-input').value, speed_notify_enabled: document.getElementById('auto-notify-input').checked ? 'true' : 'false', speed_min_download_mbps: document.getElementById('auto-min-dl-input').value, speed_min_upload_mbps: document.getElementById('auto-min-ul-input').value, speed_default_provider: document.getElementById('default-provider-input').value, speed_page_refresh_sec: document.getElementById('speed-page-refresh-input').value, speed_librespeed_server_id: document.getElementById('librespeed-server-input').value, speed_ookla_server_id: document.getElementById('ookla-server-input').value, speed_local_librespeed_port: document.getElementById('local-ls-port-input').value };
-  const resultEl=document.getElementById('speed-save-auto-result');
-  resultEl.textContent='saving…';
-  try{ const j=await fetchJSON('/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}); const j2=await fetchJSON('/api/apply', {method:'POST'}); resultEl.textContent=(j.message || 'saved') + ' · ' + (j2.message || 'applied'); await refreshAll(); } catch(e){ resultEl.textContent='save failed: ' + e.message; }
+function fmtMbps(v){
+  return (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(Number(v) >= 100 ? 0 : Number(v) >= 10 ? 1 : 2) + ' Mbps';
+}
+function fmtBare(v){
+  return (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(Number(v) >= 100 ? 0 : Number(v) >= 10 ? 1 : 2);
+}
+function fmtMs(v){
+  return (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(1) + ' ms';
+}
+function fmtPct(v){
+  return (v === null || v === undefined || Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(1) + '%';
+}
+async function fetchJSON(url, opts){
+  const res = await fetch(url, Object.assign({ cache:'no-store' }, opts || {}));
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || data.message || ('HTTP ' + res.status));
+  return data;
+}
+function providerBadge(p){
+  const cls = p === 'ookla' ? 'ookla' : (p === 'speedtest' ? 'legacy' : 'other');
+  return `<span class="provider-badge ${cls}">${esc(p)}</span>`;
+}
+function runTypeBadge(t){
+  const cls = t === 'auto' ? 'auto' : 'manual';
+  return `<span class="provider-badge ${cls}">${esc(t || 'manual')}</span>`;
+}
+function niceStep(v){
+  if (!Number.isFinite(v) || v <= 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / p;
+  const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return m * p;
+}
+function niceMax(v){
+  const step = niceStep((Number(v) || 0) / 4 || 1);
+  return Math.max(step, Math.ceil((Number(v) || 0) / step) * step);
+}
+function drawLine(canvas, dl, ul){
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(10, canvas.clientWidth);
+  const h = Math.max(150, canvas.clientHeight);
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const all = [...dl.map(x => Number(x[1] || 0)), ...ul.map(x => Number(x[1] || 0))];
+  if (!all.length) {
+    ctx.fillStyle = SPEED_COL.dim;
+    ctx.font = '12px monospace';
+    ctx.fillText('waiting for speed history', 12, h / 2);
+    return;
+  }
+  const max = niceMax(Math.max(...all, 0.01));
+  const padL = 40, padR = 10, padT = 8, padB = 20;
+  const gw = w - padL - padR, gh = h - padT - padB;
+  ctx.strokeStyle = SPEED_COL.grid;
+  ctx.fillStyle = SPEED_COL.dim;
+  ctx.font = '10px monospace';
+  for (let i = 0; i <= 3; i++) {
+    const y = padT + (gh / 3) * i;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(w - padR, y);
+    ctx.stroke();
+    ctx.fillText((max - (max / 3) * i).toFixed(max > 100 ? 0 : 1), 2, y + 3);
+  }
+  const line = (points, color) => {
+    if (!points.length) return;
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.8;
+    points.forEach((p, i) => {
+      const x = padL + (points.length > 1 ? gw * i / (points.length - 1) : gw / 2);
+      const y = padT + gh - ((Number(p[1] || 0) / max) * gh);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  };
+  line(dl, SPEED_COL.dl);
+  line(ul, SPEED_COL.ul);
+}
+function pickLatest(rows){
+  for (const name of ['ookla', 'speedtest']) {
+    const hit = (rows || []).find(r => r.provider === name);
+    if (hit) return hit;
+  }
+  return null;
+}
+function fillCurrent(row){
+  document.getElementById('cur-dl').textContent = row ? fmtBare(row.dl_mbps) : '—';
+  document.getElementById('cur-ul').textContent = row ? fmtBare(row.ul_mbps) : '—';
+  document.getElementById('cur-ping').textContent = row ? fmtMs(row.ping_ms) : '—';
+  document.getElementById('cur-jitter').textContent = row ? fmtMs(row.jitter_ms) : '—';
+  document.getElementById('cur-loss').textContent = row ? fmtPct(row.packet_loss) : '—';
+  document.getElementById('cur-server').textContent = row ? (row.target || row.server_id || 'auto') : '—';
+  if (!speedRunning) updateSelectedTargetDisplay();
+}
+const SPEED_PRESETS = [
+  { id:'33496', label:'MS Online · Dhaka, Bangladesh' },
+  { id:'73779', label:'VOLO NET · Dhaka, Bangladesh' },
+  { id:'70157', label:'Carnival Internet · Dhaka, Bangladesh' },
+  { id:'13623', label:'Singtel · Singapore, Singapore' },
+  { id:'1755', label:'Vodafone Albania · Tirana, Albania' },
+  { id:'4227', label:'Telecom Personal · Santa Fe, Argentina' },
+];
+function ensureServerOption(id, label){
+  if (!id) return;
+  const sel = document.getElementById('ookla-server-select');
+  if ([...sel.options].some(o => o.value === String(id))) return;
+  const opt = document.createElement('option');
+  opt.value = String(id);
+  opt.textContent = label || ('server ' + id);
+  sel.appendChild(opt);
+}
+function updateSelectedTargetDisplay(){
+  const sel = document.getElementById('ookla-server-select');
+  const txt = sel?.selectedOptions?.[0]?.textContent?.trim() || 'auto';
+  document.getElementById('speed-live-target').textContent = txt;
+  document.getElementById('speed-go-label-top').textContent = txt.split('·')[0].trim() || txt;
+}
+function renderScheduleSummary(sc){
+  const box = document.getElementById('speed-schedule-current');
+  const hasSaved = !!(sc.auto_enabled || sc.notify_enabled || sc.ookla_server_id);
+  const server = sc.ookla_server_id || 'auto';
+  const active = !!sc.auto_enabled;
+  if (!hasSaved) {
+    box.innerHTML = `<div class="speed-saved-empty"><strong>No saved schedule</strong><span>Enable autorun and save when you want a stored schedule.</span></div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="speed-saved-head"><span>Saved schedule</span><span class="badge ${active ? 'ok' : 'warn'}">${active ? 'enabled' : 'disabled'}</span></div>
+    <div class="speed-saved-grid">
+      <div><span>Every</span><strong>${sc.auto_interval_min || 180} min</strong></div>
+      <div><span>Server</span><strong>${esc(server)}</strong></div>
+      <div><span>Min DL</span><strong>${Number(sc.min_download_mbps ?? 0).toFixed(1)} Mbps</strong></div>
+      <div><span>Min UL</span><strong>${Number(sc.min_upload_mbps ?? 0).toFixed(1)} Mbps</strong></div>
+      <div><span>Notify</span><strong>${sc.notify_enabled ? 'on' : 'off'}</strong></div>
+      <div><span>Status poll</span><strong>${sc.page_refresh_sec || 0}s</strong></div>
+    </div>
+    <div class="speed-saved-actions">
+      <button class="btn secondary compact" id="speed-disable-schedule">Disable</button>
+      <button class="btn secondary compact" id="speed-clear-schedule">Delete</button>
+    </div>`;
+  document.getElementById('speed-disable-schedule')?.addEventListener('click', async()=>{
+    document.getElementById('auto-enabled-input').checked = false;
+    await saveSettings();
+  });
+  document.getElementById('speed-clear-schedule')?.addEventListener('click', async()=>{
+    document.getElementById('auto-enabled-input').checked = false;
+    document.getElementById('auto-notify-input').checked = false;
+    document.getElementById('auto-interval-input').value = '180';
+    document.getElementById('auto-min-dl-input').value = '50';
+    document.getElementById('auto-min-ul-input').value = '20';
+    document.getElementById('ookla-server-id-input').value = '';
+    document.getElementById('ookla-server-select').value = '';
+    document.getElementById('speed-save-result').textContent = 'schedule deleted';
+    updateSelectedTargetDisplay();
+    renderScheduleSummary({auto_enabled:false,notify_enabled:false,ookla_server_id:'',auto_interval_min:180,min_download_mbps:50,min_upload_mbps:20,page_refresh_sec:document.getElementById('speed-page-refresh-input').value || 0});
+    await saveSettings();
+  });
+}
+let speedLivePoll = null;
+async function pollLiveStatus(loop=false){
+  const tick = async () => {
+    const j = await fetchJSON('/api/speed/live/status');
+    applyLiveState(j.live || {});
+    if (!(j.live || {}).running && speedLivePoll) {
+      clearInterval(speedLivePoll);
+      speedLivePoll = null;
+      await refreshAll();
+    }
+  };
+  await tick();
+  if (loop) {
+    clearInterval(speedLivePoll);
+    speedLivePoll = setInterval(() => { tick().catch(()=>{}); }, 700);
+  }
+}
+function applyLiveState(live){
+  const map = { idle:6, starting:6, ping:25, jitter:50, download:75, upload:75, complete:100, stopped:0, failed:100 };
+  if (!live || !Object.keys(live).length) return;
+  speedRunning = !!live.running;
+  document.getElementById('speed-live-runner').classList.toggle('is-running', !!live.running);
+  document.getElementById('speed-go-btn').disabled = !!live.running;
+  document.getElementById('speed-run-btn').disabled = !!live.running;
+  document.getElementById('speed-stop-btn').disabled = !live.running;
+  document.getElementById('speed-run-btn').textContent = live.running ? 'Running…' : 'Run speedtest';
+  if (live.target) {
+    document.getElementById('speed-live-target').textContent = live.target;
+    document.getElementById('speed-go-label-top').textContent = String(live.target).split('·')[0].trim();
+    document.getElementById('cur-server').textContent = live.target;
+  }
+  if (live.ping_ms !== null && live.ping_ms !== undefined) document.getElementById('cur-ping').textContent = fmtMs(live.ping_ms);
+  if (live.jitter_ms !== null && live.jitter_ms !== undefined) document.getElementById('cur-jitter').textContent = fmtMs(live.jitter_ms);
+  if (live.packet_loss !== null && live.packet_loss !== undefined) document.getElementById('cur-loss').textContent = fmtPct(live.packet_loss);
+  if (live.dl_mbps !== null && live.dl_mbps !== undefined) document.getElementById('cur-dl').textContent = fmtBare(live.dl_mbps);
+  if (live.ul_mbps !== null && live.ul_mbps !== undefined) document.getElementById('cur-ul').textContent = fmtBare(live.ul_mbps);
+  document.getElementById('speed-live-core').textContent = live.running ? (String(live.phase || 'run').slice(0,2).toUpperCase()) : 'GO';
+  document.getElementById('speed-live-phase').textContent = live.phase || 'idle';
+  document.getElementById('speed-run-status').textContent = live.status || 'ready';
+  const phase = live.phase || 'idle';
+  const phases = ['ping','jitter','download','upload'];
+  document.querySelectorAll('.speed-phase-chip').forEach(el => el.classList.remove('active','done','fail'));
+  if (phase === 'complete') document.querySelectorAll('.speed-phase-chip').forEach(el => el.classList.add('done'));
+  else if (phase === 'failed' || phase === 'stopped') document.querySelectorAll('.speed-phase-chip').forEach(el => el.classList.add('fail'));
+  else if (phases.includes(phase)) {
+    phases.forEach((p, idx) => {
+      const el = document.getElementById('phase-' + p);
+      if (p === phase) el.classList.add('active');
+      if (phases.indexOf(phase) > idx) el.classList.add('done');
+    });
+  }
+  document.getElementById('speed-stage-fill').style.width = `${map[phase] ?? 6}%`;
+}
+async function loadServers(){
+  const j = await fetchJSON('/api/speed/options');
+  speedOptions = j.ookla_servers || [];
+  const sel = document.getElementById('ookla-server-select');
+  const current = String(SPEED_CFG.ookla_server_id || '');
+  sel.innerHTML = '<option value="">auto</option>' + speedOptions.map(s => `<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('');
+  SPEED_PRESETS.forEach(p => ensureServerOption(p.id, p.label));
+  if (current) ensureServerOption(current, current);
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+}
+async function loadStatus(){
+  const j = await fetchJSON('/api/speed/status');
+  const latest = pickLatest(j.latest || []);
+  fillCurrent(latest);
+  const sc = (j.config || {}).speed || {};
+  const poll = String(sc.page_refresh_sec ?? 0);
+  document.getElementById('speed-poll-select').value = poll;
+  document.getElementById('speed-page-refresh-input').value = poll;
+  document.getElementById('auto-enabled-input').checked = !!sc.auto_enabled;
+  document.getElementById('auto-notify-input').checked = !!sc.notify_enabled;
+  document.getElementById('auto-interval-input').value = sc.auto_interval_min || 180;
+  document.getElementById('auto-min-dl-input').value = sc.min_download_mbps ?? 50;
+  document.getElementById('auto-min-ul-input').value = sc.min_upload_mbps ?? 20;
+  document.getElementById('ookla-server-id-input').value = sc.ookla_server_id || '';
+  document.getElementById('history-page-size-input').value = String(sc.history_page_size || 25);
+  document.getElementById('speed-schedule-meta').textContent = `${sc.auto_enabled ? 'on' : 'off'} · every ${sc.auto_interval_min || 180}m`;
+  renderScheduleSummary(sc);
+  if ((j.live || {}).running) applyLiveState(j.live); else setRunnerIdle();
+}
+async function loadHistory(){
+  const q = new URLSearchParams({
+    limit: String(historyState.limit),
+    offset: String((historyState.page - 1) * historyState.limit),
+    provider: historyState.provider,
+    run_type: historyState.run_type,
+  });
+  const j = await fetchJSON('/api/speedtests?' + q.toString());
+  const rows = j.rows || [];
+  historyState.total = Number(j.total || rows.length);
+  const totalPages = Math.max(1, Math.ceil(historyState.total / historyState.limit));
+  document.getElementById('speed-history-meta').textContent = `${historyState.total} rows · page ${historyState.page}/${totalPages}`;
+  document.getElementById('speed-history-prev').disabled = historyState.page <= 1;
+  document.getElementById('speed-history-next').disabled = historyState.page >= totalPages;
+  const body = document.getElementById('speed-history-body');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="11" class="empty-cell">No history for this filter</td></tr>';
+    drawLine(document.getElementById('speed-history-chart'), [], []);
+    document.getElementById('speed-chart-meta').innerHTML = '<span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span>';
+    return;
+  }
+  body.innerHTML = rows.map(r => `
+    <tr>
+      <td class="mono">${new Date((r.ts || 0) * 1000).toLocaleString()}</td>
+      <td>${providerBadge(r.provider)}</td>
+      <td>${runTypeBadge(r.run_type || 'manual')}</td>
+      <td title="${esc(r.note || '')}">${esc(r.target || '—')}</td>
+      <td class="mono">${esc(r.server_id || 'auto')}</td>
+      <td class="text-right mono dl-text">${fmtMbps(r.dl_mbps)}</td>
+      <td class="text-right mono ul-text">${fmtMbps(r.ul_mbps)}</td>
+      <td class="text-right mono">${fmtMs(r.ping_ms)}</td>
+      <td class="text-right mono">${fmtMs(r.jitter_ms)}</td>
+      <td class="text-right mono">${fmtPct(r.packet_loss)}</td>
+      <td><span class="badge ${r.ok ? 'ok' : 'fail'}">${r.ok ? 'ok' : 'fail'}</span></td>
+    </tr>
+  `).join('');
+  const chartRows = [...rows].reverse();
+  const dl = chartRows.filter(r => r.dl_mbps !== null && r.dl_mbps !== undefined).map(r => [r.ts, Number(r.dl_mbps)]);
+  const ul = chartRows.filter(r => r.ul_mbps !== null && r.ul_mbps !== undefined).map(r => [r.ts, Number(r.ul_mbps)]);
+  drawLine(document.getElementById('speed-history-chart'), dl, ul);
+  const lastDl = dl.length ? dl[dl.length - 1][1] : null;
+  const lastUl = ul.length ? ul[ul.length - 1][1] : null;
+  document.getElementById('speed-chart-meta').innerHTML = `<span class="dl-text"><strong>DL ${fmtMbps(lastDl)}</strong></span> · <span class="ul-text"><strong>UL ${fmtMbps(lastUl)}</strong></span>`;
+}
+async function refreshAll(){
+  if (speedBusy) return;
+  speedBusy = true;
+  document.getElementById('speed-updated').textContent = 'loading…';
+  try {
+    await Promise.all([loadStatus(), loadHistory()]);
+    document.getElementById('speed-updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('speed-updated').textContent = 'error: ' + e.message;
+  } finally {
+    speedBusy = false;
+  }
+}
+function resetTimer(sec){
+  clearInterval(speedTimer);
+  const raw = (sec ?? document.getElementById('speed-poll-select').value ?? 0);
+  const val = Number(raw || 0);
+  if (val <= 0) return;
+  speedTimer = setInterval(refreshAll, val * 1000);
+}
+let speedRunAnim = null;
+let speedRunning = false;
+function setRunnerIdle(){
+  speedRunning = false;
+  clearInterval(speedLivePoll);
+  speedLivePoll = null;
+  document.getElementById('speed-live-runner').classList.remove('is-running');
+  document.getElementById('speed-go-btn').disabled = false;
+  document.getElementById('speed-stop-btn').disabled = true;
+  document.getElementById('speed-run-btn').disabled = false;
+  document.getElementById('speed-run-btn').textContent = 'Run speedtest';
+  document.getElementById('speed-live-core').textContent = 'GO';
+  document.getElementById('speed-live-phase').textContent = 'idle';
+  document.getElementById('speed-run-status').textContent = 'ready';
+  document.querySelectorAll('.speed-phase-chip').forEach(el => el.classList.remove('active','done','fail'));
+  document.getElementById('speed-stage-fill').style.width = '6%';
+  updateSelectedTargetDisplay();
+}
+async function stopLiveRun(){
+  try { await fetchJSON('/api/speed/live/stop', { method:'POST' }); }
+  catch(e){}
+  await pollLiveStatus(false);
+}
+function applyServerPreset(id, label){
+  ensureServerOption(id, label);
+  document.getElementById('ookla-server-select').value = String(id);
+  document.getElementById('ookla-server-id-input').value = String(id);
+  document.querySelectorAll('.speed-preset-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.serverId === String(id)));
+  document.getElementById('speed-live-target').textContent = label || ('server ' + id);
+  document.getElementById('speed-go-label-top').textContent = String(label || ('server ' + id)).split('·')[0].trim();
+}
+async function runOokla(){
+  if (speedRunning) return;
+  const sel = document.getElementById('ookla-server-select');
+  const serverId = sel.value;
+  const target = sel.selectedOptions[0]?.textContent?.trim() || 'auto';
+  document.getElementById('speed-run-status').textContent = 'starting…';
+  try {
+    await fetchJSON('/api/speed/live/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'ookla', server_id: serverId, target, run_type: 'manual' })
+    });
+    await pollLiveStatus(true);
+  } catch (e) {
+    document.getElementById('speed-run-status').textContent = 'error: ' + e.message;
+    setRunnerIdle();
+  }
+}
+async function saveSettings(){
+  const payload = {
+    speed_default_provider: 'ookla',
+    speed_auto_provider: 'ookla',
+    speed_auto_enabled: document.getElementById('auto-enabled-input').checked ? 'true' : 'false',
+    speed_notify_enabled: document.getElementById('auto-notify-input').checked ? 'true' : 'false',
+    speed_auto_interval_min: document.getElementById('auto-interval-input').value,
+    speed_min_download_mbps: document.getElementById('auto-min-dl-input').value,
+    speed_min_upload_mbps: document.getElementById('auto-min-ul-input').value,
+    speed_ookla_server_id: document.getElementById('ookla-server-id-input').value,
+    speed_page_refresh_sec: document.getElementById('speed-page-refresh-input').value,
+    speed_history_page_size: document.getElementById('history-page-size-input').value,
+  };
+  const result = document.getElementById('speed-save-result');
+  result.textContent = 'saving…';
+  try {
+    const j = await fetchJSON('/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const j2 = await fetchJSON('/api/apply', { method: 'POST' });
+    historyState.limit = Number(document.getElementById('history-page-size-input').value || 25);
+    document.getElementById('speed-poll-select').value = document.getElementById('speed-page-refresh-input').value;
+    resetTimer(document.getElementById('speed-page-refresh-input').value);
+    result.textContent = 'saved · applied';
+    result.title = (j.message || 'saved') + ' · ' + (j2.message || 'applied');
+    await refreshAll();
+  } catch (e) {
+    result.textContent = 'save failed: ' + e.message;
+  }
 }
 
-document.getElementById('speed-refresh').addEventListener('click', refreshAll);
-document.getElementById('speed-run-provider').addEventListener('change', updateRunServerSelect);
-document.getElementById('speed-refresh-sec').addEventListener('change', resetTimer);
-document.getElementById('speed-run-one').addEventListener('click', ()=>runSelected(document.getElementById('speed-run-provider').value === 'all' ? 'ookla' : document.getElementById('speed-run-provider').value));
-document.getElementById('speed-run-all').addEventListener('click', ()=>runSelected('all'));
-document.getElementById('speed-open-cf').addEventListener('click', ()=>window.open('https://speed.cloudflare.com/','_blank','noopener'));
-document.getElementById('speed-open-local').addEventListener('click', ()=>window.open(currentLocalLibrespeedUrl(),'_blank','noopener'));
-document.getElementById('speed-reload-local').addEventListener('click', reloadLocalFrame);
-document.getElementById('speed-start-iperf').addEventListener('click', async()=>{ await fetchJSON('/api/speed/iperf/start', {method:'POST'}); await refreshAll(); });
-document.getElementById('speed-save-auto').addEventListener('click', saveAutoSettings);
-document.getElementById('local-ls-port-input').addEventListener('change', reloadLocalFrame);
-document.getElementById('speed-history-provider').addEventListener('change', ()=>{ historyState.provider=document.getElementById('speed-history-provider').value; historyState.page=1; loadHistory(); });
-document.getElementById('speed-history-type').addEventListener('change', ()=>{ historyState.run_type=document.getElementById('speed-history-type').value; historyState.page=1; loadHistory(); });
-document.getElementById('speed-history-prev').addEventListener('click', ()=>{ historyState.page=Math.max(1, historyState.page-1); loadHistory(); });
-document.getElementById('speed-history-next').addEventListener('click', ()=>{ historyState.page+=1; loadHistory(); });
+document.getElementById('speed-refresh-btn').addEventListener('click', refreshAll);
+document.querySelectorAll('.speed-preset-btn').forEach(btn => btn.addEventListener('click', () => applyServerPreset(btn.dataset.serverId, btn.dataset.serverLabel)));
+document.getElementById('ookla-server-select').addEventListener('change', () => { const sel=document.getElementById('ookla-server-select'); document.getElementById('ookla-server-id-input').value = sel.value; document.querySelectorAll('.speed-preset-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.serverId === sel.value)); updateSelectedTargetDisplay(); });
+document.getElementById('speed-run-btn').addEventListener('click', runOokla);
+document.getElementById('speed-go-btn').addEventListener('click', runOokla);
+document.getElementById('speed-stop-btn').addEventListener('click', stopLiveRun);
+document.getElementById('speed-poll-select').addEventListener('change', (e) => resetTimer(e.target.value));
+document.getElementById('speed-save-settings').addEventListener('click', saveSettings);
+document.getElementById('speed-history-provider').addEventListener('change', () => {
+  historyState.provider = document.getElementById('speed-history-provider').value;
+  historyState.page = 1;
+  loadHistory();
+});
+document.getElementById('speed-history-type').addEventListener('change', () => {
+  historyState.run_type = document.getElementById('speed-history-type').value;
+  historyState.page = 1;
+  loadHistory();
+});
+document.getElementById('speed-history-prev').addEventListener('click', () => {
+  historyState.page = Math.max(1, historyState.page - 1);
+  loadHistory();
+});
+document.getElementById('speed-history-next').addEventListener('click', () => {
+  historyState.page += 1;
+  loadHistory();
+});
 
-(async()=>{ await loadOptions(); await refreshAll(); resetTimer(); })();
-window.addEventListener('resize', ()=>{ clearTimeout(window.__speedResize); window.__speedResize=setTimeout(loadHistory, 150); });
+(async function initSpeedPage(){
+  await loadServers();
+  historyState.limit = Number(SPEED_CFG.history_page_size || 25);
+  await refreshAll();
+  resetTimer(Number(SPEED_CFG.page_refresh_sec || 0));
+  setRunnerIdle();
+  updateSelectedTargetDisplay();
+})();
+window.addEventListener('resize', () => {
+  clearTimeout(window.__speedResize);
+  window.__speedResize = setTimeout(loadHistory, 150);
+});
 </script>
 {% endblock %}

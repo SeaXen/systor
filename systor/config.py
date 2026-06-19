@@ -61,7 +61,7 @@ DEFAULT_CONFIG: dict = {
         "default_limit": 10,
     },
     "speed": {
-        "page_refresh_sec": 15,
+        "page_refresh_sec": 0,
         "default_provider": "ookla",
         "auto_enabled": False,
         "auto_provider": "ookla",

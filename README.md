@@ -1,257 +1,309 @@
 <p align="center">
-  <img src="docs/systor-logo.png" alt="systor logo" width="140">
+  <img src="docs/systor-logo.png" alt="systor" width="140">
 </p>
 
-# systor
+<h1 align="center">systor</h1>
 
-**Lightweight Linux system monitor with a branded web dashboard, sustained-threshold alerts, and Telegram / Discord notifications.**
+<p align="center">
+  <strong>Lightweight Linux system monitor + branded web dashboard + Telegram/Discord alerts + speedtest.</strong><br>
+  Built for resource-constrained machines (DietPi, RPi, home servers, VPS) where Prometheus + Grafana is overkill, and where you still want clean dashboards, real alerts that don't fire on a single spike, and an honest speed test surface.
+</p>
 
-Built for resource-constrained machines where Prometheus + Grafana is overkill, and where you still want clean dashboards and real alerts that don't fire on a single spike.
+<p align="center">
+  <img alt="dashboard" src="docs/screen-dashboard.png">
+</p>
 
-```
+---
 
-systor — system monitor
+## Why systor?
 
-~15 MB RAM total. No SPA. No Electron. No Java. Just Python + Flask + SQLite.
-```
+| Tool | RAM | Setup | Telemetry style | Notifications |
+|---|---|---|---|---|
+| Prometheus + Grafana | 250 MB+ | hours | industrial | via Alertmanager |
+| Netdata | 200 MB+ | one command | charts everywhere | email/webhook |
+| Glances (web) | 30 MB | one command | single screen | limited |
+| **systor** | **~25 MB** | **one command** | **GitHub-dark, branded** | **Telegram + Discord, first-class** |
 
-## Features
+systor is one Flask app + one Python collector + one SQLite DB. No SPA, no Electron, no Java, no Prometheus, no Grafana, no agent protocol. Just Python + Waitress + SQLite + a small custom canvas charting layer.
 
-- **Live metrics** — CPU load (1/5/15m), CPU temperature, memory, swap, disk, network
-- **Sustained-threshold alerts** — won't fire on a single spike; set per-metric threshold + duration in **minutes**
-- **Telegram + Discord notifications** — with cooldowns to avoid alert spam
-- **Web dashboard on port 6677** — GitHub-dark style, live charts, no external JS deps, LAN-accessible
-- **Hot-reload config** — change thresholds in the UI, collector picks them up within one poll cycle
-- **SQLite storage** — 7 days raw + 90 days aggregated by default
-- **~15 MB RAM** — collector ~10 MB, web server ~20 MB peak
-- **No cron** — runs as systemd services, auto-restarts on crash and starts on boot
-- **Standalone** — no Hermes, no Docker, no external services
-- **CLI** — `systor status`, `systor setup telegram`, `systor test`
+## Highlights
+
+- **Live dashboard** — CPU, temperature, memory, swap, disk I/O, CPU load, network DL/UL. Six charts, six KPI cards, top procs, recent alerts, all on one screen.
+- **Sustained-threshold alerts** — won't fire on a single spike. Per-metric threshold + duration in minutes, with recovery events when the condition clears.
+- **Telegram + Discord notifications** — channel-specific formatting, test buttons, cooldowns to avoid spam. Both in the same Settings page.
+- **Speed page** — real official Ookla CLI runs, history, scheduler, mobile-friendly. Honest per-phase progress parsed from the live stream, not a fake staged animation.
+- **Network page** — interface-aware usage tables (daily / monthly / yearly), 90-day bar chart on desktop / 30-day on mobile, per-interface filtering.
+- **Apps page** — host + Docker processes ranked by CPU / RAM / network / disk, with pagination and a row-count selector.
+- **Lightweight** — ~25 MB total RAM (collector ~10 MB, web ~20 MB peak). `python3.11` only. No build step. Single CSS file, no JS framework.
+- **Self-restart** — collector + web both systemd-managed. Restart buttons in the UI. Live SIGHUP config reload.
+- **Standalone** — no Hermes, no Docker, no external services. Drop it on any Linux box.
 
 ## Quick start
 
 ```bash
-git clone https://github.com/SeaXen/systor
+git clone https://github.com/SeaXen/systor.git
 cd systor
 sudo ./install.sh
 ```
 
-Open <http://127.0.0.1:6677> in your browser. For LAN access, use the host's IP, e.g.
-<http://192.168.1.10:6677>.
+Open <http://127.0.0.1:6677> in your browser.
 
-The install script:
+For LAN access, open `http://<host-ip>:6677` (e.g. `http://192.168.1.10:6677`). The web service binds to `0.0.0.0:6677` by default.
+
+The installer:
 - Copies the app to `/opt/systor`
 - Writes `/etc/systor/config.yaml` with sensible defaults
-- Creates `/etc/systor/systor.env` (empty — fill in tokens for notifications)
-- Installs `Flask` + `waitress` via pip
-- Installs + starts the two systemd services (`systor-collector`, `systor-web`)
+- Writes `/etc/systor/systor.env` (empty — fill in tokens for notifications)
+- Installs `Flask` + `waitress` via `pip install -r requirements.txt`
+- Installs + starts `systor-collector` and `systor-web` systemd services
+- Creates `/var/log/systor/`, `/var/lib/systor/`
+- Reloads systemd daemon and enables services on boot
 
-## Alert thresholds
-
-Each metric has three knobs: **enable** (checkbox), **threshold value**, and **duration in minutes**.
-The alert only fires when the value stays above (or below) the threshold for the configured number of minutes.
-
-| Metric              | Default      | When it fires                              |
-|---------------------|--------------|--------------------------------------------|
-| CPU load (1m avg)   | > 4.0 for 2m | 1-minute load average stays above 4.0      |
-| CPU temperature     | > 85°C for 3m| CPU temp stays above 85 °C                 |
-| Memory free         | < 500 MB for 2m | available memory drops below 500 MB     |
-| Swap used           | > 4096 MB for 2m | swap usage grows above 4 GB            |
-| Disk used           | > 90% for 5m | any mount fills above 90%                  |
-
-Example: "alert me if temperature > 85 °C for 3 minutes" → set `CPU temperature = 85 °C, 3 min` in
-the **Settings** page and click **Save & apply**. The collector picks up the change within
-`poll_interval_sec` (default 30 s) — no restart needed for threshold changes.
-
-## Configure notifications
-
-Edit `/etc/systor/systor.env` (mode 600):
-
+Uninstall cleanly:
 ```bash
-# Telegram
-SYSTOR_TELEGRAM_BOT_TOKEN=123456789:ABC-DEF...
-SYSTOR_TELEGRAM_CHAT_ID=123456789
-
-# Discord (webhook URL)
-SYSTOR_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+sudo systemctl disable --now systor-web systor-collector
+sudo rm -rf /opt/systor /etc/systor /var/lib/systor /var/log/systor
+sudo rm /etc/systemd/system/systor-web.service /etc/systemd/system/systor-collector.service
+sudo systemctl daemon-reload
 ```
 
-Or use the CLI:
+## Pages
 
-```bash
-sudo -u $USER systor setup telegram --token "..." --chat-id "..." --test
-sudo -u $USER systor setup discord --webhook "https://..." --test
+| Page | URL | What it does |
+|---|---|---|
+| Dashboard | `/` | KPI strip + 6 charts + top procs + recent alerts |
+| Apps | `/apps` | Host + Docker processes ranked by CPU/RAM/Net/Disk |
+| Network | `/network` | Live per-interface traffic + daily/monthly/yearly usage tables |
+| Speed | `/speed` | Real speedtest runner + scheduler + history |
+| Alerts | `/alerts` | Recent alert log with severity filtering |
+| Logs | `/logs` | Live log tail + Clear / Download buttons |
+| Settings | `/settings` | Thresholds, Telegram, Discord, defaults |
+
+## Speed page
+
+Two real runners:
+
+1. **WAN — official Ookla CLI** — `speedtest` (Speedtest by Ookla). Real-time phase output is parsed from the live stream, so you see actual `ping → jitter → download → upload` progress instead of a fake animation. **Stop** kills the underlying process. **Scheduler** runs it automatically every N minutes and alerts when DL/UL drop below your thresholds.
+2. **LAN — local iperf3 helper** — `iperf3 -s` is launched on the host so you can run `iperf3 -c <host-ip> -t 15` from any laptop on the same network and measure real LAN throughput.
+
+The runner supports regional quick-picks (Dhaka, Singapore, Mumbai, Delhi, Tokyo, US East/West, EU, LATAM) and any saved custom Ookla server ID. Each completed run is logged to SQLite history with provider, server ID, server name, DL/UL Mbps, ping, jitter, packet loss, and status.
+
+If you want to skip running your own LAN test from a separate laptop, you can also point the Ookla runner at any nearby LAN server IP you control.
+
+## Notifications
+
+Telegram and Discord are first-class in Settings. Each channel has:
+
+- Bot token / webhook URL field (never displayed back, masked after save)
+- Per-metric routing (only send what you care about)
+- Save + test button
+- Channel-specific formatting:
+  - **Telegram** — short, emoji-led, bold subject + newline-separated values (HTML parse mode)
+  - **Discord** — markdown-flavored, slightly richer block layout
+- Test message includes current host + live values, not a static template
+
+Cooldowns are per (channel, metric) so a single bad condition doesn't spam you every minute.
+
+## Configuration
+
+The main config lives at `/etc/systor/config.yaml` (written by the installer on first run). Edit it directly or use the **Settings** page in the UI; both paths hot-reload via SIGHUP to the collector.
+
+```yaml
+host: 0.0.0.0
+port: 6677
+refresh_sec: 5
+chart_refresh_sec: 5
+
+alerts:
+  cpu_load: { enabled: true, threshold: 4.0, duration_min: 2 }
+  cpu_temp: { enabled: true, threshold: 85,  duration_min: 3 }
+  memory:   { enabled: true, threshold: 500, duration_min: 2 }
+  swap:     { enabled: true, threshold: 4096, duration_min: 2 }
+  disk:     { enabled: true, threshold: 90,  duration_min: 5 }
+
+retention_days: 7
+
+speedtest:
+  enabled: false
+  interval_min: 180
+  server_id: ""
+  min_dl_mbps: 50
+  min_ul_mbps: 20
 ```
 
-Or use the web UI: <http://127.0.0.1:6677/settings> — the **Send test** button fires a
-notification immediately so you can verify the channel.
+Secrets (Telegram bot token, Discord webhook URL) live in `/etc/systor/systor.env` so they don't end up in the YAML diff:
+
+```bash
+SYSTOR_TELEGRAM_BOT_TOKEN=...
+SYSTOR_TELEGRAM_CHAT_ID=...
+SYSTOR_DISCORD_WEBHOOK_URL=...
+```
 
 ## CLI
 
 ```bash
-systor status                  # one-shot snapshot
-systor setup telegram          # interactive / scripted config
-systor setup discord
-systor test                    # send a test notification
-systor test --channel telegram # just one channel
-systor serve collector         # run collector in foreground (debug)
-systor serve web               # run web in foreground
-systor config show             # dump current config as JSON
+systor status               # service status, last sample, current thresholds
+systor setup telegram       # interactive Telegram setup wizard
+systor setup discord        # interactive Discord setup wizard
+systor test                 # send a test notification to all configured channels
+systor config show          # show effective config
+systor config reload        # SIGHUP the collector
+systor retention show       # show retention + DB size
+systor retention prune      # run retention manually
 ```
+
+## API
+
+The dashboard is the only consumer of the JSON API, but it's there if you want to integrate with anything else. All endpoints live under `/api/`.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/snapshot` | One-shot live snapshot (CPU, mem, swap, disk, net, db stats) — supports `If-None-Match` for `304` |
+| `GET /api/runtime` | Collector + web RSS/CPU, uptime, host storage, cloudflared/tailscaled status |
+| `GET /api/series?metric=cpu_pct&hours=6` | Time-bucketed series for any metric |
+| `GET /api/network-series?hours=6` | RX + TX time series |
+| `GET /api/network-usage?iface=eth0&days=10` | Per-interface daily totals |
+| `GET /api/network-interfaces` | List of interfaces with virtual/physical flag |
+| `GET /api/apps?scope=all&sort=cpu&limit=24` | Host + Docker apps ranked by metric |
+| `GET /api/alerts?limit=50` | Recent alerts |
+| `GET /api/notifications` | Recent notification deliveries (success / failure) |
+| `GET /api/access` | Per-access log (last N hits) |
+| `GET /api/speed/status` | Speedtest runner status (idle / running / stopped / complete) |
+| `POST /api/speed/live/start` | Start a live run (optional `server_id`) |
+| `POST /api/speed/live/stop` | Stop the active run |
+| `GET /api/speed/live/status` | Live status polled by the front-end (phase, ping, jitter, dl, ul, etc.) |
+| `GET /api/speedtests?provider=&type=&page=1` | History with provider/type/page filters |
+| `GET /api/top-processes?by=cpu&n=10` | Top N processes by CPU or memory |
+| `POST /api/restart-collector` | Restart the collector (live UI button) |
+| `POST /api/restart-web` | Restart the web service (live UI button) |
+| `GET /api/logs?lines=200` | Last N log lines |
+| `POST /api/logs/clear` | Truncate the log file |
+| `GET /logs/raw` | Download the full log file |
+| `GET /health` | `{"ok":true,"ts":...}` |
+
+## Performance budget
+
+Measured on a DietPi VM with the dashboard open in one tab:
+
+| Component | Idle | Active |
+|---|---|---|
+| Collector RSS | ~10 MB | ~12 MB |
+| Web RSS | ~20 MB | ~25 MB |
+| SQLite DB (7 days raw) | ~14 MB | grows ~2 MB / day |
+| First-paint | < 500 ms | < 500 ms |
+| `/api/snapshot` | 8–15 ms | 8–15 ms (304 on identical) |
+| `/api/apps` (warm cache) | 70 ms | 70 ms |
+| `/api/apps` (cold cache, first call) | 1.6 s | first call only |
+| Static assets (CSS, logo) | 5 ms (cache) | 5 ms (cache) |
+
+The collector samples every 5 seconds by default and writes one row per metric per cycle. Default retention is 7 days of raw samples.
+
+## Resource & accessibility
+
+- **Accessibility** — every page has a skip link, focus-visible outlines on every button/link, ARIA roles on the main navigation, and a one-line `role="note"` help string at the top of each page.
+- **Caching** — `/api/snapshot` returns an ETag and supports `If-None-Match` for instant 304s. Static assets are served with `Cache-Control: public, max-age=300`.
+- **Throttling** — every fetch on the front-end is guarded by an `inflight` flag so a slow tick never stacks a parallel duplicate request.
+- **No external JS** — no jQuery, no Chart.js, no framework. Single small canvas drawer inlined per page.
 
 ## Architecture
 
 ```
-   /etc/systor/
-   ├── config.yaml          ← main config (thresholds, ports, channels)
-   └── systor.env           ← secrets (bot tokens, webhooks)
-
-   /opt/systor/
-   └── systor/              ← python package
-
-   /var/lib/systor/
-   └── systor.db            ← SQLite (samples, rollups, alerts, notifications)
-
-   /var/log/systor/
-   ├── systor.log
-   ├── collector.log
-   └── web.log
-
-   systemd services:
-   ├── systor-collector.service   ← polls every 30s
-   └── systor-web.service         ← Flask on port 6677
-```
-
-```
-   ┌─────────────────────┐
-   │ systor-collector     │  poll every 30s
-   │  (Python daemon)     │  read /proc, /sys, df
-   │                      │  evaluate sustained thresholds
-   │                      │  insert into SQLite
-   │                      │  send via Telegram / Discord
-   └──────┬───────────────┘
-          │ writes
-          ▼
-   ┌─────────────────────┐         ┌─────────────────────┐
-   │ systor.db (SQLite)  │  ◄──── │ systor-web           │
-   └─────────────────────┘  reads  │  (Flask + waitress)  │
-                                  │  port 6677           │
-                                  │  JSON API + dashboard │
-                                  └─────────────────────┘
-```
-
-## Configuration
-
-Edit `/etc/systor/config.yaml` (or use the web UI):
-
-```yaml
-collector:
-  poll_interval_sec: 30
-  retention_days: 7
-  rollup_after_hours: 24
-  rollup_retention_days: 90
-
-thresholds:
-  cpu_load_1m: 4.0          # alert if load avg > 4
-  cpu_temp_c: 80.0          # alert if CPU temp > 80°C
-  mem_free_mb: 500          # alert if available memory < 500 MB
-  swap_used_mb: 4096        # alert if swap used > 4 GB
-  disk_used_pct: 90         # alert if any mount > 90% full
-  sustained_samples_cpu: 4  # 4 samples × 30s = 2 min
-  sustained_samples_temp: 4
-  sustained_samples_mem: 4
-  sustained_samples_swap: 4
-  sustained_samples_disk: 1
-  cooldown_sec: 600         # 10 min between repeated alerts
-
-telegram:
-  enabled: false
-  bot_token: ""             # or env SYSTOR_TELEGRAM_BOT_TOKEN
-  chat_id: ""               # or env SYSTOR_TELEGRAM_CHAT_ID
-
-discord:
-  enabled: false
-  webhook_url: ""
-
-web:
-  host: 127.0.0.1
-  port: 6677
-
-logging:
-  level: INFO
-  file: /var/log/systor/systor.log
-```
-
-All thresholds can also be overridden with environment variables (`SYSTOR_POLL_INTERVAL`, `SYSTOR_CPU_LOAD`, etc.).
-
-## Resource cost
-
-| Component | RSS at idle | CPU at idle |
-|---|---|---|
-| systor-collector | ~10 MB | < 0.5% |
-| systor-web (Flask + waitress) | ~20 MB | < 0.5% |
-| SQLite database (7 days data) | ~5-20 MB | — |
-| **Total** | **~30-50 MB** | **< 1%** |
-
-No JavaScript framework, no bundler, no Webpack. The web dashboard is vanilla HTML + CSS + JS, ~15 KB total. The charts are drawn in a `<canvas>` directly, no Chart.js dependency.
-
-## Project structure
-
-```
 systor/
-├── systor/                  ← python package
-│   ├── __init__.py
-│   ├── __main__.py           ← python -m systor
-│   ├── config.py             ← YAML + env config
-│   ├── metrics.py            ← /proc, /sys, df readers
-│   ├── storage.py            ← SQLite layer
-│   ├── notifier.py           ← Telegram + Discord
-│   ├── collector.py          ← the polling daemon
-│   ├── web.py                ← Flask dashboard
-│   ├── cli.py                ← systor command
-│   ├── templates/            ← Jinja2 HTML
-│   └── static/               ← CSS + JS
-├── systemd/                  ← service unit files
-├── install.sh
-├── uninstall.sh
-├── setup.py                  ← pip install .
-├── requirements.txt
-├── LICENSE
-├── README.md
-└── .gitignore
+├── systor/
+│   ├── __init__.py            # package init, version
+│   ├── __main__.py            # python -m systor entry
+│   ├── cli.py                 # `systor status`, `setup telegram`, etc.
+│   ├── collector.py           # background poller → SQLite
+│   ├── config.py              # config + secrets loader
+│   ├── metrics.py             # psutil / disk / network / docker collectors
+│   ├── notifier.py            # Telegram + Discord senders
+│   ├── speed.py               # Ookla CLI wrapper + iperf3 helper
+│   ├── storage.py             # SQLite schema + retention
+│   ├── web.py                 # Flask app, all routes
+│   ├── data/                  # SQLite DB lives here by default
+│   ├── static/
+│   │   ├── css/style.css
+│   │   ├── css/style.min.css
+│   │   └── img/
+│   │       ├── systor-logo.png
+│   │       ├── systor-logo-header.png
+│   │       └── favicon.png
+│   └── templates/
+│       ├── base.html
+│       ├── dashboard.html
+│       ├── apps.html
+│       ├── network.html
+│       ├── speed.html
+│       ├── alerts.html
+│       ├── logs.html
+│       └── settings.html
+├── install.sh                 # installer (systemd + dirs + pip)
+├── requirements.txt           # Flask, waitress
+├── setup.py
+└── README.md
 ```
 
-## Tested on
+Two long-running processes:
 
-- Debian 12, Debian 13
-- Ubuntu 22.04, 24.04
-- DietPi
-- Raspberry Pi OS (Bookworm)
+| Service | Role | Restart policy |
+|---|---|---|
+| `systor-collector` | Samples metrics every 5s → SQLite | `Restart=always` |
+| `systor-web` | Waitress-served Flask on `:6677` | `Restart=always` |
 
-Requires:
-- Linux kernel ≥ 3.10 (for `/sys/class/thermal`)
-- Python ≥ 3.9
-- systemd (any modern distro)
-- `df` (from coreutils)
-- `bc` (optional, for some metrics)
+Both reload config on SIGHUP without dropping samples.
 
-## Privacy
+## Troubleshooting
 
-`/var/lib/systor/systor.db` stores:
-- System metrics (CPU, memory, disk, network) — no PII
-- Timestamps
-- Alert messages
+**Dashboard unreachable on the LAN**
+The web service binds to `0.0.0.0` by default. If you can't reach it from another device, check:
+```bash
+sudo ss -ltnp | grep 6677
+sudo ufw status                # or `sudo iptables -L` if you use nftables
+```
 
-It does NOT store:
-- Process names (yet)
-- Network destinations
-- User data
-- File contents
+**No notifications arriving**
+1. Open Settings → Telegram / Discord → **Save + test** with your bot token / webhook URL. If the test fails, the credentials are wrong.
+2. The token is masked after save. Re-enter the real token if you want to retest.
+3. Check `/var/log/systor/systor.log` for delivery errors and cooldowns.
+
+**`speedtest` not found**
+The Ookla CLI is not bundled. Install it once:
+```bash
+# Debian/Ubuntu/DietPi
+curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+sudo apt-get install speedtest
+```
+systor auto-detects `speedtest` on PATH.
+
+**`docker stats` permission denied**
+The collector runs as root, so this should just work. If you run as a non-root user, add them to the `docker` group and re-login.
+
+**Charts frozen**
+The chart refresh interval is independent from the data sampling interval. If the chart timer is 5s but the collector writes every 30s, the chart redraws correctly on each tick but values won't change between collector samples. Set both to 5s in Settings.
+
+**Disk usage never dropping**
+The retention pass deletes old raw rows + rollups based on `retention_days` in config. It runs once per hour by default. To force it now:
+```bash
+systor retention prune
+```
+
+**I want to back up the DB**
+```bash
+sudo systemctl stop systor-web systor-collector
+sudo cp /var/lib/systor/systor.db /var/lib/systor/systor.db.bak
+sudo systemctl start systor-collector systor-web
+```
+
+**I changed the port**
+Edit `host` and `port` in `/etc/systor/config.yaml`, then:
+```bash
+sudo systemctl restart systor-web
+```
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. Use it, fork it, ship it.
 
 ## Author
 
-Dr. Sagar (GitHub: [@SeaXen](https://github.com/SeaXen))
+Dr. Sagar — [drpelagik@gmail.com](mailto:drpelagik@gmail.com) — [github.com/SeaXen](https://github.com/SeaXen)

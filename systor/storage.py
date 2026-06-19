@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS speedtests (
     run_type TEXT NOT NULL DEFAULT 'manual',
     ping_ms REAL,
     jitter_ms REAL,
+    packet_loss REAL,
     dl_mbps REAL,
     ul_mbps REAL,
     note TEXT,
@@ -123,6 +124,7 @@ class Storage:
             "server_id": "TEXT",
             "run_type": "TEXT NOT NULL DEFAULT 'manual'",
             "jitter_ms": "REAL",
+            "packet_loss": "REAL",
         }
         for col, typ in speed_additions.items():
             if col not in speed_existing:
@@ -233,7 +235,7 @@ class Storage:
     def log_speedtest(self, row: dict) -> None:
         with self._lock, self._conn() as c:
             c.execute(
-                "INSERT INTO speedtests (ts, provider, target, mode, server_id, run_type, ping_ms, jitter_ms, dl_mbps, ul_mbps, note, ok, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO speedtests (ts, provider, target, mode, server_id, run_type, ping_ms, jitter_ms, packet_loss, dl_mbps, ul_mbps, note, ok, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     int(row.get("ts") or time.time()),
                     str(row.get("provider") or "ookla"),
@@ -243,6 +245,7 @@ class Storage:
                     str(row.get("run_type") or "manual"),
                     row.get("ping_ms"),
                     row.get("jitter_ms"),
+                    row.get("packet_loss"),
                     row.get("dl_mbps"),
                     row.get("ul_mbps"),
                     str(row.get("note") or ""),

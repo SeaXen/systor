@@ -4,20 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}systor{% endblock %}</title>
-<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=1">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=0.6.8">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.min.css') }}?v=1.0">
 </head>
 <body>
-<div class="header">
+<a class="skip-link" href="#main-content">Skip to content</a>
+<div class="container">
   <div class="header-left">
     <div class="brand-row">
-      <img class="brand-logo" src="{{ url_for('static', filename='img/systor-logo.png') }}?v=1" alt="systor logo">
-      <h1>systor<span>.</span></h1>
+      <img class="brand-logo" src="{{ url_for('static', filename='img/systor-logo-header.png') }}?v=2" alt="systor logo">
+      <h1 aria-label="systor home">systor<span>.</span></h1>
       <div class="sub" id="global-header-meta">loading monitor…</div>
     </div>
   </div>
   <div class="actions">
-    <nav class="page-tabs">
+    <nav class="page-tabs" role="navigation" aria-label="Main pages">
       <a href="/" class="page-tab {% if request.path == '/' %}active{% endif %}" aria-label="Dashboard" title="Dashboard"><span class="tab-icon" aria-hidden="true">⌂</span><span class="tab-label">Dashboard</span></a>
       <a href="/apps" class="page-tab {% if request.path == '/apps' %}active{% endif %}" aria-label="Apps" title="Apps"><span class="tab-icon" aria-hidden="true">◫</span><span class="tab-label">Apps</span></a>
       <a href="/network" class="page-tab {% if request.path == '/network' %}active{% endif %}" aria-label="Network" title="Network"><span class="tab-icon" aria-hidden="true">⇄</span><span class="tab-label">Network</span></a>

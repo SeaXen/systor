@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -13,7 +14,7 @@ def _cmd_exists(name: str) -> bool:
 
 
 def _run(cmd: list[str], timeout: int = 180) -> subprocess.CompletedProcess:
-    env = dict(subprocess.os.environ)
+    env = dict(os.environ)
     env.setdefault('PATH', '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin')
     env.setdefault('LANG', 'C.UTF-8')
     env.setdefault('LC_ALL', 'C.UTF-8')
@@ -115,6 +116,7 @@ def run_ookla(server_id: str | int | None = None) -> dict:
         'run_type': 'manual',
         'ping_ms': _safe_float(ping.get('latency')),
         'jitter_ms': _safe_float(ping.get('jitter')),
+        'packet_loss': _safe_float(j.get('packetLoss')),
         'dl_mbps': round(float(dl.get('bandwidth', 0)) * 8 / 1_000_000, 3),
         'ul_mbps': round(float(ul.get('bandwidth', 0)) * 8 / 1_000_000, 3),
         'ok': True,
@@ -178,6 +180,7 @@ def run_librespeed(server_id: str | int | None = None) -> dict:
         'run_type': 'manual',
         'ping_ms': _safe_float(j.get('ping')),
         'jitter_ms': _safe_float(j.get('jitter')),
+        'packet_loss': None,
         'dl_mbps': _safe_float(j.get('download')),
         'ul_mbps': _safe_float(j.get('upload')),
         'ok': True,
@@ -280,14 +283,12 @@ def speed_alert_triggered(result: dict, cfg: dict) -> tuple[bool, str]:
 def build_speed_alert(result: dict, host: str) -> tuple[str, str]:
     subject = f"🐢 Speed alert · {result.get('provider', 'speed')}"
     body = "\n".join([
-        f"Host: {host}",
-        f"Provider: {result.get('provider', '?')}",
-        f"Target: {result.get('target', '?')}",
-        f"DL: {result.get('dl_mbps', '—')} Mbps",
-        f"UL: {result.get('ul_mbps', '—')} Mbps",
-        f"Ping: {result.get('ping_ms', '—')} ms",
-        f"Jitter: {result.get('jitter_ms', '—')} ms",
-        f"Run: {result.get('run_type', '?')}",
-        f"Note: {result.get('note', '')}",
+        f"🖥️ {host}",
+        f"🌐 {result.get('provider', '?')} · {result.get('target', '?')}",
+        f"⬇️ DL {result.get('dl_mbps', '—')} Mbps",
+        f"⬆️ UL {result.get('ul_mbps', '—')} Mbps",
+        f"📶 Ping {result.get('ping_ms', '—')} ms · Jitter {result.get('jitter_ms', '—')} ms",
+        f"🧪 Run {result.get('run_type', '?')}",
+        f"📝 {result.get('note', '')}",
     ])
     return subject, body
