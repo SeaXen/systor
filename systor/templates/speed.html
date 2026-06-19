@@ -395,7 +395,7 @@ function applyLiveState(live){
   if (live.packet_loss !== null && live.packet_loss !== undefined) document.getElementById('cur-loss').textContent = fmtPct(live.packet_loss);
   if (live.dl_mbps !== null && live.dl_mbps !== undefined) document.getElementById('cur-dl').textContent = fmtBare(live.dl_mbps);
   if (live.ul_mbps !== null && live.ul_mbps !== undefined) document.getElementById('cur-ul').textContent = fmtBare(live.ul_mbps);
-  document.getElementById('speed-live-core').textContent = live.running ? (String(live.phase || 'run').slice(0,2).toUpperCase()) : 'GO';
+  document.getElementById('speed-live-core').textContent = 'GO';
   document.getElementById('speed-live-phase').textContent = live.phase || 'idle';
   document.getElementById('speed-run-status').textContent = live.status || 'ready';
   const phase = live.phase || 'idle';
