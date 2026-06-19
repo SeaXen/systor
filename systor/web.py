@@ -57,6 +57,12 @@ _storage_lock = threading.Lock()
 _docker_cache: dict = {"ts": 0.0, "rows": []}
 _docker_cache_lock = threading.Lock()
 
+# Cache one combined Apps snapshot briefly so the UI can derive CPU/RAM/Disk/Net
+# views from a single stable sample instead of recomputing host/docker reads on
+# every request burst. Short TTL keeps it feeling live while smoothing cost.
+_apps_cache: dict = {"ts": 0.0, "limit": 0, "host_rows": [], "docker_rows": []}
+_apps_cache_lock = threading.Lock()
+
 _speed_live_lock = threading.Lock()
 _speed_live_proc: subprocess.Popen | None = None
 _speed_live_state: dict = {
@@ -813,8 +819,27 @@ def create_app() -> Flask:
         scope = request.args.get("scope", "all")
         sort_by = request.args.get("sort", "cpu")
         limit = max(1, min(1000, int(request.args.get("limit", 24))))
-        host_rows = _host_apps(limit=limit)
-        docker_rows = _docker_apps(limit=limit)
+
+        now = time.time()
+        fetch_limit = max(limit, 96)
+        with _apps_cache_lock:
+            cached_ts = float(_apps_cache.get("ts") or 0)
+            cached_limit = int(_apps_cache.get("limit") or 0)
+            cached_host = list(_apps_cache.get("host_rows") or [])
+            cached_docker = list(_apps_cache.get("docker_rows") or [])
+        if cached_ts > 0 and now - cached_ts < 2.0 and cached_limit >= limit and (cached_host or cached_docker):
+            host_rows = cached_host[:limit]
+            docker_rows = cached_docker[:limit]
+        else:
+            host_all = _host_apps(limit=fetch_limit)
+            docker_all = _docker_apps(limit=fetch_limit)
+            with _apps_cache_lock:
+                _apps_cache["ts"] = now
+                _apps_cache["limit"] = fetch_limit
+                _apps_cache["host_rows"] = host_all
+                _apps_cache["docker_rows"] = docker_all
+            host_rows = host_all[:limit]
+            docker_rows = docker_all[:limit]
         rows = []
         if scope in ("all", "host"):
             rows.extend(host_rows)

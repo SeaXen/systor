@@ -1071,7 +1071,7 @@ tr:hover { background: var(--bg-hover); }
   body:has(.settings-page) .tab-icon{display:inline!important;font-size:15px!important}
 
   .settings-page{gap:8px!important}
-  .settings-page .sticky-actions{top:54px!important;padding:8px!important;border-radius:12px!important;gap:8px!important;align-items:stretch!important}
+  .settings-page .sticky-actions{position:static!important;top:auto!important;padding:8px!important;border-radius:12px!important;gap:8px!important;align-items:stretch!important;margin-bottom:2px!important}
   .settings-page .sticky-actions .meta{display:grid!important;grid-template-columns:1fr 1fr!important;gap:6px!important;white-space:normal!important;overflow:visible!important;width:100%!important;font-size:11px!important}
   .settings-page .sticky-actions .meta > strong{grid-column:1 / -1!important;font-size:13px!important}
   .settings-page .sticky-actions .status-chip{min-width:0!important;justify-content:center!important;padding:5px 8px!important;font-size:11px!important}
