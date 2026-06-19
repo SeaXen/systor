@@ -1112,3 +1112,11 @@ tr:hover { background: var(--bg-hover); }
   .threshold-table th{font-size:10px!important}
   .threshold-table input[type="number"]{max-width:none!important}
 }
+
+/* v1.8 final settings mobile tab polish — lighter active gear tile, desktop untouched */
+@media (max-width:700px){
+  body:has(.settings-page) .page-tab{min-width:34px!important;width:34px!important;height:34px!important;padding:0!important;border-radius:9px!important}
+  body:has(.settings-page) .tab-icon{font-size:14px!important;line-height:1!important}
+  body:has(.settings-page) .page-tab.active{box-shadow:0 0 0 1px rgba(88,166,255,.16),0 2px 6px rgba(31,111,235,.16)!important}
+  body:has(.settings-page) .page-tab.active .tab-icon{font-size:13px!important}
+}
