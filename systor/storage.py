@@ -36,6 +36,15 @@ CREATE TABLE IF NOT EXISTS samples (
 );
 CREATE INDEX IF NOT EXISTS idx_samples_ts ON samples(ts);
 
+CREATE TABLE IF NOT EXISTS iface_samples (
+    ts INTEGER NOT NULL,
+    iface TEXT NOT NULL,
+    rx_bytes INTEGER,
+    tx_bytes INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_iface_samples_ts ON iface_samples(ts);
+CREATE INDEX IF NOT EXISTS idx_iface_samples_iface_ts ON iface_samples(iface, ts);
+
 CREATE TABLE IF NOT EXISTS rollups_5m (
     ts        INTEGER NOT NULL,
     load_1m_avg   REAL, load_1m_max REAL,
@@ -109,6 +118,7 @@ class Storage:
             net = s.get("network", {}) or {}
             cpu = s.get("cpu", {}) or {}
             disk_io = s.get("disk_io", {}) or {}
+            ts = int(s.get("ts", int(time.time())))
             c.execute(
                 """INSERT INTO samples
                 (ts, load_1m, load_5m, load_15m, cpu_pct, cpu_temp,
@@ -119,7 +129,7 @@ class Storage:
                  net_rx_bytes, net_tx_bytes, hostname)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    s.get("ts", int(time.time())),
+                    ts,
                     cpu.get("load_1m"), cpu.get("load_5m"), cpu.get("load_15m"),
                     cpu.get("percent"), cpu.get("temp_c"),
                     mem.get("total_mb"), mem.get("used_mb"), mem.get("free_mb"), mem.get("available_mb"),
@@ -130,6 +140,12 @@ class Storage:
                     s.get("hostname"),
                 ),
             )
+            iface_rows = s.get("network_interfaces") or []
+            if iface_rows:
+                c.executemany(
+                    "INSERT INTO iface_samples (ts, iface, rx_bytes, tx_bytes) VALUES (?,?,?,?)",
+                    [(ts, str(r.get("iface") or "?"), int(r.get("rx_bytes") or 0), int(r.get("tx_bytes") or 0)) for r in iface_rows],
+                )
 
     def log_alert(self, metric: str, severity: str, value: float | None, threshold: float | None, message: str) -> None:
         with self._lock, self._conn() as c:
@@ -216,14 +232,20 @@ class Storage:
             prev = cur
         return out
 
-    def network_usage_buckets(self, granularity: str = "day", limit: int = 30) -> list[dict]:
-        """Aggregate network usage deltas into day/week/month buckets."""
-        if granularity not in {"day", "week", "month"}:
+    def network_usage_buckets(self, granularity: str = "day", limit: int = 30, iface: str | None = None) -> list[dict]:
+        """Aggregate network usage deltas into day/week/month/year buckets. If iface is set, uses iface_samples history."""
+        if granularity not in {"day", "week", "month", "year"}:
             granularity = "day"
         with self._lock, self._conn() as c:
-            rows = c.execute(
-                "SELECT ts, net_rx_bytes, net_tx_bytes FROM samples WHERE net_rx_bytes IS NOT NULL AND net_tx_bytes IS NOT NULL ORDER BY ts"
-            ).fetchall()
+            if iface and iface != "all":
+                rows = c.execute(
+                    "SELECT ts, rx_bytes, tx_bytes FROM iface_samples WHERE iface = ? ORDER BY ts",
+                    (iface,),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT ts, net_rx_bytes, net_tx_bytes FROM samples WHERE net_rx_bytes IS NOT NULL AND net_tx_bytes IS NOT NULL ORDER BY ts"
+                ).fetchall()
         buckets: dict[str, dict] = {}
         prev = None
         for r in rows:
@@ -241,12 +263,16 @@ class Storage:
                     key = f"{iso.year}-W{iso.week:02d}"
                 elif granularity == "month":
                     key = stamp.strftime("%Y-%m")
+                elif granularity == "year":
+                    key = stamp.strftime("%Y")
                 else:
                     key = stamp.strftime("%Y-%m-%d")
                 bucket = buckets.setdefault(key, {"label": key, "rx_bytes": 0, "tx_bytes": 0, "samples": 0, "start_ts": cur["ts"], "end_ts": cur["ts"]})
                 bucket["rx_bytes"] += d_rx
                 bucket["tx_bytes"] += d_tx
                 bucket["samples"] += 1
+                if cur["ts"] < bucket["start_ts"]:
+                    bucket["start_ts"] = cur["ts"]
                 bucket["end_ts"] = cur["ts"]
             prev = cur
         result = list(buckets.values())[-max(1, limit):]
@@ -255,6 +281,8 @@ class Storage:
             row["rx_gb"] = round(row["rx_bytes"] / (1024 ** 3), 3)
             row["tx_gb"] = round(row["tx_bytes"] / (1024 ** 3), 3)
             row["total_gb"] = round(row["total_bytes"] / (1024 ** 3), 3)
+            duration = max(1, int(row.get("end_ts", 0)) - int(row.get("start_ts", 0)))
+            row["avg_rate_mbps"] = round(row["total_bytes"] / duration / (1024 * 1024), 4)
         return result
 
     def apply_retention(self) -> tuple[int, int]:

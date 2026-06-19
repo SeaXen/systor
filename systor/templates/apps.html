@@ -42,12 +42,12 @@
   <div class="apps-top-grid">
     <div class="stat-card compact-stat apps-summary-card rx-card">
       <div class="label">Host</div>
-      <div class="value small-value compact-kpi-lines"><div><span class="rx-text">CPU</span> <span id="host-cpu">—</span></div><div><span class="tx-text">RAM</span> <span id="host-mem">—</span></div></div>
+      <div class="value small-value compact-kpi-inline"><span class="rx-text">CPU</span> <span id="host-cpu">—</span><span class="tx-text">RAM</span> <span id="host-mem">—</span><span class="disk-text">DSK</span> <span id="host-disk">—</span></div>
       <div class="sub" id="host-sub">— apps</div>
     </div>
     <div class="stat-card compact-stat apps-summary-card tx-card">
       <div class="label">Docker</div>
-      <div class="value small-value compact-kpi-lines"><div><span class="rx-text">CPU</span> <span id="docker-cpu">—</span></div><div><span class="tx-text">RAM</span> <span id="docker-mem">—</span></div></div>
+      <div class="value small-value compact-kpi-inline"><span class="rx-text">CPU</span> <span id="docker-cpu">—</span><span class="tx-text">RAM</span> <span id="docker-mem">—</span><span class="disk-text">DSK</span> <span id="docker-disk">—</span></div>
       <div class="sub" id="docker-sub">— containers</div>
     </div>
   </div>
@@ -193,12 +193,14 @@ function repaintFromRows(scope, summary){
   renderRows('cpu', cpuRows, 'apps-cpu-body', 'cpu', 'cpu-pager', 'cpu-title-meta', pageSize, scope);
   renderRows('mem', memRows, 'apps-mem-body', 'mem', 'mem-pager', 'mem-title-meta', pageSize, scope);
   renderRows('disk', diskRows, 'apps-disk-body', 'disk', 'disk-pager', 'disk-title-meta', pageSize, scope);
-  renderRows('net', netRows, 'apps-net-body', 'net', 'net-pager', 'net-title-meta', pageSize, scope, ' · best for docker');
+  renderRows('net', netRows, 'apps-net-body', 'net', 'net-pager', 'net-title-meta', pageSize, scope, ' · host net limited');
   renderAllRows(rows, scope);
   document.getElementById('host-cpu').textContent=(summary.host_cpu||0).toFixed(2)+'%';
   document.getElementById('host-mem').textContent=bytesMB(summary.host_mem_mb||0);
   document.getElementById('docker-cpu').textContent=(summary.docker_cpu||0).toFixed(2)+'%';
   document.getElementById('docker-mem').textContent=bytesMB(summary.docker_mem_mb||0);
+  document.getElementById('host-disk').textContent=bytesMB(summary.host_disk_mb||0);
+  document.getElementById('docker-disk').textContent=bytesMB(summary.docker_disk_mb||0);
   document.getElementById('host-sub').textContent=`${summary.host_count || 0} apps`;
   document.getElementById('docker-sub').textContent=`${summary.docker_count || 0} containers`;
 }

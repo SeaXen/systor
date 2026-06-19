@@ -490,8 +490,9 @@ def create_app() -> Flask:
     def api_network_usage():
         granularity = request.args.get("granularity", "day")
         limit = max(1, min(5000, int(request.args.get("limit", 30))))
-        data = get_storage().network_usage_buckets(granularity=granularity, limit=limit)
-        return jsonify({"ok": True, "granularity": granularity, "limit": limit, "data": data, "stats": get_storage().stats()})
+        iface = (request.args.get("iface") or "all").strip()
+        data = get_storage().network_usage_buckets(granularity=granularity, limit=limit, iface=iface)
+        return jsonify({"ok": True, "granularity": granularity, "limit": limit, "iface": iface, "data": data, "stats": get_storage().stats()})
 
     @app.route("/api/network-interfaces")
     def api_network_interfaces():
@@ -532,8 +533,10 @@ def create_app() -> Flask:
             "summary": {
                 "host_cpu": round(sum(r.get("cpu_percent", 0) for r in host_rows), 2),
                 "host_mem_mb": round(sum(r.get("mem_mb", 0) for r in host_rows), 2),
+                "host_disk_mb": round(sum((r.get("disk_in_mb", 0) + r.get("disk_out_mb", 0)) for r in host_rows), 2),
                 "docker_cpu": round(sum(r.get("cpu_percent", 0) for r in docker_rows), 2),
                 "docker_mem_mb": round(sum(r.get("mem_mb", 0) for r in docker_rows), 2),
+                "docker_disk_mb": round(sum((r.get("disk_in_mb", 0) + r.get("disk_out_mb", 0)) for r in docker_rows), 2),
                 "host_count": len(host_rows),
                 "docker_count": len(docker_rows),
             }

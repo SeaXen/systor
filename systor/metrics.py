@@ -422,6 +422,7 @@ def collect_snapshot() -> dict[str, Any]:
     disks = read_disk_usage()
     cpu_pct = _cpu_percent_delta()
     net = read_network_stats() or {}
+    net_ifaces = read_network_interfaces()
     disk_io = read_disk_io_mbps()
     return {
         "ts": int(time.time()),
@@ -437,6 +438,7 @@ def collect_snapshot() -> dict[str, Any]:
         "memory": mem,
         "disks": disks,
         "disk_io": disk_io,
+        "network_interfaces": net_ifaces,
         "network": net,
     }
 
