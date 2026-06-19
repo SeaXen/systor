@@ -18,12 +18,12 @@
   </div>
   <div class="actions">
     <nav class="page-tabs">
-      <a href="/" class="page-tab {% if request.path == '/' %}active{% endif %}">Dashboard</a>
-      <a href="/apps" class="page-tab {% if request.path == '/apps' %}active{% endif %}">Apps</a>
-      <a href="/network" class="page-tab {% if request.path == '/network' %}active{% endif %}">Network</a>
-      <a href="/alerts" class="page-tab {% if request.path == '/alerts' %}active{% endif %}">Alerts</a>
-      <a href="/logs" class="page-tab {% if request.path == '/logs' %}active{% endif %}">Logs</a>
-      <a href="/settings" class="page-tab {% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
+      <a href="/" class="page-tab {% if request.path == '/' %}active{% endif %}" aria-label="Dashboard" title="Dashboard"><span class="tab-icon" aria-hidden="true">⌂</span><span class="tab-label">Dashboard</span></a>
+      <a href="/apps" class="page-tab {% if request.path == '/apps' %}active{% endif %}" aria-label="Apps" title="Apps"><span class="tab-icon" aria-hidden="true">◫</span><span class="tab-label">Apps</span></a>
+      <a href="/network" class="page-tab {% if request.path == '/network' %}active{% endif %}" aria-label="Network" title="Network"><span class="tab-icon" aria-hidden="true">⇄</span><span class="tab-label">Network</span></a>
+      <a href="/alerts" class="page-tab {% if request.path == '/alerts' %}active{% endif %}" aria-label="Alerts" title="Alerts"><span class="tab-icon" aria-hidden="true">⚠</span><span class="tab-label">Alerts</span></a>
+      <a href="/logs" class="page-tab {% if request.path == '/logs' %}active{% endif %}" aria-label="Logs" title="Logs"><span class="tab-icon" aria-hidden="true">≣</span><span class="tab-label">Logs</span></a>
+      <a href="/settings" class="page-tab {% if request.path.startswith('/settings') %}active{% endif %}" aria-label="Settings" title="Settings"><span class="tab-icon" aria-hidden="true">⚙</span><span class="tab-label">Settings</span></a>
     </nav>
   </div>
 </div>
