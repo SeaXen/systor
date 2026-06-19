@@ -19,6 +19,10 @@
           <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
           <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
           <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
+          <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
+          <option value="2160" {% if cfg.network.default_hours == 2160 %}selected{% endif %}>90d</option>
+          <option value="8760" {% if cfg.network.default_hours == 8760 %}selected{% endif %}>1y</option>
+          <option value="87600" {% if cfg.network.default_hours == 87600 %}selected{% endif %}>all</option>
         </select>
       </label>
       <label>usage view

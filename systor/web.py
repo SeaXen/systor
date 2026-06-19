@@ -70,6 +70,79 @@ def get_storage() -> Storage:
     return _storage
 
 
+def _parse_hours_arg(value, default: float) -> float:
+    if value in (None, '', 'all'):
+        return 24.0 * 3650
+    try:
+        hours = float(value)
+    except (TypeError, ValueError):
+        hours = float(default)
+    return max(0.25, min(24.0 * 3650, hours))
+
+
+def _bucket_series_points(rows, limit: int = 600):
+    rows = list(rows or [])
+    n = len(rows)
+    if n <= limit:
+        return rows
+    first_ts, last_ts = int(rows[0][0]), int(rows[-1][0])
+    span = max(1, last_ts - first_ts)
+    bucket_sec = max(1, int((span + limit - 1) // limit))
+    out = []
+    cur_key = None
+    cur_vals = []
+    cur_ts = first_ts
+    for ts, val in rows:
+        key = int(ts) // bucket_sec
+        if cur_key is None:
+            cur_key = key
+        if key != cur_key and cur_vals:
+            out.append((cur_ts, round(sum(cur_vals) / len(cur_vals), 3)))
+            cur_vals = []
+            cur_key = key
+        cur_ts = int(ts)
+        if val is not None:
+            cur_vals.append(float(val))
+    if cur_vals:
+        out.append((cur_ts, round(sum(cur_vals) / len(cur_vals), 3)))
+    if out[-1][0] != last_ts:
+        out.append(rows[-1])
+    return out[-limit:]
+
+
+def _bucket_network_points(rows, limit: int = 600):
+    rows = list(rows or [])
+    n = len(rows)
+    if n <= limit:
+        return rows
+    first_ts, last_ts = int(rows[0]["ts"]), int(rows[-1]["ts"])
+    span = max(1, last_ts - first_ts)
+    bucket_sec = max(1, int((span + limit - 1) // limit))
+    out = []
+    cur_key = None
+    rx_vals = []
+    tx_vals = []
+    cur_ts = first_ts
+    for row in rows:
+        ts = int(row["ts"])
+        key = ts // bucket_sec
+        if cur_key is None:
+            cur_key = key
+        if key != cur_key and (rx_vals or tx_vals):
+            out.append({"ts": cur_ts, "rx_mbps": round(sum(rx_vals) / len(rx_vals), 4) if rx_vals else 0.0, "tx_mbps": round(sum(tx_vals) / len(tx_vals), 4) if tx_vals else 0.0})
+            rx_vals = []
+            tx_vals = []
+            cur_key = key
+        cur_ts = ts
+        rx_vals.append(float(row.get("rx_mbps") or 0.0))
+        tx_vals.append(float(row.get("tx_mbps") or 0.0))
+    if rx_vals or tx_vals:
+        out.append({"ts": cur_ts, "rx_mbps": round(sum(rx_vals) / len(rx_vals), 4) if rx_vals else 0.0, "tx_mbps": round(sum(tx_vals) / len(tx_vals), 4) if tx_vals else 0.0})
+    if out[-1]["ts"] != last_ts:
+        out.append(rows[-1])
+    return out[-limit:]
+
+
 def _find_exact_processes(args_variants: list[str]) -> list[dict]:
     try:
         out = subprocess.run(
@@ -301,16 +374,9 @@ def create_app() -> Flask:
     @app.route("/api/series")
     def api_series():
         metric = request.args.get("metric", "cpu_pct")
-        try:
-            hours = float(request.args.get("hours", 6))
-        except (TypeError, ValueError):
-            hours = 6.0
-        hours = max(0.25, min(24 * 31, hours))
+        hours = _parse_hours_arg(request.args.get("hours"), 6.0)
         data = get_storage().series(metric, hours=hours)
-        # downsample to <= 600 points for charts
-        if len(data) > 600:
-            step = len(data) // 600 + 1
-            data = data[::step]
+        data = _bucket_series_points(data, 600)
         return jsonify({"metric": metric, "hours": hours, "data": data})
 
     @app.route("/api/alerts")
@@ -401,15 +467,9 @@ def create_app() -> Flask:
 
     @app.route("/api/network-series")
     def api_network_series():
-        try:
-            hours = float(request.args.get("hours", 24))
-        except (TypeError, ValueError):
-            hours = 24.0
-        hours = max(0.25, min(24 * 31, hours))
+        hours = _parse_hours_arg(request.args.get("hours"), 24.0)
         data = get_storage().network_series(hours=hours)
-        if len(data) > 600:
-            step = len(data) // 600 + 1
-            data = data[::step]
+        data = _bucket_network_points(data, 600)
         snap = collect_snapshot()
         return jsonify({"ok": True, "hours": hours, "data": data, "current": snap.get("network", {})})
 
@@ -560,11 +620,11 @@ def create_app() -> Flask:
                 try: cfg["collector"]["poll_interval_sec"] = max(1, int(data["poll_interval_sec"]))
                 except (ValueError, TypeError): pass
             if "retention_days" in data and data["retention_days"]:
-                try: cfg["collector"]["retention_days"] = max(1, int(data["retention_days"]))
+                try: cfg["collector"]["retention_days"] = max(1, int(float(data["retention_days"])))
                 except (ValueError, TypeError): pass
             cfg.setdefault("network", {})
             if "network_default_hours" in data and data["network_default_hours"]:
-                try: cfg["network"]["default_hours"] = max(0.25, min(24 * 31, float(data["network_default_hours"])))
+                try: cfg["network"]["default_hours"] = max(0.25, min(24 * 3650, float(data["network_default_hours"])))
                 except (ValueError, TypeError): pass
             if "network_auto_refresh_sec" in data and data["network_auto_refresh_sec"]:
                 try: cfg["network"]["auto_refresh_sec"] = max(1, int(data["network_auto_refresh_sec"]))
@@ -575,7 +635,7 @@ def create_app() -> Flask:
                 cfg["network"]["hide_virtual_default"] = _bool(data.get("network_hide_virtual_default"))
             cfg.setdefault("dashboard", {})
             if "dashboard_default_hours" in data and data["dashboard_default_hours"]:
-                try: cfg["dashboard"]["default_hours"] = max(0.25, min(24 * 31, float(data["dashboard_default_hours"])))
+                try: cfg["dashboard"]["default_hours"] = max(0.25, min(24 * 3650, float(data["dashboard_default_hours"])))
                 except (ValueError, TypeError): pass
             if "dashboard_refresh_sec" in data and data["dashboard_refresh_sec"]:
                 try: cfg["dashboard"]["refresh_sec"] = max(1, int(data["dashboard_refresh_sec"]))

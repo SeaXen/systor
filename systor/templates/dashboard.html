@@ -42,6 +42,10 @@
         <option value="24">24h</option>
         <option value="72">3d</option>
         <option value="168">7d</option>
+        <option value="720">30d</option>
+        <option value="2160">90d</option>
+        <option value="8760">1y</option>
+        <option value="87600">all</option>
       </select>
     </label>
     <button class="btn secondary compact" id="manual-refresh-btn">Refresh</button>
@@ -59,8 +63,8 @@
   </div>
   <div class="stat-card" id="kpi-load">
     <div class="label">CPU load</div>
-    <div class="value small-value"><span class="load1-text">1m</span> <span id="load1">—</span> <span class="load5-text">5m</span> <span id="load5">—</span> <span class="load15-text">15m</span> <span id="load15">—</span></div>
-    <div class="sub">1m · 5m · 15m</div>
+    <div class="value small-value compact-kpi-lines"><div><span class="load1-text">1m</span> <span id="load1">—</span></div><div><span class="load5-text">5m</span> <span id="load5">—</span> <span class="load15-text">15m</span> <span id="load15">—</span></div></div>
+    <div class="sub card-sub-empty"></div>
   </div>
   <div class="stat-card" id="kpi-temp">
     <div class="label">Temp</div>
@@ -79,13 +83,13 @@
   </div>
   <div class="stat-card" id="kpi-disk-io">
     <div class="label">Disk load</div>
-    <div class="value small-value"><span class="rx-text">RX</span> <span id="disk-r-mbps">0.0</span> <span class="tx-text">TX</span> <span id="disk-w-mbps">0.0</span><span class="unit">MB/s</span></div>
-    <div class="sub" id="disk-io-devs">—</div>
+    <div class="value small-value compact-kpi-lines"><div><span class="rx-text">RX</span> <span id="disk-r-mbps">0.0</span></div><div><span class="tx-text">TX</span> <span id="disk-w-mbps">0.0</span></div></div>
+    <div class="sub" id="disk-io-devs"></div>
   </div>
   <div class="stat-card" id="kpi-net">
     <div class="label">Network</div>
-    <div class="value small-value"><span class="rx-text">RX</span> <span id="net-rx">—</span> <span class="tx-text">TX</span> <span id="net-tx">—</span></div>
-    <div class="sub">cumulative</div>
+    <div class="value small-value compact-kpi-lines"><div><span class="rx-text">RX</span> <span id="net-rx">—</span></div><div><span class="tx-text">TX</span> <span id="net-tx">—</span></div></div>
+    <div class="sub card-sub-empty" id="net-sub"></div>
   </div>
 </div>
 
@@ -166,7 +170,7 @@ function niceStep(v){ if(!Number.isFinite(v)||v<=0) return 1; const p=Math.pow(1
 function showTooltip(html,x,y){ tooltip.innerHTML=html; tooltip.classList.remove('hidden'); tooltip.style.left=(x+14)+'px'; tooltip.style.top=(y+14)+'px'; }
 function hideTooltip(){ tooltip.classList.add('hidden'); }
 function bindLineTooltip(canvas){ if(canvas.__tooltipBound) return; canvas.__tooltipBound=true; canvas.addEventListener('mouseleave', hideTooltip); canvas.addEventListener('mousemove', ev=>{ const meta=canvas.__hoverMeta; if(!meta||!meta.groups||!meta.groups.length) return hideTooltip(); const rect=canvas.getBoundingClientRect(); const x=ev.clientX-rect.left; let best=null; for(const g of meta.groups){ const dx=Math.abs(g.x-x); if(!best||dx<best.dx) best={dx,g}; } if(!best||best.dx>18) return hideTooltip(); const lines=[`<div class="tt-time">${new Date(best.g.ts*1000).toLocaleString()}</div>`]; for(const item of best.g.items) lines.push(`<div><span style="color:${item.color};font-weight:700">${item.name}</span>: <strong>${item.value}</strong></div>`); showTooltip(lines.join(''),ev.clientX,ev.clientY); }); }
-function drawChart(canvas, series, opts={}){ if(!canvas) return; bindLineTooltip(canvas); const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(84,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); const allVals=series.flatMap(s=>(s.data||[]).map(p=>p[1])); const bounds=niceBounds(allVals,opts.ymin,opts.ymax); if(!bounds){ ctx.fillStyle=COLORS.dim; ctx.font='12px monospace'; ctx.fillText('waiting for data',12,h/2); canvas.__hoverMeta={groups:[]}; return; } const [lo,hi]=bounds; const padL=38,padR=10,padT=8,padB=18; const gw=w-padL-padR, gh=h-padT-padB; ctx.strokeStyle=COLORS.grid; ctx.lineWidth=1; ctx.fillStyle=COLORS.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); const label=(hi-((hi-lo)/3)*i).toFixed(hi>100?0:2); ctx.fillText(label,2,y+3); } const groups=[]; for(const s of series){ const data=s.data||[]; if(!data.length) continue; if(s.fill){ const grad=ctx.createLinearGradient(0,padT,0,padT+gh); grad.addColorStop(0,(s.fillColor||s.color)+'33'); grad.addColorStop(1,(s.fillColor||s.color)+'05'); ctx.beginPath(); let started=false; for(let i=0;i<data.length;i++){ const v=data[i][1]; if(v===null||v===undefined||!Number.isFinite(v)) continue; const x=padL+(data.length>1?(gw*i)/(data.length-1):gw/2); const y=padT+gh-((v-lo)/(hi-lo))*gh; if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); } if(started){ ctx.lineTo(padL+gw,padT+gh); ctx.lineTo(padL,padT+gh); ctx.closePath(); ctx.fillStyle=grad; ctx.fill(); } } ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=s.width||1.8; let started=false; for(let i=0;i<data.length;i++){ const ts=data[i][0], v=data[i][1]; if(v===null||v===undefined||!Number.isFinite(v)) continue; const x=padL+(data.length>1?(gw*i)/(data.length-1):gw/2); const y=padT+gh-((v-lo)/(hi-lo))*gh; if(!started){ctx.moveTo(x,y); started=true;} else ctx.lineTo(x,y); let g=groups.find(p=>Math.abs(p.x-x)<0.5); if(!g){ g={x,ts,items:[]}; groups.push(g);} g.items.push({name:s.name, value:fmt(v,s.unit), color:s.color}); } if(started) ctx.stroke(); } canvas.__hoverMeta={groups}; }
+function drawChart(canvas, series, opts={}){ if(!canvas) return; bindLineTooltip(canvas); const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(104,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); const allVals=series.flatMap(s=>(s.data||[]).map(p=>p[1])); const bounds=niceBounds(allVals,opts.ymin,opts.ymax); if(!bounds){ ctx.fillStyle=COLORS.dim; ctx.font='12px monospace'; ctx.fillText('waiting for data',12,h/2); canvas.__hoverMeta={groups:[]}; return; } const [lo,hi]=bounds; const padL=38,padR=10,padT=8,padB=18; const gw=w-padL-padR, gh=h-padT-padB; ctx.strokeStyle=COLORS.grid; ctx.lineWidth=1; ctx.fillStyle=COLORS.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); const label=(hi-((hi-lo)/3)*i).toFixed(hi>100?0:2); ctx.fillText(label,2,y+3); } const groups=[]; for(const s of series){ const data=s.data||[]; if(!data.length) continue; if(s.fill){ const grad=ctx.createLinearGradient(0,padT,0,padT+gh); grad.addColorStop(0,(s.fillColor||s.color)+'33'); grad.addColorStop(1,(s.fillColor||s.color)+'05'); ctx.beginPath(); let started=false; for(let i=0;i<data.length;i++){ const v=data[i][1]; if(v===null||v===undefined||!Number.isFinite(v)) continue; const x=padL+(data.length>1?(gw*i)/(data.length-1):gw/2); const y=padT+gh-((v-lo)/(hi-lo))*gh; if(!started){ctx.moveTo(x,y);started=true;} else ctx.lineTo(x,y); } if(started){ ctx.lineTo(padL+gw,padT+gh); ctx.lineTo(padL,padT+gh); ctx.closePath(); ctx.fillStyle=grad; ctx.fill(); } } ctx.beginPath(); ctx.strokeStyle=s.color; ctx.lineWidth=s.width||1.8; let started=false; for(let i=0;i<data.length;i++){ const ts=data[i][0], v=data[i][1]; if(v===null||v===undefined||!Number.isFinite(v)) continue; const x=padL+(data.length>1?(gw*i)/(data.length-1):gw/2); const y=padT+gh-((v-lo)/(hi-lo))*gh; if(!started){ctx.moveTo(x,y); started=true;} else ctx.lineTo(x,y); let g=groups.find(p=>Math.abs(p.x-x)<0.5); if(!g){ g={x,ts,items:[]}; groups.push(g);} g.items.push({name:s.name, value:fmt(v,s.unit), color:s.color}); } if(started) ctx.stroke(); } canvas.__hoverMeta={groups}; }
 async function fetchJSON(url, opts){ const r=await fetch(url, opts||{cache:'no-store'}); if(!r.ok){ let msg='HTTP '+r.status; try{ const j=await r.json(); msg=j.error||j.message||msg; }catch(e){} throw new Error(msg);} return r.json(); }
 let settings={ refreshMs: SERVER_DEFAULTS.refreshMs, chartMs: SERVER_DEFAULTS.chartMs, rangeHours: SERVER_DEFAULTS.rangeHours, paused:false };
 settings.refreshMs=Math.max(1000, Number(settings.refreshMs)||SERVER_DEFAULTS.refreshMs);
@@ -178,7 +182,57 @@ let snapTimer, chartTimer, alertTimer, procTimer; const inflight={snap:false, ch
 function restartTimers(){ clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer); if(settings.paused) return; snapTimer=setInterval(refresh, settings.refreshMs); chartTimer=setInterval(refreshCharts, settings.chartMs); alertTimer=setInterval(refreshAlerts, Math.max(settings.refreshMs,10000)); procTimer=setInterval(refreshProcs,30000); }
 function refreshAll(){ refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); }
 function setGlobalHeader(snap, runtime){ const cpu=snap.cpu||{}, mem=snap.memory||{}, web=runtime.web||{}, collector=runtime.collector||{}, s=runtime.storage||{}; const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null; const el=document.getElementById('global-header-meta'); if(!el) return; el.innerHTML=`<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(s.total_mb,'MB')}</strong></span>`; }
-async function refresh(){ if(settings.paused||inflight.snap) return; inflight.snap=true; setLoadState('loading snapshot…'); try{ const [snap,runtime]=await Promise.all([fetchJSON('/api/snapshot'), fetchJSON('/api/runtime')]); document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString(); document.getElementById('hostname').textContent=snap.hostname||'systor'; const up=snap.uptime_sec||0; document.getElementById('uptime').textContent=Math.floor(up/3600)+'h '+Math.floor((up%3600)/60)+'m'; document.getElementById('dbmeta').textContent=(snap.db_stats.samples||0)+' samples'; const cpu=snap.cpu||{}; document.getElementById('cpu-pct').textContent=fmt(cpu.percent); document.getElementById('load1').textContent=fmt(cpu.load_1m); document.getElementById('load5').textContent=fmt(cpu.load_5m); document.getElementById('load15').textContent=fmt(cpu.load_15m); document.getElementById('kpi-cpu-pct').className='stat-card '+statusClass(cpu.percent,50,85); document.getElementById('kpi-load').className='stat-card '+statusClass(Math.max(cpu.load_1m||0,cpu.load_5m||0),3,6); document.getElementById('temp').textContent=fmt(cpu.temp_c); document.getElementById('temp-sub').textContent=(cpu.temp_c===null||cpu.temp_c===undefined)?'sensor n/a':'CPU sensor'; document.getElementById('kpi-temp').className='stat-card '+statusClass(cpu.temp_c,70,85); const mem=snap.memory||{}; const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null; document.getElementById('mem-pct').textContent=memPct!==null?memPct:'—'; document.getElementById('mem-used').textContent=bytes((mem.used_mb||0)*1024*1024); document.getElementById('mem-total').textContent=bytes((mem.total_mb||0)*1024*1024); document.getElementById('kpi-mem').className='stat-card '+statusClass(memPct,75,90); document.getElementById('swap-used').textContent=mem.swap_used_mb||0; document.getElementById('swap-total').textContent=mem.swap_total_mb||0; document.getElementById('kpi-swap').className='stat-card '+statusClass(mem.swap_used_mb,2048,4096); const dio=snap.disk_io||{}; document.getElementById('disk-r-mbps').textContent=fmt(dio.read_mbps); document.getElementById('disk-w-mbps').textContent=fmt(dio.write_mbps); document.getElementById('disk-io-devs').textContent=(dio.devices||[]).join(', ')||'—'; const net=snap.network||{}; document.getElementById('net-rx').textContent=bytes(net.rx_bytes||0); document.getElementById('net-tx').textContent=bytes(net.tx_bytes||0); setGlobalHeader(snap, runtime); setLoadState('snapshot '+new Date().toLocaleTimeString()); }catch(e){ console.error(e); setLoadState('snapshot error'); } finally { inflight.snap=false; } }
+async function refresh(){
+  if(settings.paused||inflight.snap) return;
+  inflight.snap=true;
+  setLoadState('loading snapshot…');
+  try{
+    const [snap,runtime]=await Promise.all([fetchJSON('/api/snapshot'), fetchJSON('/api/runtime')]);
+    document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString();
+    document.getElementById('hostname').textContent=snap.hostname||'systor';
+    const up=snap.uptime_sec||0;
+    document.getElementById('uptime').textContent=Math.floor(up/3600)+'h '+Math.floor((up%3600)/60)+'m';
+    document.getElementById('dbmeta').textContent=(snap.db_stats.samples||0)+' samples';
+    const cpu=snap.cpu||{};
+    document.getElementById('cpu-pct').textContent=fmt(cpu.percent);
+    document.getElementById('load1').textContent=fmt(cpu.load_1m);
+    document.getElementById('load5').textContent=fmt(cpu.load_5m);
+    document.getElementById('load15').textContent=fmt(cpu.load_15m);
+    document.getElementById('kpi-cpu-pct').className='stat-card '+statusClass(cpu.percent,50,85);
+    document.getElementById('kpi-load').className='stat-card '+statusClass(Math.max(cpu.load_1m||0,cpu.load_5m||0),3,6);
+    document.getElementById('temp').textContent=fmt(cpu.temp_c);
+    document.getElementById('temp-sub').textContent=(cpu.temp_c===null||cpu.temp_c===undefined)?'sensor n/a':'CPU sensor';
+    document.getElementById('kpi-temp').className='stat-card '+statusClass(cpu.temp_c,70,85);
+
+    const mem=snap.memory||{};
+    const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null;
+    document.getElementById('mem-pct').textContent=memPct!==null?memPct:'—';
+    document.getElementById('mem-used').textContent=bytes((mem.used_mb||0)*1024*1024);
+    document.getElementById('mem-total').textContent=bytes((mem.total_mb||0)*1024*1024);
+    document.getElementById('kpi-mem').className='stat-card '+statusClass(memPct,75,90);
+
+    document.getElementById('swap-used').textContent=mem.swap_used_mb||0;
+    document.getElementById('swap-total').textContent=mem.swap_total_mb||0;
+    document.getElementById('kpi-swap').className='stat-card '+statusClass(mem.swap_used_mb,2048,4096);
+
+    const dio=snap.disk_io||{};
+    document.getElementById('disk-r-mbps').textContent=fmt(dio.read_mbps);
+    document.getElementById('disk-w-mbps').textContent=fmt(dio.write_mbps);
+    document.getElementById('disk-io-devs').textContent='';
+    document.getElementById('kpi-disk-io').className='stat-card '+statusClass(Math.max(dio.read_mbps||0,dio.write_mbps||0),20,80);
+
+    const net=snap.network||{};
+    document.getElementById('net-rx').textContent=bytes(net.rx_bytes||0);
+    document.getElementById('net-tx').textContent=bytes(net.tx_bytes||0);
+    document.getElementById('net-sub').textContent='';
+    document.getElementById('kpi-net').className='stat-card '+statusClass(Math.max((net.rx_bytes||0),(net.tx_bytes||0))/(1024*1024*1024),4,12);
+
+    setGlobalHeader(snap,runtime);
+    setLoadState('snapshot '+new Date().toLocaleTimeString());
+  }catch(e){ console.error(e); setLoadState('snapshot error'); }
+  finally{ inflight.snap=false; }
+}
+
 async function getSeries(metric){ const d=await fetchJSON('/api/series?metric='+metric+'&hours='+settings.rangeHours); return d.data||[]; }
 function lastVal(data){ const p=[...(data||[])].reverse().find(x=>x[1]!==null&&x[1]!==undefined); return p?p[1]:null; }
 function maxVal(data){ const vals=(data||[]).map(x=>x[1]).filter(v=>v!==null&&v!==undefined); return vals.length?Math.max(...vals):null; }
