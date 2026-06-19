@@ -571,7 +571,7 @@ tr:hover { background: var(--bg-hover); }
 .apps-summary-card.tx-card .compact-kpi-inline span[id^="docker-"]{ font-weight:800; }
 
 
-.kpi-meter{position:absolute;left:14px;right:14px;top:10px;height:10px;background:#182131;border:1px solid #263246;border-radius:999px;overflow:hidden;}
+.kpi-meter{position:absolute;left:14px;right:14px;top:8px;height:8px;background:#182131;border:1px solid #263246;border-radius:999px;overflow:hidden;}
 .kpi-meter i{display:block;height:100%;width:0%;border-radius:999px;}
 .kpi-meter.cpu i{background:linear-gradient(90deg,#16c3ff,#7b61ff);}
 .kpi-meter.mem i{background:linear-gradient(90deg,#22d3ee,#7c3aed);}
@@ -580,9 +580,39 @@ tr:hover { background: var(--bg-hover); }
 .kpi-meter.temp i{background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444);}
 .kpi-meter.disk i{background:linear-gradient(90deg,#22d3ee,#f59e0b);}
 .kpi-meter.net i{background:linear-gradient(90deg,#22d3ee,#ff6b8a);}
-#kpis .stat-card.has-meter .label{margin-top:18px;}
+#kpis .stat-card.has-meter .label{margin-top:14px;}
 .speed-layout{display:grid;gap:8px;}
 .speed-kpis{grid-template-columns:repeat(4,minmax(0,1fr));}
 .speed-helper-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px 12px;}
 .speed-helper-grid code{font-family:var(--mono);font-size:11px;word-break:break-all;color:var(--text-bright);}
 @media (max-width:1100px){.speed-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.speed-helper-grid{grid-template-columns:1fr;}}
+
+
+.speed-layout-v2{display:grid;gap:8px;}
+.speed-run-controls{row-gap:6px;column-gap:6px;flex-wrap:wrap;}
+.speed-kpis-5{grid-template-columns:repeat(5,minmax(0,1fr));}
+.speed-mid-grid{grid-template-columns:1.45fr .95fr;}
+.speed-browser-card{min-height:620px;}
+.speed-browser-actions{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 8px;}
+.speed-browser-frame{width:100%;height:520px;border:1px solid var(--line);border-radius:12px;background:#fff;}
+.speed-frame-note{padding:8px 12px 12px;color:var(--text-muted);font-size:11px;}
+.speed-side-stack{display:flex;flex-direction:column;gap:8px;}
+.speed-auto-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 12px 0;}
+.speed-auto-form label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;}
+.speed-auto-form input,.speed-auto-form select{margin-top:0;}
+.speed-auto-actions{display:flex;align-items:center;gap:8px;padding:10px 12px 12px;}
+.speed-history-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-right:4px;}
+.speed-history-controls{gap:6px;}
+.provider-badge{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:999px;border:1px solid var(--line);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.provider-badge.ookla{background:rgba(34,211,238,.12);color:#67e8f9;border-color:rgba(34,211,238,.35);}
+.provider-badge.legacy{background:rgba(139,148,158,.12);color:#c9d1d9;border-color:rgba(139,148,158,.35);}
+.provider-badge.librespeed{background:rgba(139,92,246,.14);color:#c4b5fd;border-color:rgba(139,92,246,.35);}
+.provider-badge.cloudflare{background:rgba(249,115,22,.14);color:#fdba74;border-color:rgba(249,115,22,.35);}
+.provider-badge.notion{background:rgba(244,244,245,.08);color:#e5e7eb;border-color:rgba(244,244,245,.28);}
+.provider-badge.manual{background:rgba(34,197,94,.12);color:#86efac;border-color:rgba(34,197,94,.3);}
+.provider-badge.auto{background:rgba(234,179,8,.14);color:#fde68a;border-color:rgba(234,179,8,.35);}
+.speed-history-table tbody tr td{vertical-align:middle;}
+.compact-speed-note{margin:0 12px 12px;}
+#speed-run-server-wrap{display:none;}
+@media (max-width:1400px){.speed-kpis-5{grid-template-columns:repeat(3,minmax(0,1fr));}.speed-mid-grid{grid-template-columns:1fr;}}
+@media (max-width:900px){.speed-kpis-5{grid-template-columns:repeat(2,minmax(0,1fr));}.speed-auto-form{grid-template-columns:1fr;}.speed-browser-card{min-height:auto;}.speed-browser-frame{height:440px;}.speed-history-head{flex-direction:column;align-items:flex-start;}}

@@ -30,7 +30,7 @@ from .config import load_config, save_config
 from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb, read_network_interfaces
 from .notifier import Notifier, send_telegram, send_discord
 from .storage import Storage, DEFAULT_DB_PATH
-from .speed import run_provider, run_many, iperf_status, start_iperf_server, local_ipv4s
+from .speed import run_provider, run_many, iperf_status, start_iperf_server, local_ipv4s, list_ookla_servers, list_librespeed_servers
 
 log = logging.getLogger("systor.web")
 _running = True
@@ -505,15 +505,19 @@ def create_app() -> Flask:
 
     @app.route("/api/speedtests")
     def api_speedtests():
-        limit = max(1, min(500, int(request.args.get("limit", 50))))
+        cfg = load_config()
+        default_limit = int((cfg.get("speed", {}) or {}).get("history_page_size", 25))
+        limit = max(1, min(500, int(request.args.get("limit", default_limit))))
+        offset = max(0, int(request.args.get("offset", 0)))
         provider = (request.args.get("provider") or "all").strip().lower()
-        rows = get_storage().recent_speedtests(limit=limit, provider=provider)
-        return jsonify({"ok": True, "rows": rows, "provider": provider, "limit": limit})
+        run_type = (request.args.get("run_type") or "all").strip().lower()
+        rows, total = get_storage().recent_speedtests(limit=limit, offset=offset, provider=provider, run_type=run_type)
+        return jsonify({"ok": True, "rows": rows, "provider": provider, "run_type": run_type, "limit": limit, "offset": offset, "total": total})
 
     @app.route("/api/speed/status")
     def api_speed_status():
         cfg = load_config()
-        rows = get_storage().recent_speedtests(limit=200, provider="all")
+        rows, _total = get_storage().recent_speedtests(limit=200, provider="all")
         latest = []
         seen = set()
         for row in rows:
@@ -525,13 +529,23 @@ def create_app() -> Flask:
         port = int((cfg.get("speed", {}) or {}).get("iperf_port", 5201))
         return jsonify({"ok": True, "latest": latest, "iperf": iperf_status(port), "local_ips": local_ipv4s(), "config": cfg})
 
+    @app.route("/api/speed/options")
+    def api_speed_options():
+        return jsonify({
+            "ok": True,
+            "ookla_servers": list_ookla_servers(limit=20),
+            "librespeed_servers": list_librespeed_servers(limit=40),
+        })
+
     @app.route("/api/speed/run", methods=["POST"])
     def api_speed_run():
         cfg = load_config()
         body = request.get_json(silent=True) or {}
-        provider = str(body.get("provider") or "speedtest").strip().lower()
-        providers = ["speedtest", "librespeed", "notion", "cloudflare"] if provider == "all" else [provider]
-        rows = run_many(providers, cfg=cfg)
+        provider = str(body.get("provider") or "ookla").strip().lower()
+        server_id = body.get("server_id")
+        run_type = str(body.get("run_type") or "manual").strip().lower()
+        providers = ["ookla", "librespeed", "notion", "cloudflare"] if provider == "all" else [provider]
+        rows = run_many(providers, cfg=cfg, server_id=server_id, run_type=run_type)
         for row in rows:
             get_storage().log_speedtest(row)
         return jsonify({"ok": True, "rows": rows})
@@ -731,13 +745,13 @@ def create_app() -> Flask:
                 cfg["apps"]["default_sort"] = data["apps_default_sort"]
             cfg.setdefault("speed", {})
             if "speed_page_refresh_sec" in data and data["speed_page_refresh_sec"]:
-                try: cfg["speed"]["page_refresh_sec"] = max(5, int(data["speed_page_refresh_sec"]))
+                try: cfg["speed"]["page_refresh_sec"] = max(1, int(data["speed_page_refresh_sec"]))
                 except (ValueError, TypeError): pass
-            if "speed_default_provider" in data and data["speed_default_provider"] in ("speedtest", "librespeed", "notion", "cloudflare"):
+            if "speed_default_provider" in data and data["speed_default_provider"] in ("ookla", "librespeed", "notion", "cloudflare"):
                 cfg["speed"]["default_provider"] = data["speed_default_provider"]
             if "speed_auto_enabled" in data:
                 cfg["speed"]["auto_enabled"] = _bool(data.get("speed_auto_enabled"))
-            if "speed_auto_provider" in data and data["speed_auto_provider"] in ("speedtest", "librespeed", "notion", "cloudflare"):
+            if "speed_auto_provider" in data and data["speed_auto_provider"] in ("ookla", "librespeed", "notion", "cloudflare"):
                 cfg["speed"]["auto_provider"] = data["speed_auto_provider"]
             if "speed_auto_interval_min" in data and data["speed_auto_interval_min"]:
                 try: cfg["speed"]["auto_interval_min"] = max(5, int(float(data["speed_auto_interval_min"])))
@@ -752,6 +766,14 @@ def create_app() -> Flask:
                 except (ValueError, TypeError): pass
             if "speed_librespeed_server_id" in data:
                 cfg["speed"]["librespeed_server_id"] = str(data.get("speed_librespeed_server_id") or "").strip()
+            if "speed_ookla_server_id" in data:
+                cfg["speed"]["ookla_server_id"] = str(data.get("speed_ookla_server_id") or "").strip()
+            if "speed_local_librespeed_port" in data and data["speed_local_librespeed_port"]:
+                try: cfg["speed"]["local_librespeed_port"] = max(1, min(65535, int(data["speed_local_librespeed_port"])))
+                except (ValueError, TypeError): pass
+            if "speed_history_page_size" in data and data["speed_history_page_size"]:
+                try: cfg["speed"]["history_page_size"] = max(5, min(100, int(data["speed_history_page_size"])))
+                except (ValueError, TypeError): pass
             if "speed_iperf_port" in data and data["speed_iperf_port"]:
                 try: cfg["speed"]["iperf_port"] = max(1, min(65535, int(data["speed_iperf_port"])))
                 except (ValueError, TypeError): pass

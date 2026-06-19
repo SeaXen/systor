@@ -279,9 +279,9 @@ def run():
             if speed_cfg.get("auto_enabled"):
                 interval_sec = max(300, int(float(speed_cfg.get("auto_interval_min", 180)) * 60))
                 if (t0 - last_speedtest_check) >= interval_sec:
-                    provider = str(speed_cfg.get("auto_provider") or "speedtest")
+                    provider = str(speed_cfg.get("auto_provider") or "ookla")
                     try:
-                        result = run_provider(provider, cfg=cfg)
+                        result = run_provider(provider, cfg=cfg, run_type="auto")
                         storage.log_speedtest(result)
                         last_speedtest_check = t0
                         if result.get("ok") and speed_cfg.get("notify_enabled"):

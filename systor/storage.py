@@ -77,7 +77,10 @@ CREATE TABLE IF NOT EXISTS speedtests (
     provider TEXT NOT NULL,
     target TEXT,
     mode TEXT NOT NULL,
+    server_id TEXT,
+    run_type TEXT NOT NULL DEFAULT 'manual',
     ping_ms REAL,
+    jitter_ms REAL,
     dl_mbps REAL,
     ul_mbps REAL,
     note TEXT,
@@ -115,6 +118,15 @@ class Storage:
         for col, typ in additions.items():
             if col not in existing:
                 c.execute(f"ALTER TABLE samples ADD COLUMN {col} {typ}")
+        speed_existing = {row[1] for row in c.execute("PRAGMA table_info(speedtests)").fetchall()}
+        speed_additions = {
+            "server_id": "TEXT",
+            "run_type": "TEXT NOT NULL DEFAULT 'manual'",
+            "jitter_ms": "REAL",
+        }
+        for col, typ in speed_additions.items():
+            if col not in speed_existing:
+                c.execute(f"ALTER TABLE speedtests ADD COLUMN {col} {typ}")
 
     @contextmanager
     def _conn(self):
@@ -221,13 +233,16 @@ class Storage:
     def log_speedtest(self, row: dict) -> None:
         with self._lock, self._conn() as c:
             c.execute(
-                "INSERT INTO speedtests (ts, provider, target, mode, ping_ms, dl_mbps, ul_mbps, note, ok, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO speedtests (ts, provider, target, mode, server_id, run_type, ping_ms, jitter_ms, dl_mbps, ul_mbps, note, ok, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     int(row.get("ts") or time.time()),
-                    str(row.get("provider") or "speedtest"),
+                    str(row.get("provider") or "ookla"),
                     str(row.get("target") or ""),
                     str(row.get("mode") or "wan"),
+                    str(row.get("server_id") or ""),
+                    str(row.get("run_type") or "manual"),
                     row.get("ping_ms"),
+                    row.get("jitter_ms"),
                     row.get("dl_mbps"),
                     row.get("ul_mbps"),
                     str(row.get("note") or ""),
@@ -236,19 +251,23 @@ class Storage:
                 ),
             )
 
-    def recent_speedtests(self, limit: int = 50, provider: str = "all") -> list[dict]:
+    def recent_speedtests(self, limit: int = 50, provider: str = "all", run_type: str = "all", offset: int = 0) -> tuple[list[dict], int]:
+        where = []
+        vals = []
+        if provider and provider != "all":
+            where.append("provider = ?")
+            vals.append(provider)
+        if run_type and run_type != "all":
+            where.append("COALESCE(run_type, 'manual') = ?")
+            vals.append(run_type)
+        clause = (" WHERE " + " AND ".join(where)) if where else ""
         with self._lock, self._conn() as c:
-            if provider and provider != "all":
-                rows = c.execute(
-                    "SELECT * FROM speedtests WHERE provider = ? ORDER BY ts DESC LIMIT ?",
-                    (provider, limit),
-                ).fetchall()
-            else:
-                rows = c.execute(
-                    "SELECT * FROM speedtests ORDER BY ts DESC LIMIT ?",
-                    (limit,),
-                ).fetchall()
-        return [dict(r) for r in rows]
+            total = c.execute("SELECT COUNT(*) FROM speedtests" + clause, tuple(vals)).fetchone()[0]
+            rows = c.execute(
+                "SELECT * FROM speedtests" + clause + " ORDER BY ts DESC LIMIT ? OFFSET ?",
+                tuple(vals + [limit, offset]),
+            ).fetchall()
+        return [dict(r) for r in rows], int(total)
 
     def network_series(self, hours: int = 24) -> list[dict]:
         """Return rx/tx throughput points derived from cumulative net byte counters."""

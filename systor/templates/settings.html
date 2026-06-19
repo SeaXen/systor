@@ -332,7 +332,7 @@
             </select>
             <label>Default provider</label>
             <select name="speed_default_provider">
-              <option value="speedtest" {% if (cfg.speed.default_provider or 'speedtest') == 'speedtest' %}selected{% endif %}>speedtest</option>
+              <option value="ookla" {% if (cfg.speed.default_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
               <option value="librespeed" {% if (cfg.speed.default_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
               <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
               <option value="cloudflare" {% if (cfg.speed.default_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
@@ -341,7 +341,7 @@
             <div class="inline-help">Runs inside the collector loop. Keep intervals sane; WAN tests are heavier than normal metrics.</div>
             <label>Auto provider</label>
             <select name="speed_auto_provider">
-              <option value="speedtest" {% if (cfg.speed.auto_provider or 'speedtest') == 'speedtest' %}selected{% endif %}>speedtest</option>
+              <option value="ookla" {% if (cfg.speed.auto_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
               <option value="librespeed" {% if (cfg.speed.auto_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
               <option value="notion" {% if (cfg.speed.auto_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
               <option value="cloudflare" {% if (cfg.speed.auto_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
@@ -356,6 +356,12 @@
             <input type="number" name="speed_min_upload_mbps" value="{{ cfg.speed.min_upload_mbps or 20 }}" min="0" step="0.1">
             <label>LibreSpeed server ID</label>
             <input type="text" name="speed_librespeed_server_id" value="{{ cfg.speed.librespeed_server_id or '' }}" placeholder="blank = auto">
+            <label>Ookla server ID</label>
+            <input type="text" name="speed_ookla_server_id" value="{{ cfg.speed.ookla_server_id or '' }}" placeholder="blank = auto">
+            <label>Local LibreSpeed port</label>
+            <input type="number" name="speed_local_librespeed_port" value="{{ cfg.speed.local_librespeed_port or 8077 }}" min="1" max="65535" step="1">
+            <label>History page size</label>
+            <input type="number" name="speed_history_page_size" value="{{ cfg.speed.history_page_size or 25 }}" min="5" max="100" step="5">
             <label>iperf port</label>
             <input type="number" name="speed_iperf_port" value="{{ cfg.speed.iperf_port or 5201 }}" min="1" max="65535" step="1">
           </div>
