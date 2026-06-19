@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}systor{% endblock %}</title>
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=2">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.min.css') }}?v=1.0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.min.css') }}?v=1.1">
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>
-<div class="container">
+<div class="header" role="banner">
   <div class="header-left">
     <div class="brand-row">
       <img class="brand-logo" src="{{ url_for('static', filename='img/systor-logo-header.png') }}?v=2" alt="systor logo">
@@ -29,7 +29,7 @@
     </nav>
   </div>
 </div>
-<div class="container">
+<div class="container" id="main-content">
   {% block content %}{% endblock %}
 </div>
 {% block scripts %}{% endblock %}
