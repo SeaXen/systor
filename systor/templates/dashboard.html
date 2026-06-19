@@ -58,37 +58,39 @@
 <div class="stat-grid compact-grid" id="kpis">
   <div class="stat-card" id="kpi-cpu-pct">
     <div class="label">CPU usage</div>
-    <div class="value"><span id="cpu-pct">—</span><span class="unit">%</span></div>
+    <div class="kpi-meter cpu"><i id="bar-cpu"></i></div><div class="value"><span id="cpu-pct">—</span><span class="unit">%</span></div>
     <div class="sub">now</div>
   </div>
   <div class="stat-card" id="kpi-load">
     <div class="label">CPU load</div>
-    <div class="value small-value compact-kpi-lines"><div><span class="load1-text">1m</span> <span id="load1">—</span></div><div><span class="load5-text">5m</span> <span id="load5">—</span> <span class="load15-text">15m</span> <span id="load15">—</span></div></div>
+    <div class="kpi-meter load"><i id="bar-load"></i></div><div class="value small-value compact-kpi-lines"><div><span class="load1-text">1m</span> <span id="load1">—</span></div><div><span class="load5-text">5m</span> <span id="load5">—</span> <span class="load15-text">15m</span> <span id="load15">—</span></div></div>
     <div class="sub card-sub-empty"></div>
   </div>
   <div class="stat-card" id="kpi-temp">
     <div class="label">Temp</div>
-    <div class="value"><span id="temp">—</span><span class="unit">°C</span></div>
+    <div class="kpi-meter temp"><i id="bar-temp"></i></div><div class="value"><span id="temp">—</span><span class="unit">°C</span></div>
     <div class="sub" id="temp-sub">CPU sensor</div>
   </div>
   <div class="stat-card" id="kpi-mem">
     <div class="label">Memory</div>
-    <div class="value"><span id="mem-pct">—</span><span class="unit">%</span></div>
+    <div class="kpi-meter mem"><i id="bar-mem"></i></div><div class="value"><span id="mem-pct">—</span><span class="unit">%</span></div>
     <div class="sub"><span id="mem-used">—</span> / <span id="mem-total">—</span></div>
   </div>
   <div class="stat-card" id="kpi-swap">
     <div class="label">Swap</div>
-    <div class="value"><span id="swap-used">—</span><span class="unit">MB</span></div>
+    <div class="kpi-meter swap"><i id="bar-swap"></i></div><div class="value"><span id="swap-used">—</span><span class="unit">MB</span></div>
     <div class="sub">of <span id="swap-total">—</span> MB</div>
   </div>
   <div class="stat-card" id="kpi-disk-io">
-    <div class="label">Disk load</div>
-    <div class="value small-value compact-kpi-lines"><div><span class="rx-text">RX</span> <span id="disk-r-mbps">0.0</span></div><div><span class="tx-text">TX</span> <span id="disk-w-mbps">0.0</span></div></div>
+    <div class="label">Disk I/O</div>
+    <div class="kpi-meter disk"><i id="bar-disk"></i></div>
+    <div class="value small-value compact-kpi-lines"><div><span class="disk-text">Read</span> <span id="disk-r-mbps">0.0</span></div><div><span class="disk2-text">Write</span> <span id="disk-w-mbps">0.0</span></div></div>
     <div class="sub" id="disk-io-devs"></div>
   </div>
   <div class="stat-card" id="kpi-net">
     <div class="label">Network</div>
-    <div class="value small-value compact-kpi-lines"><div><span class="rx-text">RX</span> <span id="net-rx">—</span></div><div><span class="tx-text">TX</span> <span id="net-tx">—</span></div></div>
+    <div class="kpi-meter net"><i id="bar-net"></i></div>
+    <div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="net-rx">—</span></div><div><span class="ul-text">UL</span> <span id="net-tx">—</span></div></div>
     <div class="sub card-sub-empty" id="net-sub"></div>
   </div>
 </div>
@@ -115,7 +117,7 @@
     <canvas id="chart-load"></canvas>
   </div>
   <div class="chart-card">
-    <div class="chart-head"><h3><strong>Network</strong></h3><div class="chart-meta" id="meta-net-chart"><span class="rx-text"><strong>RX —</strong></span> · <span class="tx-text"><strong>TX —</strong></span></div></div>
+    <div class="chart-head"><h3><strong>Network</strong></h3><div class="chart-meta" id="meta-net-chart"><span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span></div></div>
     <canvas id="chart-net"></canvas>
   </div>
 </div>
@@ -198,34 +200,31 @@ async function refresh(){
     document.getElementById('load1').textContent=fmt(cpu.load_1m);
     document.getElementById('load5').textContent=fmt(cpu.load_5m);
     document.getElementById('load15').textContent=fmt(cpu.load_15m);
-    document.getElementById('kpi-cpu-pct').className='stat-card '+statusClass(cpu.percent,50,85);
-    document.getElementById('kpi-load').className='stat-card '+statusClass(Math.max(cpu.load_1m||0,cpu.load_5m||0),3,6);
+    document.getElementById('kpi-cpu-pct').className='stat-card has-meter '+statusClass(cpu.percent,50,85); document.getElementById('bar-cpu').style.width=Math.max(0,Math.min(100,Number(cpu.percent||0)))+'%';
+    document.getElementById('kpi-load').className='stat-card has-meter '+statusClass(Math.max(cpu.load_1m||0,cpu.load_5m||0),3,6); document.getElementById('bar-load').style.width=Math.max(0,Math.min(100,((Number(cpu.load_1m||0)/8)*100)))+'%';
     document.getElementById('temp').textContent=fmt(cpu.temp_c);
     document.getElementById('temp-sub').textContent=(cpu.temp_c===null||cpu.temp_c===undefined)?'sensor n/a':'CPU sensor';
-    document.getElementById('kpi-temp').className='stat-card '+statusClass(cpu.temp_c,70,85);
+    document.getElementById('kpi-temp').className='stat-card has-meter '+statusClass(cpu.temp_c,70,85); document.getElementById('bar-temp').style.width=Math.max(0,Math.min(100,Number(cpu.temp_c||0)))+'%';
 
     const mem=snap.memory||{};
     const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null;
     document.getElementById('mem-pct').textContent=memPct!==null?memPct:'—';
     document.getElementById('mem-used').textContent=bytes((mem.used_mb||0)*1024*1024);
     document.getElementById('mem-total').textContent=bytes((mem.total_mb||0)*1024*1024);
-    document.getElementById('kpi-mem').className='stat-card '+statusClass(memPct,75,90);
+    document.getElementById('kpi-mem').className='stat-card has-meter '+statusClass(memPct,75,90); document.getElementById('bar-mem').style.width=Math.max(0,Math.min(100,Number(memPct||0)))+'%';
 
     document.getElementById('swap-used').textContent=mem.swap_used_mb||0;
     document.getElementById('swap-total').textContent=mem.swap_total_mb||0;
-    document.getElementById('kpi-swap').className='stat-card '+statusClass(mem.swap_used_mb,2048,4096);
+    const swapPct=(mem.swap_total_mb?((Number(mem.swap_used_mb||0)/Number(mem.swap_total_mb||1))*100):0); document.getElementById('kpi-swap').className='stat-card has-meter '+statusClass(mem.swap_used_mb,2048,4096); document.getElementById('bar-swap').style.width=Math.max(0,Math.min(100,swapPct))+'%';
 
     const dio=snap.disk_io||{};
     document.getElementById('disk-r-mbps').textContent=fmt(dio.read_mbps);
     document.getElementById('disk-w-mbps').textContent=fmt(dio.write_mbps);
     document.getElementById('disk-io-devs').textContent='';
-    document.getElementById('kpi-disk-io').className='stat-card '+statusClass(Math.max(dio.read_mbps||0,dio.write_mbps||0),20,80);
+    document.getElementById('kpi-disk-io').className='stat-card has-meter '+statusClass(Math.max(dio.read_mbps||0,dio.write_mbps||0),20,80); document.getElementById('bar-disk').style.width=Math.max(0,Math.min(100,(Math.max(Number(dio.read_mbps||0),Number(dio.write_mbps||0))/100)*100))+'%';
 
     const net=snap.network||{};
-    document.getElementById('net-rx').textContent=bytes(net.rx_bytes||0);
-    document.getElementById('net-tx').textContent=bytes(net.tx_bytes||0);
-    document.getElementById('net-sub').textContent='';
-    document.getElementById('kpi-net').className='stat-card '+statusClass(Math.max((net.rx_bytes||0),(net.tx_bytes||0))/(1024*1024*1024),4,12);
+    document.getElementById('net-sub').textContent='current speed';
 
     setGlobalHeader(snap,runtime);
     setLoadState('snapshot '+new Date().toLocaleTimeString());
@@ -252,13 +251,13 @@ async function refreshCharts(){
     drawChart(document.getElementById('chart-mem'),[{name:'RAM',unit:'MB',data:mem,color:COLORS.ram,fill:true}],{ymin:0,ymax:null});
     drawChart(document.getElementById('chart-disk-io'),[{name:'Read',unit:'MB/s',data:dRead,color:COLORS.disk,fill:true},{name:'Write',unit:'MB/s',data:dWrite,color:COLORS.disk2}],{ymin:0,ymax:null});
     drawChart(document.getElementById('chart-load'),[{name:'1m',unit:'',data:load1,color:COLORS.green,fill:true},{name:'5m',unit:'',data:load5,color:COLORS.yellow},{name:'15m',unit:'',data:load15,color:COLORS.blue}],{ymin:0,ymax:null});
-    drawChart(document.getElementById('chart-net'),[{name:'RX',unit:'MB/s',data:netRx,color:COLORS.cyan,fill:true},{name:'TX',unit:'MB/s',data:netTx,color:COLORS.tx}],{ymin:0,ymax:null});
+    drawChart(document.getElementById('chart-net'),[{name:'DL',unit:'MB/s',data:netRx,color:COLORS.cyan,fill:true},{name:'UL',unit:'MB/s',data:netTx,color:COLORS.tx}],{ymin:0,ymax:null});
     document.getElementById('meta-cpu-pct').innerHTML=`<span class="cpu-text"><strong>latest ${fmt(lastVal(cpu),'%')}</strong></span> · avg ${fmt(avgVal(cpu),'%')} · peak ${fmt(maxVal(cpu),'%')}`;
     document.getElementById('meta-temp').innerHTML=`<strong>latest ${fmt(lastVal(temp),'°C')}</strong> · avg ${fmt(avgVal(temp),'°C')} · peak ${fmt(maxVal(temp),'°C')}`;
     document.getElementById('meta-mem').innerHTML=`<span class="ram-text"><strong>latest ${fmt(lastVal(mem),'MB')}</strong></span> · avg ${fmt(avgVal(mem),'MB')} · peak ${fmt(maxVal(mem),'MB')}`;
     document.getElementById('meta-disk-io').innerHTML=`<span class="disk-text"><strong>read ${fmt(lastVal(dRead),'MB/s')}</strong></span> · avg ${fmt(avgVal(dRead),'MB/s')} · <span class="disk2-text"><strong>write ${fmt(lastVal(dWrite),'MB/s')}</strong></span> · avg ${fmt(avgVal(dWrite),'MB/s')}`;
     document.getElementById('meta-load').innerHTML=`1m ${fmt(lastVal(load1))} avg ${fmt(avgVal(load1))} · 5m ${fmt(lastVal(load5))} avg ${fmt(avgVal(load5))} · 15m ${fmt(lastVal(load15))} avg ${fmt(avgVal(load15))}`;
-    document.getElementById('meta-net-chart').innerHTML=`<span class="rx-text"><strong>RX ${fmt(lastVal(netRx),'MB/s')}</strong></span> · avg ${fmt(avgVal(netRx),'MB/s')} · <span class="tx-text"><strong>TX ${fmt(lastVal(netTx),'MB/s')}</strong></span> · avg ${fmt(avgVal(netTx),'MB/s')}`;
+    const lastDl=lastVal(netRx), lastUl=lastVal(netTx), maxDl=maxVal(netRx), maxUl=maxVal(netTx); document.getElementById('net-rx').textContent=fmt(lastDl,'MB/s'); document.getElementById('net-tx').textContent=fmt(lastUl,'MB/s'); document.getElementById('kpi-net').className='stat-card '+statusClass(Math.max(lastDl||0,lastUl||0),10,40); document.getElementById('meta-net-chart').innerHTML=`<span class="dl-text"><strong>DL ${fmt(lastDl,'MB/s')}</strong></span> · avg ${fmt(avgVal(netRx),'MB/s')} · <span class="ul-text"><strong>UL ${fmt(lastUl,'MB/s')}</strong></span> · avg ${fmt(avgVal(netTx),'MB/s')}`; document.getElementById('bar-net').style.width=((Math.max(lastDl||0,lastUl||0)/Math.max(1,Math.max(maxDl||0,maxUl||0)))*100).toFixed(1)+'%';
     setLoadState('charts '+new Date().toLocaleTimeString());
   }catch(e){ console.error(e); setLoadState('charts error'); }
   finally{ inflight.charts=false; }

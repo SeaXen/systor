@@ -60,6 +60,18 @@ DEFAULT_CONFIG: dict = {
         "default_sort": "cpu",
         "default_limit": 10,
     },
+    "speed": {
+        "page_refresh_sec": 15,
+        "default_provider": "speedtest",
+        "auto_enabled": False,
+        "auto_provider": "speedtest",
+        "auto_interval_min": 180,
+        "notify_enabled": False,
+        "min_download_mbps": 50.0,
+        "min_upload_mbps": 20.0,
+        "librespeed_server_id": "",
+        "iperf_port": 5201,
+    },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
         "host": "0.0.0.0",
@@ -148,6 +160,9 @@ def _apply_env(cfg: dict) -> None:
         "SYSTOR_DASHBOARD_CHART_SEC":    ("dashboard", "chart_refresh_sec", int, None),
         "SYSTOR_APPS_REFRESH_SEC":       ("apps", "auto_refresh_sec", int, None),
         "SYSTOR_APPS_LIMIT":             ("apps", "default_limit", int, None),
+        "SYSTOR_SPEED_REFRESH_SEC":      ("speed", "page_refresh_sec", int, None),
+        "SYSTOR_SPEED_AUTO_ENABLED":     ("speed", "auto_enabled", lambda v: str(v).lower() in ("1","true","yes","on"), None),
+        "SYSTOR_SPEED_AUTO_MIN":         ("speed", "auto_interval_min", int, None),
         "SYSTOR_WEB_PORT":               ("web", "port", int, None),
         "SYSTOR_WEB_HOST":               ("web", "host", str, None),
     }

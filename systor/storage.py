@@ -71,6 +71,21 @@ CREATE TABLE IF NOT EXISTS notification_log (
     success   INTEGER NOT NULL, -- 0/1
     error     TEXT
 );
+
+CREATE TABLE IF NOT EXISTS speedtests (
+    ts INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    target TEXT,
+    mode TEXT NOT NULL,
+    ping_ms REAL,
+    dl_mbps REAL,
+    ul_mbps REAL,
+    note TEXT,
+    ok INTEGER NOT NULL DEFAULT 1,
+    raw_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_speedtests_ts ON speedtests(ts);
+CREATE INDEX IF NOT EXISTS idx_speedtests_provider_ts ON speedtests(provider, ts);
 """
 
 
@@ -203,6 +218,38 @@ class Storage:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def log_speedtest(self, row: dict) -> None:
+        with self._lock, self._conn() as c:
+            c.execute(
+                "INSERT INTO speedtests (ts, provider, target, mode, ping_ms, dl_mbps, ul_mbps, note, ok, raw_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    int(row.get("ts") or time.time()),
+                    str(row.get("provider") or "speedtest"),
+                    str(row.get("target") or ""),
+                    str(row.get("mode") or "wan"),
+                    row.get("ping_ms"),
+                    row.get("dl_mbps"),
+                    row.get("ul_mbps"),
+                    str(row.get("note") or ""),
+                    1 if row.get("ok", True) else 0,
+                    str(row.get("raw_json") or ""),
+                ),
+            )
+
+    def recent_speedtests(self, limit: int = 50, provider: str = "all") -> list[dict]:
+        with self._lock, self._conn() as c:
+            if provider and provider != "all":
+                rows = c.execute(
+                    "SELECT * FROM speedtests WHERE provider = ? ORDER BY ts DESC LIMIT ?",
+                    (provider, limit),
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT * FROM speedtests ORDER BY ts DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+        return [dict(r) for r in rows]
+
     def network_series(self, hours: int = 24) -> list[dict]:
         """Return rx/tx throughput points derived from cumulative net byte counters."""
         cutoff = int(time.time()) - hours * 3600
@@ -294,8 +341,9 @@ class Storage:
             r2 = c.execute("DELETE FROM rollups_5m WHERE ts < ?", (rollup_cutoff,)).rowcount
             r3 = c.execute("DELETE FROM alerts WHERE ts < ?", (raw_cutoff,)).rowcount
             r4 = c.execute("DELETE FROM notification_log WHERE ts < ?", (raw_cutoff,)).rowcount
+            r5 = c.execute("DELETE FROM speedtests WHERE ts < ?", (raw_cutoff,)).rowcount
             c.execute("VACUUM")
-        return r1 + r3 + r4, r2
+        return r1 + r3 + r4 + r5, r2
 
     def stats(self) -> dict:
         with self._lock, self._conn() as c:
@@ -304,6 +352,7 @@ class Storage:
                 "rollups":       c.execute("SELECT COUNT(*) FROM rollups_5m").fetchone()[0],
                 "alerts":        c.execute("SELECT COUNT(*) FROM alerts").fetchone()[0],
                 "notifications": c.execute("SELECT COUNT(*) FROM notification_log").fetchone()[0],
+                "speedtests":    c.execute("SELECT COUNT(*) FROM speedtests").fetchone()[0],
                 "oldest_sample_ts": c.execute("SELECT MIN(ts) FROM samples").fetchone()[0],
                 "newest_sample_ts": c.execute("SELECT MAX(ts) FROM samples").fetchone()[0],
                 "db_size_bytes": self.db_path.stat().st_size if self.db_path.exists() else 0,

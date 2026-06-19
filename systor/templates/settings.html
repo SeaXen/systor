@@ -316,6 +316,50 @@
           </div>
         </div>
 
+
+
+        <div class="settings-card">
+          <h3>Speed defaults</h3>
+          <div class="card-subtle">Speed page defaults, auto WAN tests, local iperf port, and notification thresholds.</div>
+          <div class="notif-field-grid compact-top network-settings-grid">
+            <label>Page refresh</label>
+            <select name="speed_page_refresh_sec">
+              <option value="5" {% if (cfg.speed.page_refresh_sec or 15) == 5 %}selected{% endif %}>5s</option>
+              <option value="10" {% if (cfg.speed.page_refresh_sec or 15) == 10 %}selected{% endif %}>10s</option>
+              <option value="15" {% if (cfg.speed.page_refresh_sec or 15) == 15 %}selected{% endif %}>15s</option>
+              <option value="30" {% if (cfg.speed.page_refresh_sec or 15) == 30 %}selected{% endif %}>30s</option>
+              <option value="60" {% if (cfg.speed.page_refresh_sec or 15) == 60 %}selected{% endif %}>1m</option>
+            </select>
+            <label>Default provider</label>
+            <select name="speed_default_provider">
+              <option value="speedtest" {% if (cfg.speed.default_provider or 'speedtest') == 'speedtest' %}selected{% endif %}>speedtest</option>
+              <option value="librespeed" {% if (cfg.speed.default_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
+              <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
+              <option value="cloudflare" {% if (cfg.speed.default_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
+            </select>
+            <label><input type="checkbox" class="checkbox" name="speed_auto_enabled" {% if cfg.speed.auto_enabled %}checked{% endif %}> Auto speed test</label>
+            <div class="inline-help">Runs inside the collector loop. Keep intervals sane; WAN tests are heavier than normal metrics.</div>
+            <label>Auto provider</label>
+            <select name="speed_auto_provider">
+              <option value="speedtest" {% if (cfg.speed.auto_provider or 'speedtest') == 'speedtest' %}selected{% endif %}>speedtest</option>
+              <option value="librespeed" {% if (cfg.speed.auto_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
+              <option value="notion" {% if (cfg.speed.auto_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
+              <option value="cloudflare" {% if (cfg.speed.auto_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
+            </select>
+            <label>Auto interval</label>
+            <input type="number" name="speed_auto_interval_min" value="{{ cfg.speed.auto_interval_min or 180 }}" min="5" step="5">
+            <label><input type="checkbox" class="checkbox" name="speed_notify_enabled" {% if cfg.speed.notify_enabled %}checked{% endif %}> Notify on low speed</label>
+            <div class="inline-help">Uses Telegram + Discord if enabled and saved.</div>
+            <label>Min download</label>
+            <input type="number" name="speed_min_download_mbps" value="{{ cfg.speed.min_download_mbps or 50 }}" min="0" step="0.1">
+            <label>Min upload</label>
+            <input type="number" name="speed_min_upload_mbps" value="{{ cfg.speed.min_upload_mbps or 20 }}" min="0" step="0.1">
+            <label>LibreSpeed server ID</label>
+            <input type="text" name="speed_librespeed_server_id" value="{{ cfg.speed.librespeed_server_id or '' }}" placeholder="blank = auto">
+            <label>iperf port</label>
+            <input type="number" name="speed_iperf_port" value="{{ cfg.speed.iperf_port or 5201 }}" min="1" max="65535" step="1">
+          </div>
+        </div>
         <div class="settings-card">
           <h3>Notification history</h3>
           <div class="card-subtle">Latest delivery results from both channels.</div>
@@ -349,7 +393,7 @@ function fmtUptime(sec) {
 function formToJSON(form) {
   const fd = new FormData(form);
   const data = Object.fromEntries(fd.entries());
-  ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
+  ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default', 'speed_auto_enabled', 'speed_notify_enabled'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
   ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
     data[`threshold_${k}_enabled`] = fd.has(`threshold_${k}_enabled`) ? 'true' : 'false';
   });

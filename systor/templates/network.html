@@ -62,22 +62,22 @@
   </div>
 
   <div class="network-grid network-kpis network-kpis-6">
-    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">RX total</div><div class="value rx-text" id="cur-rx">—</div></div>
-    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">TX total</div><div class="value tx-text" id="cur-tx">—</div></div>
-    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Peak RX</div><div class="value rx-text" id="peak-rx">—</div></div>
-    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Peak TX</div><div class="value tx-text" id="peak-tx">—</div></div>
+    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">DL total</div><div class="value rx-text" id="cur-rx">—</div></div>
+    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">UL total</div><div class="value tx-text" id="cur-tx">—</div></div>
+    <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Current DL</div><div class="value rx-text" id="peak-rx">—</div></div>
+    <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">Current UL</div><div class="value tx-text" id="peak-tx">—</div></div>
     <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">Today use</div><div class="value" id="today-use">—</div></div>
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">This month use</div><div class="value" id="month-use">—</div></div>
   </div>
 
   <div class="chart-card">
-    <div class="chart-head"><h3><strong>Usage totals by period</strong></h3><div class="chart-meta" id="meta-usage-bars"><span class="rx-text"><strong>RX —</strong></span> · <span class="tx-text"><strong>TX —</strong></span> · avg — · total —</div></div>
+    <div class="chart-head"><h3><strong>Usage totals by period</strong></h3><div class="chart-meta" id="meta-usage-bars"><span class="rx-text"><strong>DL —</strong></span> · <span class="tx-text"><strong>UL —</strong></span> · avg — · total —</div></div>
     <canvas id="net-usage-chart"></canvas>
   </div>
 
   <div class="chart-grid">
-    <div class="chart-card"><div class="chart-head"><h3><strong>Receive rate</strong></h3><div class="chart-meta" id="meta-rx-line"><span class="rx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-rx-chart"></canvas></div>
-    <div class="chart-card"><div class="chart-head"><h3><strong>Transmit rate</strong></h3><div class="chart-meta" id="meta-tx-line"><span class="tx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-tx-chart"></canvas></div>
+    <div class="chart-card"><div class="chart-head"><h3><strong>Download rate</strong></h3><div class="chart-meta" id="meta-rx-line"><span class="rx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-rx-chart"></canvas></div>
+    <div class="chart-card"><div class="chart-head"><h3><strong>Upload rate</strong></h3><div class="chart-meta" id="meta-tx-line"><span class="tx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-tx-chart"></canvas></div>
   </div>
 
   <div class="table-grid">
@@ -85,7 +85,7 @@
       <h3><span>Per-interface breakdown</span><span class="network-mini" id="iface-title-meta">0 interfaces total</span></h3>
       <table class="network-table aligned-table">
         <thead>
-          <tr><th>Interface <span class="text-muted" id="iface-period-note"></span></th><th class="text-right rx-text">RX total</th><th class="text-right tx-text">TX total</th><th class="text-right rx-text">Avg RX MB/s</th><th class="text-right tx-text">Avg TX MB/s</th></tr>
+          <tr><th>Interface <span class="text-muted" id="iface-period-note"></span></th><th class="text-right rx-text">DL total</th><th class="text-right tx-text">UL total</th><th class="text-right rx-text">Avg DL MB/s</th><th class="text-right tx-text">Avg UL MB/s</th></tr>
         </thead>
         <tbody id="iface-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
       </table>
@@ -97,7 +97,7 @@
       </div>
       <table class="network-table aligned-table">
         <thead>
-          <tr><th>Day <span class="text-muted" id="daily-period-note"></span></th><th class="text-right rx-text">RX total</th><th class="text-right tx-text">TX total</th><th class="text-right">Total</th><th class="text-right">Avg rate</th></tr>
+          <tr><th>Day <span class="text-muted" id="daily-period-note"></span></th><th class="text-right rx-text">DL total</th><th class="text-right tx-text">UL total</th><th class="text-right">Total</th><th class="text-right">Avg rate</th></tr>
         </thead>
         <tbody id="daily-usage-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
       </table>
@@ -112,7 +112,7 @@
       </div>
       <table class="network-table aligned-table">
         <thead>
-          <tr><th>Month</th><th class="text-right rx-text">RX total</th><th class="text-right tx-text">TX total</th><th class="text-right">Total</th><th class="text-right">Avg rate</th></tr>
+          <tr><th>Month</th><th class="text-right rx-text">DL total</th><th class="text-right tx-text">UL total</th><th class="text-right">Total</th><th class="text-right">Avg rate</th></tr>
         </thead>
         <tbody id="monthly-usage-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
       </table>
@@ -124,7 +124,7 @@
       </div>
       <table class="network-table aligned-table">
         <thead>
-          <tr><th>Year</th><th class="text-right rx-text">RX total</th><th class="text-right tx-text">TX total</th><th class="text-right">Total</th><th class="text-right">Avg rate</th></tr>
+          <tr><th>Year</th><th class="text-right rx-text">DL total</th><th class="text-right tx-text">UL total</th><th class="text-right">Total</th><th class="text-right">Avg rate</th></tr>
         </thead>
         <tbody id="yearly-usage-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
       </table>
@@ -134,7 +134,7 @@
   <div class="table-card compact-table">
     <h3><span>Per-app network usage</span><span class="network-mini" id="app-net-meta">best for docker/live counters</span></h3>
     <table class="apps-table aligned-table compact-apps-table network-apps-table">
-      <thead><tr><th>App</th><th>Kind</th><th class="text-right">Network</th><th class="text-right rx-text">RX</th><th class="text-right tx-text">TX</th></tr></thead>
+      <thead><tr><th>App</th><th>Kind</th><th class="text-right">Network</th><th class="text-right dl-text">DL</th><th class="text-right ul-text">UL</th></tr></thead>
       <tbody id="app-net-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
     </table>
   </div>
@@ -166,7 +166,7 @@ function currentPeriodCount(granularity){ return granularity==='day'?'days':(gra
 function periodsForDays(granularity, days){ if(days==='all') return 5000; const d=Math.max(1, Number(days||30)); if(granularity==='month') return Math.max(1, Math.ceil(d/30)); if(granularity==='week') return Math.max(1, Math.ceil(d/7)); return d; }
 async function fetchJSON(url, opts){ const r=await fetch(url, Object.assign({cache:'no-store'}, opts||{})); const j=await r.json(); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }
 function bindLineTooltip(canvas){ if(canvas.__tooltipBound) return; canvas.__tooltipBound=true; canvas.addEventListener('mouseleave', hideTip); canvas.addEventListener('mousemove', ev=>{ const meta=canvas.__hoverMeta; if(!meta||!meta.groups||!meta.groups.length) return hideTip(); const rect=canvas.getBoundingClientRect(); const x=ev.clientX-rect.left; let best=null; for(const g of meta.groups){ const dx=Math.abs(g.x-x); if(!best||dx<best.dx) best={dx,g}; } if(!best||best.dx>18) return hideTip(); const lines=[`<div class="tt-time">${fmtTs(best.g.ts)}</div>`]; for(const item of best.g.items) lines.push(`<div><span style="color:${item.color};font-weight:700">${item.name}</span>: <strong>${item.value}</strong></div>`); showTip(lines.join(''), ev.clientX, ev.clientY); }); }
-function bindBarTooltip(canvas){ if(canvas.__barTooltipBound) return; canvas.__barTooltipBound=true; canvas.addEventListener('mouseleave', hideTip); canvas.addEventListener('mousemove', ev=>{ const meta=canvas.__barMeta; if(!meta||!meta.rects||!meta.rects.length) return hideTip(); const rect=canvas.getBoundingClientRect(); const x=ev.clientX-rect.left, y=ev.clientY-rect.top; const hit=meta.rects.find(r=>x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h); if(!hit) return hideTip(); const row=hit.row; showTip(`<div class="tt-time">${row.label}</div><div><span class="rx-text"><strong>RX</strong></span>: ${gbVal(row.rx_gb)}</div><div><span class="tx-text"><strong>TX</strong></span>: ${gbVal(row.tx_gb)}</div><div><strong>Total</strong>: ${gbVal(row.total_gb)}</div><div>Avg rate: ${mbs(row.avg_rate_mbps||0)}</div>`, ev.clientX, ev.clientY); }); }
+function bindBarTooltip(canvas){ if(canvas.__barTooltipBound) return; canvas.__barTooltipBound=true; canvas.addEventListener('mouseleave', hideTip); canvas.addEventListener('mousemove', ev=>{ const meta=canvas.__barMeta; if(!meta||!meta.rects||!meta.rects.length) return hideTip(); const rect=canvas.getBoundingClientRect(); const x=ev.clientX-rect.left, y=ev.clientY-rect.top; const hit=meta.rects.find(r=>x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h); if(!hit) return hideTip(); const row=hit.row; showTip(`<div class="tt-time">${row.label}</div><div><span class="dl-text"><strong>DL</strong></span>: ${gbVal(row.rx_gb)}</div><div><span class="ul-text"><strong>UL</strong></span>: ${gbVal(row.tx_gb)}</div><div><strong>Total</strong>: ${gbVal(row.total_gb)}</div><div>Avg rate: ${mbs(row.avg_rate_mbps||0)}</div>`, ev.clientX, ev.clientY); }); }
 function drawLine(canvas, points, color, name){ bindLineTooltip(canvas); const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(90,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); if(!points.length){ ctx.fillStyle=NCOL.dim; ctx.font='12px monospace'; ctx.fillText('waiting for data',12,h/2); canvas.__hoverMeta={groups:[]}; return; } const vals=points.map(p=>Number(p[1]||0)); const max=niceMax(Math.max(...vals,0.01)), min=0; const padL=38,padR=12,padT=8,padB=18,gw=w-padL-padR,gh=h-padT-padB; ctx.strokeStyle=NCOL.grid; ctx.lineWidth=1; ctx.fillStyle=NCOL.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.fillText((max-((max-min)/3)*i).toFixed(2),2,y+3); } ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=1.8; const groups=[]; points.forEach((p,i)=>{ const v=Number(p[1]||0), x=padL+(points.length>1?gw*i/(points.length-1):gw/2), y=padT+gh-((v-min)/(max-min))*gh; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); groups.push({x,ts:p[0],items:[{name,value:mbs(v),color}]}); }); ctx.stroke(); canvas.__hoverMeta={groups}; }
 function drawBars(canvas, rows, granularity){ bindBarTooltip(canvas); const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(120,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); if(!rows.length){ ctx.fillStyle=NCOL.dim; ctx.font='12px monospace'; ctx.fillText('no usage buckets yet',12,h/2); canvas.__barMeta={rects:[],granularity}; return; } const max=niceMax(Math.max(...rows.map(r=>Math.max(Number(r.rx_gb||0),Number(r.tx_gb||0))),0.01)); const padL=38,padR=12,padT=12,padB=34,gw=w-padL-padR,gh=h-padT-padB; ctx.strokeStyle=NCOL.grid; ctx.lineWidth=1; ctx.fillStyle=NCOL.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.fillText((max-(max/3)*i).toFixed(2),2,y+3); } const n=rows.length, groupW=gw/Math.max(1,n), barW=Math.max(4,Math.min(16,groupW*0.32)); const rects=[]; rows.forEach((r,i)=>{ const xCenter=padL+groupW*i+groupW/2; const rxh=gh*(Number(r.rx_gb||0)/max), txh=gh*(Number(r.tx_gb||0)/max); const rxX=xCenter-barW-1, txX=xCenter+1, rxY=padT+gh-rxh, txY=padT+gh-txh; ctx.fillStyle=NCOL.fillRx; ctx.fillRect(rxX,rxY,barW,rxh); ctx.strokeStyle=NCOL.rx; ctx.strokeRect(rxX,rxY,barW,rxh); ctx.fillStyle=NCOL.fillTx; ctx.fillRect(txX,txY,barW,txh); ctx.strokeStyle=NCOL.tx; ctx.strokeRect(txX,txY,barW,txh); rects.push({x:rxX,y:rxY,w:barW,h:rxh,row:r}); rects.push({x:txX,y:txY,w:barW,h:txh,row:r}); const label=String(r.label||'').replace(/^\d{4}-/,''); ctx.fillStyle=NCOL.dim; ctx.save(); ctx.translate(xCenter,h-6); ctx.rotate(-0.30); ctx.fillText(label,0,0); ctx.restore(); }); canvas.__barMeta={rects,granularity}; }
 function renderInterfaces(rows){ const hideVirtual=document.getElementById('hide-virtual-toggle').checked; const visible=hideVirtual?rows.filter(r=>!isVirtualIface(r.iface)):rows.slice(); const hiddenCount=rows.length-visible.length; const body=document.getElementById('iface-body'); document.getElementById('iface-title-meta').textContent=`${visible.length} visible · ${rows.length} total`; document.getElementById('iface-period-note').textContent=hideVirtual?`(${hiddenCount} hidden virtual)`:`(${rows.length} total interfaces)`; if(!visible.length){ body.innerHTML='<tr><td colspan="5" class="empty-cell">No visible interfaces after filter</td></tr>'; return; } const totalRx=visible.reduce((a,r)=>a+Number(r.rx_bytes||0),0), totalTx=visible.reduce((a,r)=>a+Number(r.tx_bytes||0),0), avgRx=visible.reduce((a,r)=>a+Number(r.rx_mbps||0),0)/visible.length, avgTx=visible.reduce((a,r)=>a+Number(r.tx_mbps||0),0)/visible.length; const summary=`<tr class="summary-row"><td class="mono strongish">TOTAL</td><td class="mono text-right rx-text">${bytes(totalRx)}</td><td class="mono text-right tx-text">${bytes(totalTx)}</td><td class="mono text-right rx-text">${mbs(avgRx)}</td><td class="mono text-right tx-text">${mbs(avgTx)}</td></tr>`; body.innerHTML=summary+visible.map(r=>`<tr><td class="mono">${r.iface}</td><td class="mono text-right rx-text">${bytes(r.rx_bytes)}</td><td class="mono text-right tx-text">${bytes(r.tx_bytes)}</td><td class="mono text-right rx-text">${mbs(r.rx_mbps)}</td><td class="mono text-right tx-text">${mbs(r.tx_mbps)}</td></tr>`).join(''); }
@@ -185,7 +185,7 @@ function renderUsageTable(kind, bodyId, pagerId, titleId, periodNoteId){
   const start=(stateBox.page-1)*pageSize; const pageRows=rows.slice().reverse().slice(start,start+pageSize);
   body.innerHTML=summary+pageRows.map(r=>`<tr><td class="mono">${r.label}</td><td class="text-right mono rx-text">${gbVal(r.rx_gb)}</td><td class="text-right mono tx-text">${gbVal(r.tx_gb)}</td><td class="text-right mono">${gbVal(r.total_gb)}</td><td class="text-right mono">${mbs(r.avg_rate_mbps||0)}</td></tr>`).join('');
 }
-async function loadSeries(){ const hours=document.getElementById('net-hours').value; const j=await fetchJSON('/api/network-series?hours='+hours); const data=j.data||[]; const peakRx=data.reduce((a,b)=>(!a||Number(b.rx_mbps||0)>Number(a.rx_mbps||0))?b:a,null); const peakTx=data.reduce((a,b)=>(!a||Number(b.tx_mbps||0)>Number(a.tx_mbps||0))?b:a,null); const latestRx=data.length?data[data.length-1].rx_mbps:0, latestTx=data.length?data[data.length-1].tx_mbps:0; document.getElementById('cur-rx').textContent=bytes((j.current||{}).rx_bytes||0); document.getElementById('cur-tx').textContent=bytes((j.current||{}).tx_bytes||0); document.getElementById('peak-rx').textContent=peakRx?mbs(peakRx.rx_mbps):'0.000 MB/s'; document.getElementById('peak-tx').textContent=peakTx?mbs(peakTx.tx_mbps):'0.000 MB/s'; document.getElementById('meta-rx-line').innerHTML=`<span class="rx-text"><strong>latest ${mbs(latestRx)}</strong></span> · avg ${mbs(avg(data,'rx_mbps'))} · peak ${peakRx?mbs(peakRx.rx_mbps):'0.000 MB/s'}`; document.getElementById('meta-tx-line').innerHTML=`<span class="tx-text"><strong>latest ${mbs(latestTx)}</strong></span> · avg ${mbs(avg(data,'tx_mbps'))} · peak ${peakTx?mbs(peakTx.tx_mbps):'0.000 MB/s'}`; drawLine(document.getElementById('net-rx-chart'), data.map(p=>[p.ts,p.rx_mbps]), NCOL.rx, 'RX'); drawLine(document.getElementById('net-tx-chart'), data.map(p=>[p.ts,p.tx_mbps]), NCOL.tx, 'TX'); }
+async function loadSeries(){ const hours=document.getElementById('net-hours').value; const j=await fetchJSON('/api/network-series?hours='+hours); const data=j.data||[]; const peakRx=data.reduce((a,b)=>(!a||Number(b.rx_mbps||0)>Number(a.rx_mbps||0))?b:a,null); const peakTx=data.reduce((a,b)=>(!a||Number(b.tx_mbps||0)>Number(a.tx_mbps||0))?b:a,null); const latestRx=data.length?data[data.length-1].rx_mbps:0, latestTx=data.length?data[data.length-1].tx_mbps:0; document.getElementById('cur-rx').textContent=bytes((j.current||{}).rx_bytes||0); document.getElementById('cur-tx').textContent=bytes((j.current||{}).tx_bytes||0); document.getElementById('peak-rx').textContent=mbs(latestRx); document.getElementById('peak-tx').textContent=mbs(latestTx); document.getElementById('meta-rx-line').innerHTML=`<span class="dl-text"><strong>latest ${mbs(latestRx)}</strong></span> · avg ${mbs(avg(data,'rx_mbps'))} · peak ${peakRx?mbs(peakRx.rx_mbps):'0.000 MB/s'}`; document.getElementById('meta-tx-line').innerHTML=`<span class="ul-text"><strong>latest ${mbs(latestTx)}</strong></span> · avg ${mbs(avg(data,'tx_mbps'))} · peak ${peakTx?mbs(peakTx.tx_mbps):'0.000 MB/s'}`; drawLine(document.getElementById('net-rx-chart'), data.map(p=>[p.ts,p.rx_mbps]), NCOL.rx, 'RX'); drawLine(document.getElementById('net-tx-chart'), data.map(p=>[p.ts,p.tx_mbps]), NCOL.tx, 'TX'); }
 async function loadUsage(){
   const granularity=document.getElementById('net-granularity').value;
   const barDays=document.getElementById('net-bar-days').value;
@@ -208,7 +208,7 @@ async function loadUsage(){
   document.getElementById('net-coverage').textContent=`${granularity} usage · iface ${iface} · bar ${barRows.length} · daily ${usageState.daily.rows.length}`;
   drawBars(document.getElementById('net-usage-chart'), barRows, granularity);
   const totalRx=sum(barRows,'rx_gb'), totalTx=sum(barRows,'tx_gb'), totalGb=sum(barRows,'total_gb'), avgGb=avg(barRows,'total_gb');
-  document.getElementById('meta-usage-bars').innerHTML=`<span class="rx-text"><strong>RX ${gbVal(totalRx)}</strong></span> · <span class="tx-text"><strong>TX ${gbVal(totalTx)}</strong></span> · avg ${gbVal(avgGb)} · total <strong>${gbVal(totalGb)}</strong>`;
+  document.getElementById('meta-usage-bars').innerHTML=`<span class="rx-text"><strong>DL ${gbVal(totalRx)}</strong></span> · <span class="tx-text"><strong>UL ${gbVal(totalTx)}</strong></span> · avg ${gbVal(avgGb)} · total <strong>${gbVal(totalGb)}</strong>`;
   const today=(usageState.daily.rows||[]).slice(-1)[0]; const month=(usageState.monthly.rows||[]).slice(-1)[0];
   document.getElementById('today-use').textContent=today?gbVal(today.total_gb):'0.000 GB';
   document.getElementById('month-use').textContent=month?gbVal(month.total_gb):'0.000 GB';

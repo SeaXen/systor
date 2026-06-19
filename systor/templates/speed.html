@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}systor · Speed{% endblock %}
+{% block content %}
+<div class="speed-layout">
+  <div class="dash-toolbar">
+    <div class="dash-status">
+      <span class="dot green"></span>
+      <strong>Speed</strong>
+      <span id="speed-updated">loading…</span>
+      <span id="speed-meta">wan + local</span>
+    </div>
+    <div class="dash-controls">
+      <label>provider
+        <select id="speed-provider" class="control-select">
+          <option value="all">all</option>
+          <option value="speedtest" {% if (cfg.speed.default_provider or 'speedtest') == 'speedtest' %}selected{% endif %}>speedtest</option>
+          <option value="librespeed" {% if (cfg.speed.default_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
+          <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
+          <option value="cloudflare" {% if (cfg.speed.default_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
+        </select>
+      </label>
+      <label>refresh
+        <select id="speed-refresh-sec" class="control-select">
+          <option value="5">5s</option>
+          <option value="10">10s</option>
+          <option value="15" {% if (cfg.speed.page_refresh_sec or 15) == 15 %}selected{% endif %}>15s</option>
+          <option value="30" {% if (cfg.speed.page_refresh_sec or 15) == 30 %}selected{% endif %}>30s</option>
+          <option value="60" {% if (cfg.speed.page_refresh_sec or 15) == 60 %}selected{% endif %}>1m</option>
+        </select>
+      </label>
+      <button class="btn secondary compact" id="speed-run-provider">Run selected</button>
+      <button class="btn secondary compact" id="speed-run-all">Run all</button>
+      <button class="btn secondary compact" id="speed-refresh">Refresh</button>
+      <button class="btn secondary compact" id="speed-start-iperf">Start iperf3 server</button>
+    </div>
+  </div>
+
+  <div class="stat-grid compact-grid speed-kpis" id="speed-kpis">
+    <div class="stat-card" id="speed-card-speedtest"><div class="label">Speedtest</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="speedtest-dl">—</span></div><div><span class="ul-text">UL</span> <span id="speedtest-ul">—</span></div></div><div class="sub" id="speedtest-sub">waiting</div></div>
+    <div class="stat-card" id="speed-card-librespeed"><div class="label">LibreSpeed</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="librespeed-dl">—</span></div><div><span class="ul-text">UL</span> <span id="librespeed-ul">—</span></div></div><div class="sub" id="librespeed-sub">waiting</div></div>
+    <div class="stat-card" id="speed-card-notion"><div class="label">Notion probe</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="notion-dl">—</span></div><div><span class="ul-text">UL</span> <span id="notion-ul">—</span></div></div><div class="sub" id="notion-sub">waiting</div></div>
+    <div class="stat-card" id="speed-card-cloudflare"><div class="label">Cloudflare probe</div><div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="cloudflare-dl">—</span></div><div><span class="ul-text">UL</span> <span id="cloudflare-ul">—</span></div></div><div class="sub" id="cloudflare-sub">waiting</div></div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-head"><h3><strong>Speed history</strong></h3><div class="chart-meta" id="speed-chart-meta"><span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span></div></div>
+    <canvas id="speed-history-chart"></canvas>
+  </div>
+
+  <div class="table-grid">
+    <div class="table-card compact-table">
+      <h3><span>Local LAN test helper</span><span class="network-mini" id="iperf-meta">checking iperf3…</span></h3>
+      <div class="speed-helper-grid">
+        <div class="history-item">
+          <div class="history-head"><strong>NAS endpoint</strong><span class="status-chip" id="iperf-status-chip">unknown</span></div>
+          <div class="history-body" id="iperf-ips">loading…</div>
+        </div>
+        <div class="history-item">
+          <div class="history-head"><strong>Laptop → NAS</strong><span class="text-muted">upload to NAS</span></div>
+          <div class="history-body"><code id="iperf-up-cmd">iperf3 -c 192.168.0.222 -p 5201 -t 15</code></div>
+        </div>
+        <div class="history-item">
+          <div class="history-head"><strong>NAS → Laptop</strong><span class="text-muted">download from NAS</span></div>
+          <div class="history-body"><code id="iperf-down-cmd">iperf3 -c 192.168.0.222 -p 5201 -R -t 15</code></div>
+        </div>
+      </div>
+    </div>
+    <div class="table-card compact-table">
+      <h3><span>Auto speed monitor</span><span class="network-mini" id="speed-auto-meta">settings snapshot</span></h3>
+      <div class="speed-helper-grid" id="speed-auto-box">
+        <div class="history-item"><div class="history-head"><strong>Auto run</strong><span class="text-muted" id="auto-enabled">—</span></div><div class="history-body" id="auto-provider">—</div></div>
+        <div class="history-item"><div class="history-head"><strong>Interval</strong><span class="text-muted" id="auto-interval">—</span></div><div class="history-body" id="auto-thresholds">—</div></div>
+        <div class="history-item"><div class="history-head"><strong>Notify</strong><span class="text-muted" id="auto-notify">—</span></div><div class="history-body">Use Settings → Speed to change defaults.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-card compact-table">
+    <h3><span>Recent speed tests</span><span class="network-mini" id="speed-history-meta">latest 30</span></h3>
+    <table class="apps-table aligned-table compact-apps-table">
+      <thead><tr><th>Time</th><th>Provider</th><th>Target</th><th class="text-right dl-text">DL</th><th class="text-right ul-text">UL</th><th class="text-right">Ping</th><th>Status</th></tr></thead>
+      <tbody id="speed-history-body"><tr><td colspan="7" class="empty-cell">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const SPEED_COL = { dl:'#22d3ee', ul:'#ff6b8a', grid:'#30363d', dim:'#8b949e' };
+let speedTimer=null, speedBusy=false;
+function fmtMbps(v){ return (v===null||v===undefined||Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(Number(v)>=100?0:Number(v)>=10?1:2)+' Mbps'; }
+function fmtMs(v){ return (v===null||v===undefined||Number.isNaN(Number(v))) ? '—' : Number(v).toFixed(1)+' ms'; }
+function esc(s){ return String(s ?? '').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function fetchJSON(url, opts){ const r=await fetch(url, Object.assign({cache:'no-store'}, opts||{})); const j=await r.json(); if(!r.ok) throw new Error(j.error || j.message || ('HTTP '+r.status)); return j; }
+function niceStep(v){ if(!Number.isFinite(v)||v<=0) return 1; const p=Math.pow(10, Math.floor(Math.log10(v))); const n=v/p; const m=n<=1?1:n<=2?2:n<=5?5:10; return m*p; }
+function niceMax(v){ const step=niceStep((Number(v)||0)/4 || 1); return Math.max(step, Math.ceil((Number(v)||0)/step)*step); }
+function drawLine(canvas, dl, ul){ const dpr=window.devicePixelRatio||1; const w=Math.max(10,canvas.clientWidth), h=Math.max(120,canvas.clientHeight); canvas.width=Math.floor(w*dpr); canvas.height=Math.floor(h*dpr); const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h); const all=[...dl.map(x=>Number(x[1]||0)), ...ul.map(x=>Number(x[1]||0))]; if(!all.length){ ctx.fillStyle=SPEED_COL.dim; ctx.font='12px monospace'; ctx.fillText('waiting for speed history',12,h/2); return; } const max=niceMax(Math.max(...all,0.01)); const padL=38,padR=10,padT=8,padB=18,gw=w-padL-padR,gh=h-padT-padB; ctx.strokeStyle=SPEED_COL.grid; ctx.fillStyle=SPEED_COL.dim; ctx.font='10px monospace'; for(let i=0;i<=3;i++){ const y=padT+(gh/3)*i; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke(); ctx.fillText((max-(max/3)*i).toFixed(max>100?0:1),2,y+3); }
+  function line(points,color){ if(!points.length) return; ctx.beginPath(); ctx.strokeStyle=color; ctx.lineWidth=1.8; points.forEach((p,i)=>{ const x=padL+(points.length>1?gw*i/(points.length-1):gw/2); const y=padT+gh-((Number(p[1]||0)/max)*gh); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }); ctx.stroke(); }
+  line(dl,SPEED_COL.dl); line(ul,SPEED_COL.ul);
+}
+function setCard(prefix, row){ document.getElementById(prefix+'-dl').textContent = row && row.dl_mbps!==null && row.dl_mbps!==undefined ? Number(row.dl_mbps).toFixed(Number(row.dl_mbps)>=100?0:1) : '—'; document.getElementById(prefix+'-ul').textContent = row && row.ul_mbps!==null && row.ul_mbps!==undefined ? Number(row.ul_mbps).toFixed(Number(row.ul_mbps)>=100?0:1) : '—'; document.getElementById(prefix+'-sub').textContent = row ? `${row.ok ? 'ok' : 'fail'} · ${row.target || row.note || '—'} · ${fmtMs(row.ping_ms)}` : 'waiting'; const card=document.getElementById('speed-card-'+prefix); card.className='stat-card ' + (row && row.ok ? 'cyan' : 'red'); }
+function pickLatest(rows, provider){ return (rows||[]).find(r => r.provider===provider) || null; }
+async function loadStatus(){ const j=await fetchJSON('/api/speed/status'); const latest=j.latest || []; setCard('speedtest', pickLatest(latest,'speedtest')); setCard('librespeed', pickLatest(latest,'librespeed')); setCard('notion', pickLatest(latest,'notion')); setCard('cloudflare', pickLatest(latest,'cloudflare')); const ip=j.iperf || {}; const ips=j.local_ips || []; document.getElementById('iperf-meta').textContent = `${ip.running ? 'running' : 'stopped'} · port ${ip.port || 5201}`; document.getElementById('iperf-status-chip').textContent = ip.running ? 'running' : 'stopped'; document.getElementById('iperf-status-chip').className = 'status-chip ' + (ip.running ? 'ok' : 'warn'); const mainIp=(ips.find(x=>x.startsWith('192.168.')) || ips.find(x=>!x.startsWith('172.')) || ips[0] || '192.168.0.222'); document.getElementById('iperf-ips').innerHTML = ips.map(x=>`<div><code>${esc(x)}</code></div>`).join('') || '<span class="text-muted">no IPv4 found</span>'; document.getElementById('iperf-up-cmd').textContent = `iperf3 -c ${mainIp} -p ${ip.port || 5201} -t 15`; document.getElementById('iperf-down-cmd').textContent = `iperf3 -c ${mainIp} -p ${ip.port || 5201} -R -t 15`; const cfg=j.config || {}; const sc=cfg.speed || {}; document.getElementById('auto-enabled').textContent = sc.auto_enabled ? 'enabled' : 'disabled'; document.getElementById('auto-provider').textContent = `provider ${sc.auto_provider || 'speedtest'} · default page ${sc.default_provider || 'speedtest'}`; document.getElementById('auto-interval').textContent = `${sc.auto_interval_min || 180} min`; document.getElementById('auto-thresholds').textContent = `DL < ${sc.min_download_mbps || 0} Mbps · UL < ${sc.min_upload_mbps || 0} Mbps`; document.getElementById('auto-notify').textContent = sc.notify_enabled ? 'on' : 'off'; }
+async function loadHistory(){ const provider=document.getElementById('speed-provider').value; const j=await fetchJSON('/api/speedtests?limit=60&provider='+encodeURIComponent(provider)); const rows=j.rows || []; document.getElementById('speed-history-meta').textContent = `${rows.length} rows · ${provider}`; const body=document.getElementById('speed-history-body'); if(!rows.length){ body.innerHTML='<tr><td colspan="7" class="empty-cell">No speed history yet</td></tr>'; drawLine(document.getElementById('speed-history-chart'), [], []); document.getElementById('speed-chart-meta').innerHTML='<span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span>'; return; } body.innerHTML = rows.map(r=>`<tr><td class="mono">${new Date((r.ts||0)*1000).toLocaleString()}</td><td>${esc(r.provider)}</td><td title="${esc(r.note||'')}">${esc(r.target || r.note || '—')}</td><td class="text-right mono dl-text">${fmtMbps(r.dl_mbps)}</td><td class="text-right mono ul-text">${fmtMbps(r.ul_mbps)}</td><td class="text-right mono">${fmtMs(r.ping_ms)}</td><td><span class="badge ${r.ok ? 'ok' : 'fail'}">${r.ok ? 'ok' : 'fail'}</span></td></tr>`).join(''); const chartRows=[...rows].reverse(); const dl=chartRows.filter(r=>r.dl_mbps!==null&&r.dl_mbps!==undefined).map(r=>[r.ts, Number(r.dl_mbps)]); const ul=chartRows.filter(r=>r.ul_mbps!==null&&r.ul_mbps!==undefined).map(r=>[r.ts, Number(r.ul_mbps)]); drawLine(document.getElementById('speed-history-chart'), dl, ul); const lastDl=dl.length ? dl[dl.length-1][1] : null; const lastUl=ul.length ? ul[ul.length-1][1] : null; document.getElementById('speed-chart-meta').innerHTML=`<span class="dl-text"><strong>DL ${fmtMbps(lastDl)}</strong></span> · <span class="ul-text"><strong>UL ${fmtMbps(lastUl)}</strong></span>`; }
+async function refreshAll(){ if(speedBusy) return; speedBusy=true; document.getElementById('speed-updated').textContent='loading…'; try{ await Promise.all([loadStatus(), loadHistory()]); document.getElementById('speed-updated').textContent='updated '+new Date().toLocaleTimeString(); } catch(e){ document.getElementById('speed-updated').textContent='error: '+e.message; } finally{ speedBusy=false; } }
+async function runProvider(provider){ document.getElementById('speed-updated').textContent='running '+provider+'…'; await fetchJSON('/api/speed/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({provider})}); await refreshAll(); }
+function resetTimer(){ clearInterval(speedTimer); const sec=Number(document.getElementById('speed-refresh-sec').value||15); speedTimer=setInterval(refreshAll, sec*1000); }
+document.getElementById('speed-refresh').addEventListener('click', refreshAll);
+document.getElementById('speed-provider').addEventListener('change', loadHistory);
+document.getElementById('speed-refresh-sec').addEventListener('change', resetTimer);
+document.getElementById('speed-run-provider').addEventListener('click', ()=>runProvider(document.getElementById('speed-provider').value === 'all' ? 'speedtest' : document.getElementById('speed-provider').value));
+document.getElementById('speed-run-all').addEventListener('click', ()=>runProvider('all'));
+document.getElementById('speed-start-iperf').addEventListener('click', async()=>{ await fetchJSON('/api/speed/iperf/start', {method:'POST'}); await refreshAll(); });
+refreshAll(); resetTimer(); window.addEventListener('resize', ()=>{ clearTimeout(window.__speedResize); window.__speedResize=setTimeout(loadHistory, 150); });
+</script>
+{% endblock %}

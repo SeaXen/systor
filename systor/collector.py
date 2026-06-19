@@ -22,6 +22,7 @@ from .config import load_config
 from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb
 from .notifier import Notifier
 from .storage import Storage, DEFAULT_DB_PATH
+from .speed import run_provider, speed_alert_triggered, build_speed_alert
 
 log = logging.getLogger("systor.collector")
 _running = True
@@ -194,6 +195,7 @@ def run():
 
     last_cfg_mtime = _config_mtime()
     last_retention_check = 0.0
+    last_speedtest_check = 0.0
 
     log.info("collector: starting (poll=%ds)", cfg["collector"]["poll_interval_sec"])
     while _running:
@@ -272,6 +274,26 @@ def run():
                 results = notifier.notify(title, body)
                 for ch, ok, err in results:
                     storage.log_notification(ch, ok, err)
+
+            speed_cfg = cfg.get("speed", {}) or {}
+            if speed_cfg.get("auto_enabled"):
+                interval_sec = max(300, int(float(speed_cfg.get("auto_interval_min", 180)) * 60))
+                if (t0 - last_speedtest_check) >= interval_sec:
+                    provider = str(speed_cfg.get("auto_provider") or "speedtest")
+                    try:
+                        result = run_provider(provider, cfg=cfg)
+                        storage.log_speedtest(result)
+                        last_speedtest_check = t0
+                        if result.get("ok") and speed_cfg.get("notify_enabled"):
+                            bad, reason = speed_alert_triggered(result, cfg)
+                            if bad:
+                                subject, body = build_speed_alert(result, snap.get("hostname", "host"))
+                                body = body + "\n" + reason
+                                results = notifier.notify(subject, body)
+                                for ch, ok, err in results:
+                                    storage.log_notification(ch, ok, err)
+                    except Exception as e:
+                        log.warning("speed auto check failed: %s", e)
 
             # Retention once per hour
             if t0 - last_retention_check > 3600:
