@@ -71,6 +71,30 @@ _docker_cache_lock = threading.Lock()
 _apps_cache: dict = {"ts": 0.0, "limit": 0, "host_rows": [], "docker_rows": []}
 _apps_cache_lock = threading.Lock()
 
+
+def _apps_cache_refresh_worker() -> None:
+    """Background refresher: pre-warms the apps cache so /api/apps never blocks
+    on psutil/docker cold starts. Runs forever; daemon thread."""
+    while True:
+        try:
+            host_all = _host_apps(limit=96)
+            docker_all = _docker_apps(limit=96)
+            with _apps_cache_lock:
+                _apps_cache["ts"] = time.time()
+                _apps_cache["limit"] = 96
+                _apps_cache["host_rows"] = host_all
+                _apps_cache["docker_rows"] = docker_all
+        except Exception:
+            pass
+        time.sleep(4.0)
+
+
+# Start the background refresher once on import. Daemon thread dies with the process.
+try:
+    threading.Thread(target=_apps_cache_refresh_worker, name="systor-apps-cache", daemon=True).start()
+except Exception:
+    pass
+
 _speed_live_lock = threading.Lock()
 _speed_live_proc: subprocess.Popen | None = None
 _speed_live_state: dict = {
@@ -574,39 +598,22 @@ _DENY_NAME_RE = re.compile(r"(\.env$|id_rsa|id_ed25519|authorized_keys|token|sec
 
 
 def _auto_storage_roots() -> list[str]:
+    """Hardcoded user-visible roots. /mnt/tb and /root only.
+
+    The previous findmnt-based auto-detect hung indefinitely on autofs/fuse
+    mounts (e.g. /mnt/exhd1, rclone google-drive) when shutil.disk_usage()
+    blocked on the FUSE driver. Keeping the list fixed and tiny avoids that
+    class of bug entirely.
+    """
     roots: list[str] = []
-    # Always keep the common data mount if present. Other entries come from real mountpoints below.
-    for cand in ("/mnt/tb",):
+    for cand in ("/mnt/tb", "/root"):
         try:
             p = Path(cand)
             if p.exists() and p.is_dir() and str(p.resolve()) != "/":
                 roots.append(str(p.resolve()))
         except Exception:
             pass
-    try:
-        out = subprocess.run(["findmnt", "-rn", "-o", "TARGET,FSTYPE"], capture_output=True, text=True, timeout=4).stdout.splitlines()
-        skip_fs = {"proc", "sysfs", "devtmpfs", "devpts", "tmpfs", "cgroup", "cgroup2", "overlay", "squashfs", "nsfs", "securityfs", "pstore", "bpf", "tracefs", "debugfs", "fusectl", "mqueue", "hugetlbfs", "configfs", "ramfs"}
-        for line in out:
-            parts = line.split(None, 1)
-            if len(parts) < 2:
-                continue
-            target, fstype = parts[0], parts[1]
-            if fstype in skip_fs or target in ("/", "/boot", "/boot/efi"):
-                continue
-            if target.startswith(("/mnt", "/media", "/srv", "/data", "/home")):
-                try:
-                    rp = Path(target).resolve()
-                    if rp.exists() and rp.is_dir() and str(rp) != "/":
-                        roots.append(str(rp))
-                except Exception:
-                    pass
-    except Exception:
-        pass
-    clean=[]
-    for r in roots:
-        if r not in clean and not any(r == x or r.startswith(x + "/") for x in _DENY_PREFIXES):
-            clean.append(r)
-    return clean or (["/mnt/tb"] if Path("/mnt/tb").exists() else ["/home"] if Path("/home").exists() else [])
+    return roots
 
 
 def _storage_public_cfg(cfg: dict) -> dict:
@@ -757,14 +764,76 @@ def _entry_payload(p: Path) -> dict:
     except Exception: st=None
     typ = "symlink" if p.is_symlink() else "dir" if p.is_dir() else "file"
     size = 0
-    if typ == "file" and st: size = st.st_size
-    elif typ == "dir": size, _f, _d = _dir_size_limited(p, 400)
+    if typ == "file" and st:
+        size = st.st_size
+    elif typ == "dir":
+        # Fast immediate-children size for browser listings. Recursive size is
+        # available on demand via the Deep Scan tool — using recursion here
+        # made /api/storage/browse hang for ~2s on large folders.
+        size, _f, _d = _dir_size_immediate(p)
     return {"name": p.name or str(p), "path": str(p), "type": typ, "size": size, "mtime": st.st_mtime if st else 0, "mtime_text": _fmt_ts(st.st_mtime if st else 0)}
 
 
+def _dir_size_immediate(path: Path) -> tuple[int, int, int]:
+    """Sum sizes of immediate children only. O(1) system calls per entry. Fast."""
+    total = files = dirs = 0
+    try:
+        with os.scandir(path) as it:
+            for entry in it:
+                try:
+                    if entry.is_symlink():
+                        continue
+                    if entry.is_file(follow_symlinks=False):
+                        try:
+                            total += entry.stat(follow_symlinks=False).st_size
+                            files += 1
+                        except Exception:
+                            pass
+                    elif entry.is_dir(follow_symlinks=False):
+                        dirs += 1
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return total, files, dirs
+
+
 def _mount_payload(path: Path) -> dict:
-    usage=shutil.disk_usage(path)
-    return {"mount": str(path), "total": usage.total, "used": usage.used, "free": usage.free, "used_pct": round((usage.used/usage.total)*100,1) if usage.total else 0}
+    """Disk usage for a mount, bounded so a hung FUSE driver can't lock the request."""
+    try:
+        usage = _disk_usage_bounded(path, timeout=2.0)
+    except Exception:
+        return {"mount": str(path), "total": 0, "used": 0, "free": 0, "used_pct": 0, "unavailable": True}
+    if usage is None:
+        return {"mount": str(path), "total": 0, "used": 0, "free": 0, "used_pct": 0, "unavailable": True}
+    total, used, free = usage
+    return {
+        "mount": str(path),
+        "total": total,
+        "used": used,
+        "free": free,
+        "used_pct": round((used / total) * 100, 1) if total else 0,
+    }
+
+
+def _disk_usage_bounded(path: Path, timeout: float = 2.0):
+    """shutil.disk_usage() can block forever on a hung FUSE mount.
+    Run it in a thread with a hard timeout. Returns (total, used, free) or None on timeout/error.
+    """
+    import threading
+    box: dict = {}
+    def _run():
+        try:
+            u = shutil.disk_usage(str(path))
+            box["ok"] = (u.total, u.used, u.free)
+        except Exception as e:
+            box["err"] = str(e)
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        return None
+    return box.get("ok")
 
 
 def _log_storage_op(action: str, path: str, ok: bool, error: str = "") -> None:
@@ -1082,7 +1151,21 @@ def create_app() -> Flask:
                     try:
                         if _DENY_NAME_RE.search(str(child)): continue
                         # In unmanaged/root-ish folders, keep dir sizes unknown so root stays fast and not misleading.
-                        rec = _entry_payload(child) if managed else {"name": child.name or str(child), "path": str(child), "type": "symlink" if child.is_symlink() else "dir" if child.is_dir() else "file", "size": child.lstat().st_size if child.is_file() else None, "mtime": child.lstat().st_mtime, "mtime_text": _fmt_ts(child.lstat().st_mtime)}
+                        if managed:
+                            rec = _entry_payload(child)
+                        else:
+                            try:
+                                st_u = child.lstat()
+                                rec = {
+                                    "name": child.name or str(child),
+                                    "path": str(child),
+                                    "type": "symlink" if child.is_symlink() else "dir" if child.is_dir() else "file",
+                                    "size": st_u.st_size if child.is_file() else None,
+                                    "mtime": st_u.st_mtime,
+                                    "mtime_text": _fmt_ts(st_u.st_mtime),
+                                }
+                            except Exception:
+                                rec = {"name": child.name or str(child), "path": str(child), "type": "file", "size": 0, "mtime": 0, "mtime_text": "—"}
                         entries.append(rec)
                     except Exception:
                         continue
@@ -1619,7 +1702,9 @@ def create_app() -> Flask:
             cached_limit = int(_apps_cache.get("limit") or 0)
             cached_host = list(_apps_cache.get("host_rows") or [])
             cached_docker = list(_apps_cache.get("docker_rows") or [])
-        if cached_ts > 0 and now - cached_ts < 2.0 and cached_limit >= limit and (cached_host or cached_docker):
+        # Cache TTL raised from 2s -> 6s so navigation back to the apps page
+        # within a few seconds does not re-trigger the ~2s psutil/docker cold start.
+        if cached_ts > 0 and now - cached_ts < 6.0 and cached_limit >= limit and (cached_host or cached_docker):
             host_rows = cached_host[:limit]
             docker_rows = cached_docker[:limit]
         else:
