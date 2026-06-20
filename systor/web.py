@@ -25,6 +25,7 @@ import subprocess
 import ipaddress
 import zipfile
 import tempfile
+import hashlib
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -562,6 +563,8 @@ def _looks_masked_secret(value: str) -> bool:
 
 # ---------- Storage/File Manager safety helpers ----------
 STORAGE_OP_LOG = Path("/var/lib/systor/storage_ops.jsonl")
+_storage_deep_state = {"running": False, "done": False, "path": "", "started": 0, "ended": 0, "error": "", "result": None}
+_storage_deep_lock = threading.Lock()
 _DENY_PREFIXES = (
     "/etc", "/boot", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/proc", "/sys", "/dev", "/run",
     "/var/lib/docker", "/var/lib/containerd", "/root/.hermes", "/root/.ssh", "/root/.config", "/root/.cache",
@@ -1031,6 +1034,109 @@ def create_app() -> Flask:
         mode = request.args.get("mode", "quick")
         data = _scan_storage(path, min(scfg["max_scan_files"], 20000)) if mode == "deep" and str(path) != "/" else _quick_storage_analysis(path, min(scfg["max_scan_files"], 5000))
         return jsonify({"ok": True, "mode": mode if mode == "deep" else "quick", "path": str(path), "scanned": data["scanned"], "summary": data.get("summary", {}), "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit], "duplicates": data.get("duplicates", [])[:limit]})
+
+    @app.route("/api/storage/preview")
+    def api_storage_preview():
+        p = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        if not p.is_file():
+            return jsonify({"ok": False, "error": "preview supports files only"}), 400
+        st = p.stat()
+        suffix = p.suffix.lower()
+        text_ext = {".txt", ".md", ".log", ".json", ".yaml", ".yml", ".toml", ".csv", ".py", ".sh", ".js", ".ts", ".css", ".html", ".xml"}
+        image_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+        if suffix in image_ext:
+            return jsonify({"ok": True, "kind": "image", "name": p.name, "size": st.st_size, "download_url": "/api/storage/download?path=" + str(p)})
+        if suffix in text_ext or st.st_size < 128*1024:
+            try:
+                data = p.read_text(errors="replace")[:12000]
+                return jsonify({"ok": True, "kind": "text", "name": p.name, "size": st.st_size, "text": data})
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e)}), 400
+        return jsonify({"ok": True, "kind": "binary", "name": p.name, "size": st.st_size, "message": "Binary/large file; use Download"})
+
+    def _run_storage_deep_scan(path_str: str, limit: int):
+        global _storage_deep_state
+        with _storage_deep_lock:
+            _storage_deep_state.update({"running": True, "done": False, "path": path_str, "started": time.time(), "ended": 0, "error": "", "result": None})
+        try:
+            path = _resolve_storage_browse_path(path_str)[0]
+            data = _scan_storage(path, limit)
+            with _storage_deep_lock:
+                _storage_deep_state.update({"running": False, "done": True, "ended": time.time(), "result": data})
+        except Exception as e:
+            with _storage_deep_lock:
+                _storage_deep_state.update({"running": False, "done": True, "ended": time.time(), "error": str(e), "result": None})
+
+    @app.route("/api/storage/deep-scan", methods=["POST"])
+    def api_storage_deep_scan_start():
+        if not _client_private():
+            return jsonify({"ok": False, "error": "deep scan is LAN/Tailscale/local only"}), 403
+        body = request.get_json(silent=True) or {}
+        path = str(body.get("path") or "/mnt/tb")
+        limit = max(100, min(_storage_cfg()["max_scan_files"], int(body.get("limit") or _storage_cfg()["max_scan_files"])))
+        with _storage_deep_lock:
+            if _storage_deep_state.get("running"):
+                return jsonify({"ok": True, "message": "Deep scan already running", "state": _storage_deep_state})
+        t = threading.Thread(target=_run_storage_deep_scan, args=(path, limit), daemon=True)
+        t.start()
+        return jsonify({"ok": True, "message": "Deep scan started", "path": path, "limit": limit})
+
+    @app.route("/api/storage/deep-scan")
+    def api_storage_deep_scan_status():
+        with _storage_deep_lock:
+            state = dict(_storage_deep_state)
+        result = state.get("result")
+        if result:
+            state["result"] = {"scanned": result.get("scanned", 0), "summary": result.get("summary", {}), "files": result.get("files", [])[:50], "folders": result.get("folders", [])[:50], "old_files": result.get("old_files", [])[:50], "duplicates": result.get("duplicates", [])[:50]}
+        return jsonify({"ok": True, "state": state})
+
+    @app.route("/api/storage/checksum-duplicates")
+    def api_storage_checksum_duplicates():
+        if not _client_private():
+            return jsonify({"ok": False, "error": "checksum scan is LAN/Tailscale/local only"}), 403
+        path = _resolve_storage_browse_path(request.args.get("path") or "/mnt/tb")[0]
+        if not path.is_dir():
+            return jsonify({"ok": False, "error": "path is not a directory"}), 400
+        limit = max(100, min(8000, int(request.args.get("limit", 3000))))
+        by_size = {}
+        scanned = 0
+        for root, dnames, fnames in os.walk(path):
+            dnames[:] = [d for d in dnames if d not in (".systor-trash", ".Trash")]
+            for name in fnames:
+                if scanned >= limit:
+                    break
+                fp = Path(root) / name
+                try:
+                    if fp.is_symlink() or _DENY_NAME_RE.search(str(fp)):
+                        continue
+                    st = fp.stat()
+                    if st.st_size <= 0:
+                        continue
+                    by_size.setdefault(st.st_size, []).append(str(fp))
+                    scanned += 1
+                except Exception:
+                    continue
+            if scanned >= limit:
+                break
+        groups = []
+        for size, paths in by_size.items():
+            if len(paths) < 2:
+                continue
+            hmap = {}
+            for fp in paths:
+                try:
+                    h = hashlib.sha256()
+                    with open(fp, "rb") as f:
+                        for chunk in iter(lambda: f.read(1024*1024), b""):
+                            h.update(chunk)
+                    hmap.setdefault(h.hexdigest(), []).append(fp)
+                except Exception:
+                    continue
+            for digest, g in hmap.items():
+                if len(g) > 1:
+                    groups.append({"sha256": digest, "size": size, "count": len(g), "paths": g[:10]})
+        groups.sort(key=lambda x: (x["count"], x["size"]), reverse=True)
+        return jsonify({"ok": True, "path": str(path), "scanned": scanned, "groups": groups[:50]})
 
     @app.route("/api/storage/upload", methods=["POST"])
     def api_storage_upload():
