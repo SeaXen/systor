@@ -22,6 +22,8 @@ import sys
 import threading
 import time
 import subprocess
+import ipaddress
+from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
@@ -554,6 +556,159 @@ def _looks_masked_secret(value: str) -> bool:
     return bool(value) and ("***" in value or "…" in value)
 
 
+# ---------- Storage/File Manager safety helpers ----------
+STORAGE_OP_LOG = Path("/var/lib/systor/storage_ops.jsonl")
+_DENY_PREFIXES = (
+    "/etc", "/boot", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/proc", "/sys", "/dev", "/run",
+    "/var/lib/docker", "/var/lib/containerd", "/root/.hermes", "/root/.ssh", "/root/.config", "/root/.cache",
+)
+_DENY_NAME_RE = re.compile(r"(\.env$|id_rsa|id_ed25519|authorized_keys|token|secret|credential|auth\.json)", re.I)
+
+
+def _storage_cfg() -> dict:
+    cfg = load_config().setdefault("storage_page", {})
+    roots = cfg.get("allowed_roots") or "/mnt/tb"
+    if isinstance(roots, str):
+        allowed = [x.strip() for x in re.split(r"[\n,]+", roots) if x.strip()]
+    elif isinstance(roots, list):
+        allowed = [str(x).strip() for x in roots if str(x).strip()]
+    else:
+        allowed = ["/mnt/tb"]
+    return {"allowed_roots": allowed or ["/mnt/tb"], "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
+
+
+def _client_private() -> bool:
+    if request.headers.get("CF-Connecting-IP") or request.headers.get("Cf-Ray"):
+        return False
+    raw = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    try:
+        ip = ipaddress.ip_address(raw)
+        return ip.is_loopback or ip.is_private or ip in ipaddress.ip_network("100.64.0.0/10")
+    except Exception:
+        return False
+
+
+def _storage_can_write() -> bool:
+    return _client_private()
+
+
+def _safe_roots() -> list[Path]:
+    out=[]
+    for r in _storage_cfg()["allowed_roots"]:
+        try:
+            rp=Path(r).expanduser().resolve()
+            if rp.exists() and str(rp) != "/": out.append(rp)
+        except Exception:
+            continue
+    if not out:
+        fb=Path("/mnt/tb")
+        if fb.exists(): out.append(fb.resolve())
+    return out
+
+
+def _storage_roots_payload() -> list[dict]:
+    return [{"path": str(r), "label": r.name or str(r)} for r in _safe_roots()]
+
+
+def _under(root: Path, path: Path) -> bool:
+    try:
+        path.relative_to(root); return True
+    except ValueError:
+        return False
+
+
+def _resolve_storage_path(value: str | None, must_exist: bool = True) -> Path:
+    roots=_safe_roots()
+    if not roots: abort(400, "no allowed storage roots configured")
+    raw=(value or str(roots[0])).strip()
+    p=Path(raw).expanduser()
+    if not p.is_absolute(): p=roots[0] / p
+    try: rp=p.resolve(strict=must_exist)
+    except FileNotFoundError: rp=p.parent.resolve(strict=True) / p.name
+    sp=str(rp)
+    if sp == "/" or any(sp == x or sp.startswith(x + "/") for x in _DENY_PREFIXES): abort(403, "blocked system or secret path")
+    if _DENY_NAME_RE.search(sp): abort(403, "blocked secret-like path")
+    if not any(_under(root, rp) for root in roots): abort(403, "path escapes allowed roots")
+    return rp
+
+
+def _fmt_ts(ts: float) -> str:
+    try: return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+    except Exception: return "—"
+
+
+def _dir_size_limited(path: Path, max_files: int = 1200) -> tuple[int, int, int]:
+    total=files=dirs=0; seen=0
+    try:
+        for root, dnames, fnames in os.walk(path):
+            dnames[:] = [d for d in dnames if d not in (".systor-trash", ".Trash")]
+            dirs += len(dnames)
+            for name in fnames:
+                seen += 1
+                if seen > max_files: return total, files, dirs
+                try:
+                    fp=Path(root)/name
+                    if fp.is_symlink(): continue
+                    total += fp.stat().st_size; files += 1
+                except Exception: continue
+    except Exception: pass
+    return total, files, dirs
+
+
+def _entry_payload(p: Path) -> dict:
+    try: st=p.lstat()
+    except Exception: st=None
+    typ = "symlink" if p.is_symlink() else "dir" if p.is_dir() else "file"
+    size = 0
+    if typ == "file" and st: size = st.st_size
+    elif typ == "dir": size, _f, _d = _dir_size_limited(p, 400)
+    return {"name": p.name or str(p), "path": str(p), "type": typ, "size": size, "mtime": st.st_mtime if st else 0, "mtime_text": _fmt_ts(st.st_mtime if st else 0)}
+
+
+def _mount_payload(path: Path) -> dict:
+    usage=shutil.disk_usage(path)
+    return {"mount": str(path), "total": usage.total, "used": usage.used, "free": usage.free, "used_pct": round((usage.used/usage.total)*100,1) if usage.total else 0}
+
+
+def _log_storage_op(action: str, path: str, ok: bool, error: str = "") -> None:
+    try:
+        STORAGE_OP_LOG.parent.mkdir(parents=True, exist_ok=True)
+        row={"ts": int(time.time()), "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "action": action, "path": path, "ok": bool(ok), "error": error[:300]}
+        with STORAGE_OP_LOG.open("a") as f: f.write(json.dumps(row, ensure_ascii=False)+"\n")
+    except Exception: pass
+
+
+def _trash_path(p: Path) -> Path:
+    root=next((r for r in _safe_roots() if _under(r, p)), _safe_roots()[0])
+    trash=root/".systor-trash"/datetime.now().strftime("%Y%m%d-%H%M%S")
+    trash.mkdir(parents=True, exist_ok=True)
+    return trash / p.name
+
+
+def _scan_storage(path: Path, limit: int) -> dict:
+    files=[]; folders=[]; old=[]; type_map={}; scanned=0; now=time.time()
+    for root, dnames, fnames in os.walk(path):
+        dnames[:] = [d for d in dnames if d not in (".systor-trash", ".Trash")]
+        rpath=Path(root)
+        if rpath != path:
+            sz, _, _ = _dir_size_limited(rpath, 800); folders.append({"path": str(rpath), "size": sz})
+        for name in fnames:
+            scanned += 1
+            if scanned > limit: break
+            fp=rpath/name
+            try:
+                if fp.is_symlink(): continue
+                st=fp.stat(); size=st.st_size; ext=fp.suffix.lower() or "[none]"
+                rec={"path": str(fp), "size": size, "mtime": st.st_mtime, "age_days": int((now-st.st_mtime)/86400)}
+                files.append(rec)
+                if size > 50*1024*1024 and rec["age_days"] >= 30: old.append(rec)
+                cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0}); cur["count"] += 1; cur["size"] += size
+            except Exception: continue
+        if scanned > limit: break
+    files.sort(key=lambda x:x["size"], reverse=True); folders.sort(key=lambda x:x["size"], reverse=True); old.sort(key=lambda x:(x["age_days"], x["size"]), reverse=True)
+    return {"files": files, "folders": folders, "old_files": old, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True), "scanned": scanned}
+
+
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["JSON_SORT_KEYS"] = False
@@ -677,6 +832,134 @@ def create_app() -> Flask:
             "cloudflare": cloudflare,
             "note": "0.0.0.0 means one listener serves localhost, LAN, and Tailscale. Cloudflare Tunnel works if its route targets this port.",
         })
+
+    @app.route("/api/storage/settings", methods=["GET", "POST"])
+    def api_storage_settings():
+        cfg = load_config()
+        scfg = _storage_cfg()
+        if request.method == "POST":
+            if not _storage_can_write():
+                return jsonify({"ok": False, "error": "storage settings are local/LAN/Tailscale only"}), 403
+            body = request.get_json(silent=True) or {}
+            roots = body.get("allowed_roots") or []
+            if isinstance(roots, str):
+                roots = [x.strip() for x in re.split(r"[\n,]+", roots) if x.strip()]
+            clean=[]
+            for r in roots:
+                try:
+                    rp=Path(str(r)).expanduser().resolve()
+                    if rp.exists() and str(rp) != "/" and not any(str(rp)==x or str(rp).startswith(x+"/") for x in _DENY_PREFIXES):
+                        clean.append(str(rp))
+                except Exception:
+                    continue
+            cfg.setdefault("storage_page", {})
+            if clean:
+                cfg["storage_page"]["allowed_roots"] = ",".join(clean)
+            cfg["storage_page"]["public_readonly"] = bool(body.get("public_readonly", True))
+            cfg["storage_page"]["trash_enabled"] = bool(body.get("trash_enabled", True))
+            try: cfg["storage_page"]["max_scan_files"] = max(100, min(200000, int(body.get("max_scan_files", 20000))))
+            except Exception: pass
+            save_config(cfg)
+            return jsonify({"ok": True, "message": "Storage settings saved", "config": _storage_cfg(), "roots": _storage_roots_payload(), "can_write": _storage_can_write()})
+        return jsonify({"ok": True, "config": scfg, "roots": _storage_roots_payload(), "can_write": _storage_can_write(), "public": not _client_private()})
+
+    @app.route("/api/storage/browse")
+    def api_storage_browse():
+        path = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        if not path.is_dir():
+            return jsonify({"ok": False, "error": "path is not a directory"}), 400
+        entries=[]; type_map={}; total=files=dirs=0
+        try:
+            for child in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                try:
+                    if _DENY_NAME_RE.search(str(child)): continue
+                    rec=_entry_payload(child); entries.append(rec)
+                    total += rec.get("size", 0) or 0
+                    if rec["type"] == "dir": dirs += 1
+                    else:
+                        files += 1
+                        ext = child.suffix.lower() or "[none]"
+                        cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0})
+                        cur["count"] += 1; cur["size"] += rec.get("size", 0) or 0
+                except Exception:
+                    continue
+        except PermissionError:
+            return jsonify({"ok": False, "error": "permission denied"}), 403
+        return jsonify({"ok": True, "path": str(path), "entries": entries, "summary": {"total_size": total, "files": files, "dirs": dirs}, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True)[:20], "mount": _mount_payload(path), "can_write": _storage_can_write()})
+
+    @app.route("/api/storage/analysis")
+    def api_storage_analysis():
+        path = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        if not path.is_dir():
+            return jsonify({"ok": False, "error": "path is not a directory"}), 400
+        limit = max(1, min(200, int(request.args.get("limit", 25))))
+        scan_limit = _storage_cfg()["max_scan_files"]
+        data = _scan_storage(path, scan_limit)
+        return jsonify({"ok": True, "path": str(path), "scanned": data["scanned"], "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit]})
+
+    @app.route("/api/storage/action", methods=["POST"])
+    def api_storage_action():
+        if not _storage_can_write():
+            return jsonify({"ok": False, "error": "file actions are disabled on public/tunnel access; use LAN/Tailscale/local"}), 403
+        body = request.get_json(silent=True) or {}
+        action = str(body.get("action") or "").strip().lower()
+        base = _resolve_storage_path(body.get("path"), must_exist=True)
+        items = body.get("items") or []
+        if isinstance(items, str): items=[items]
+        try:
+            if action == "mkdir":
+                name = re.sub(r"[\\/]+", "", str(body.get("name") or "").strip())
+                if not name: raise ValueError("missing folder name")
+                target = _resolve_storage_path(str(base / name), must_exist=False)
+                target.mkdir(parents=False, exist_ok=False)
+                _log_storage_op(action, str(target), True)
+                return jsonify({"ok": True, "message": f"Created {target.name}"})
+            if action in ("copy", "move"):
+                dest = _resolve_storage_path(body.get("destination"), must_exist=True)
+                if not dest.is_dir(): raise ValueError("destination is not a folder")
+                for it in items:
+                    src = _resolve_storage_path(it, must_exist=True)
+                    target = dest / src.name
+                    target = _resolve_storage_path(str(target), must_exist=False)
+                    if action == "copy":
+                        if src.is_dir(): shutil.copytree(src, target)
+                        else: shutil.copy2(src, target)
+                    else:
+                        shutil.move(str(src), str(target))
+                    _log_storage_op(action, f"{src} -> {target}", True)
+                return jsonify({"ok": True, "message": f"{action} complete ({len(items)} item(s))"})
+            if action == "rename":
+                if len(items) != 1: raise ValueError("select exactly one item")
+                src = _resolve_storage_path(items[0], must_exist=True)
+                name = re.sub(r"[\\/]+", "", str(body.get("name") or "").strip())
+                if not name: raise ValueError("missing new name")
+                target = _resolve_storage_path(str(src.parent / name), must_exist=False)
+                src.rename(target)
+                _log_storage_op(action, f"{src} -> {target}", True)
+                return jsonify({"ok": True, "message": "Renamed"})
+            if action == "delete":
+                if not _storage_cfg()["trash_enabled"]: raise ValueError("trash disabled; permanent delete not implemented")
+                for it in items:
+                    src = _resolve_storage_path(it, must_exist=True)
+                    target = _trash_path(src)
+                    shutil.move(str(src), str(target))
+                    _log_storage_op("trash", f"{src} -> {target}", True)
+                return jsonify({"ok": True, "message": f"Moved to trash ({len(items)} item(s))"})
+            raise ValueError("unknown action")
+        except Exception as e:
+            _log_storage_op(action or "unknown", str(body.get("items") or body.get("path") or ""), False, str(e))
+            return jsonify({"ok": False, "error": str(e)}), 400
+
+    @app.route("/api/storage/ops")
+    def api_storage_ops():
+        rows=[]
+        try:
+            if STORAGE_OP_LOG.exists():
+                rows=[json.loads(x) for x in STORAGE_OP_LOG.read_text().splitlines()[-100:] if x.strip()]
+                rows=list(reversed(rows))
+        except Exception:
+            rows=[]
+        return jsonify({"ok": True, "rows": rows})
 
     @app.route("/api/runtime")
     def api_runtime():
@@ -916,6 +1199,11 @@ def create_app() -> Flask:
     def page_speed():
         cfg = load_config()
         return render_template("speed.html", cfg=cfg)
+
+    @app.route("/storage")
+    def page_storage():
+        cfg = load_config()
+        return render_template("storage.html", cfg=cfg)
 
     @app.route("/settings", methods=["GET", "POST"])
     def page_settings():

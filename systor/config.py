@@ -75,6 +75,12 @@ DEFAULT_CONFIG: dict = {
         "history_page_size": 25,
         "iperf_port": 5201,
     },
+    "storage_page": {
+        "allowed_roots": "/mnt/tb",
+        "public_readonly": True,
+        "trash_enabled": True,
+        "max_scan_files": 20000,
+    },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
         "host": "0.0.0.0",

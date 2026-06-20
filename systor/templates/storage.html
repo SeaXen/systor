@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}systor · Storage{% endblock %}
+{% block content %}
+<div class="storage-page">
+  <div class="dash-toolbar storage-toolbar">
+    <div class="dash-status">
+      <span class="dot green"></span>
+      <strong>Storage</strong>
+      <span id="storage-access">checking access…</span>
+      <span id="storage-meta">read-only public · actions LAN/Tailscale only</span>
+    </div>
+    <div class="dash-controls storage-controls">
+      <select id="storage-root" class="control-select" aria-label="Storage root"></select>
+      <button class="btn secondary compact" id="storage-up">Up</button>
+      <button class="btn secondary compact" id="storage-refresh">Refresh</button>
+    </div>
+  </div>
+
+  <div class="storage-pathbar">
+    <input id="storage-path" class="storage-path-input mono" placeholder="/mnt/tb" autocomplete="off">
+    <button class="btn compact" id="storage-go">Open</button>
+  </div>
+
+  <div class="storage-tabs" role="tablist">
+    <button class="storage-tab active" data-tab="overview">Overview</button>
+    <button class="storage-tab" data-tab="analysis">Disk Analysis</button>
+    <button class="storage-tab" data-tab="files">File Manager</button>
+    <button class="storage-tab" data-tab="settings">Settings</button>
+    <button class="storage-tab" data-tab="ops">Ops Log</button>
+  </div>
+
+  <section class="storage-panel active" data-panel="overview">
+    <div class="stat-grid storage-kpis">
+      <div class="stat-card cyan"><div class="label">Mount used</div><div class="value" id="st-used">—</div><div class="sub" id="st-mount">—</div></div>
+      <div class="stat-card yellow"><div class="label">Free</div><div class="value" id="st-free">—</div><div class="sub">available on selected mount</div></div>
+      <div class="stat-card purple"><div class="label">Current folder</div><div class="value" id="st-folder-size">—</div><div class="sub" id="st-folder-count">—</div></div>
+      <div class="stat-card green"><div class="label">Access</div><div class="value" id="st-mode">—</div><div class="sub">public safe by default</div></div>
+    </div>
+    <div class="storage-grid-2">
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Largest here</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Name</th><th>Type</th><th class="text-right">Size</th></tr></thead><tbody id="storage-largest-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Type usage</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Type</th><th class="text-right">Files</th><th class="text-right">Size</th></tr></thead><tbody id="storage-types-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="storage-panel" data-panel="analysis">
+    <div class="dash-toolbar storage-subbar">
+      <div class="dash-status"><strong>Disk Analysis</strong><span>largest folders/files · old large files · duplicate candidates</span></div>
+      <div class="dash-controls"><label>limit <select id="analysis-limit" class="control-select"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label><button class="btn secondary compact" id="analysis-run">Analyze</button></div>
+    </div>
+    <div class="storage-grid-3">
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Largest folders</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Folder</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-folders"><tr><td colspan="2" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Largest files</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>File</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-files"><tr><td colspan="2" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Old large files</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>File</th><th>Age</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-old"><tr><td colspan="3" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="storage-panel" data-panel="files">
+    <div class="dash-toolbar storage-subbar">
+      <div class="dash-status"><strong>File Manager</strong><span id="file-mode-note">LAN/Tailscale actions only</span></div>
+      <div class="dash-controls storage-action-row">
+        <button class="btn secondary compact" data-action="mkdir">New folder</button>
+        <button class="btn secondary compact" data-action="copy">Copy</button>
+        <button class="btn secondary compact" data-action="move">Move</button>
+        <button class="btn secondary compact" data-action="rename">Rename</button>
+        <button class="btn danger compact" data-action="delete">Trash</button>
+      </div>
+    </div>
+    <div class="table-card compact-table storage-file-card">
+      <table class="apps-table compact-apps-table storage-table">
+        <thead><tr><th><input type="checkbox" id="storage-check-all"></th><th>Name</th><th>Type</th><th class="text-right">Size</th><th>Modified</th></tr></thead>
+        <tbody id="storage-files-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="storage-panel" data-panel="settings">
+    <div class="settings-grid storage-settings-grid">
+      <div class="settings-card">
+        <h3>Allowed roots</h3>
+        <textarea id="storage-allowed-roots" class="storage-textarea mono" rows="5"></textarea>
+        <p class="muted-small">One path per line. Actions never escape these roots. Public Cloudflare access stays read-only.</p>
+      </div>
+      <div class="settings-card">
+        <h3>Safety</h3>
+        <label class="toggle-row"><input type="checkbox" id="storage-public-readonly" checked> Public/tunnel read-only</label>
+        <label class="toggle-row"><input type="checkbox" id="storage-trash-enabled" checked> Delete to trash first</label>
+        <label class="field-row">Analysis max files <input id="storage-max-scan" class="control-input" type="number" min="100" max="200000" step="100" value="20000"></label>
+        <button class="btn compact" id="storage-save-settings">Save Storage settings</button>
+        <div id="storage-save-result" class="save-result"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="storage-panel" data-panel="ops">
+    <div class="table-card compact-table"><div class="apps-card-head"><h3>Recent file operations</h3><button class="btn secondary compact" id="ops-refresh">Refresh</button></div><table class="apps-table compact-apps-table"><thead><tr><th>Time</th><th>Action</th><th>Path</th><th>Result</th></tr></thead><tbody id="storage-ops-body"><tr><td colspan="4" class="empty-cell">No operations yet</td></tr></tbody></table></div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const st={path:'', roots:[], canWrite:false, clipboard:null, tab:'overview'};
+const $=s=>document.querySelector(s); const $$=s=>[...document.querySelectorAll(s)];
+function esc(s){return String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function fmtBytes(n){n=Number(n||0); const u=['B','KB','MB','GB','TB']; let i=0; while(n>=1024&&i<u.length-1){n/=1024;i++;} return (i? n.toFixed(n>=10?1:2):n.toFixed(0))+' '+u[i];}
+function short(p){p=String(p||''); return p.length>54?'…'+p.slice(-53):p;}
+async function api(url,opt){const r=await fetch(url,Object.assign({cache:'no-store'},opt||{})); const j=await r.json().catch(()=>({ok:false,error:'bad json'})); if(!r.ok||j.ok===false) throw new Error(j.error||('HTTP '+r.status)); return j;}
+function setTab(t){st.tab=t; $$('.storage-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); $$('.storage-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===t)); if(t==='ops') loadOps();}
+function selected(){return $$('.storage-row-check:checked').map(x=>x.value);}
+function rowName(r){const icon=r.type==='dir'?'📁':r.type==='symlink'?'🔗':'📄'; return `<button class="storage-name-btn" data-open="${esc(r.path)}" data-type="${esc(r.type)}">${icon} <span>${esc(r.name)}</span></button>`;}
+async function loadSettings(){const j=await api('/api/storage/settings'); st.roots=j.roots||[]; st.canWrite=!!j.can_write; $('#storage-access').textContent=st.canWrite?'LAN/Tailscale · actions enabled':'public/read-only'; $('#st-mode').textContent=st.canWrite?'Manage':'Read-only'; $('#file-mode-note').textContent=st.canWrite?'Actions enabled on local/LAN/Tailscale':'Public/tunnel mode: actions disabled'; $('#storage-allowed-roots').value=(j.config.allowed_roots||[]).join('\n'); $('#storage-public-readonly').checked=!!j.config.public_readonly; $('#storage-trash-enabled').checked=!!j.config.trash_enabled; $('#storage-max-scan').value=j.config.max_scan_files||20000; const sel=$('#storage-root'); sel.innerHTML=st.roots.map(r=>`<option value="${esc(r.path)}">${esc(r.label||r.path)}</option>`).join(''); if(!st.path&&st.roots[0]) st.path=st.roots[0].path; sel.value=st.roots.find(r=>st.path.startsWith(r.path))?.path||st.path; }
+async function loadBrowse(){await loadSettings(); $('#storage-path').value=st.path; const j=await api('/api/storage/browse?path='+encodeURIComponent(st.path)); st.path=j.path; $('#storage-path').value=j.path; $('#st-used').textContent=j.mount?j.mount.used_pct+'%':'—'; $('#st-free').textContent=j.mount?fmtBytes(j.mount.free):'—'; $('#st-mount').textContent=j.mount?j.mount.mount:'—'; $('#st-folder-size').textContent=fmtBytes(j.summary.total_size); $('#st-folder-count').textContent=`${j.summary.dirs} dirs · ${j.summary.files} files`; renderFiles(j.entries||[]); renderLargest(j.entries||[]); renderTypes(j.types||[]); }
+function renderFiles(rows){const body=$('#storage-files-body'); if(!rows.length){body.innerHTML='<tr><td colspan="5" class="empty-cell">Empty folder</td></tr>';return;} body.innerHTML=rows.map(r=>`<tr><td><input class="storage-row-check" type="checkbox" value="${esc(r.path)}"></td><td>${rowName(r)}</td><td>${esc(r.type)}</td><td class="text-right mono">${r.type==='dir'?fmtBytes(r.size):fmtBytes(r.size)}</td><td class="mono">${esc(r.mtime_text)}</td></tr>`).join('');}
+function renderLargest(rows){const body=$('#storage-largest-body'); const top=[...rows].sort((a,b)=>(b.size||0)-(a.size||0)).slice(0,10); body.innerHTML=top.length?top.map(r=>`<tr><td>${rowName(r)}</td><td>${esc(r.type)}</td><td class="text-right mono">${fmtBytes(r.size)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty-cell">No files</td></tr>';}
+function renderTypes(rows){const body=$('#storage-types-body'); body.innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.ext)}</td><td class="text-right mono">${r.count}</td><td class="text-right mono">${fmtBytes(r.size)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty-cell">No file type data</td></tr>';}
+async function loadAnalysis(force=true){if(!force && $('#analysis-files').dataset.loaded)return; const limit=Number($('#analysis-limit').value||25); ['#analysis-folders','#analysis-files','#analysis-old'].forEach(s=>$(s).innerHTML='<tr><td colspan="3" class="empty-cell">Analyzing…</td></tr>'); const j=await api(`/api/storage/analysis?path=${encodeURIComponent(st.path)}&limit=${limit}`); $('#analysis-files').dataset.loaded='1'; $('#analysis-folders').innerHTML=(j.folders||[]).map(r=>`<tr><td title="${esc(r.path)}">${esc(short(r.path))}</td><td class="text-right mono">${fmtBytes(r.size)}</td></tr>`).join('')||'<tr><td colspan="2" class="empty-cell">No folders</td></tr>'; $('#analysis-files').innerHTML=(j.files||[]).map(r=>`<tr><td title="${esc(r.path)}">${esc(short(r.path))}</td><td class="text-right mono">${fmtBytes(r.size)}</td></tr>`).join('')||'<tr><td colspan="2" class="empty-cell">No files</td></tr>'; $('#analysis-old').innerHTML=(j.old_files||[]).map(r=>`<tr><td title="${esc(r.path)}">${esc(short(r.path))}</td><td>${r.age_days}d</td><td class="text-right mono">${fmtBytes(r.size)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty-cell">No old large files</td></tr>';}
+async function loadOps(){const j=await api('/api/storage/ops'); $('#storage-ops-body').innerHTML=(j.rows||[]).map(r=>`<tr><td class="mono">${esc(r.time)}</td><td>${esc(r.action)}</td><td title="${esc(r.path)}">${esc(short(r.path))}</td><td>${r.ok?'✅':'❌'} ${esc(r.error||'ok')}</td></tr>`).join('')||'<tr><td colspan="4" class="empty-cell">No operations yet</td></tr>';}
+async function doAction(action){if(!st.canWrite){alert('File actions are disabled on public/tunnel access. Use LAN/Tailscale/local.'); return;} const items=selected(); let body={action, path:st.path, items}; if(action==='mkdir'){const name=prompt('Folder name'); if(!name)return; body.name=name;} else if(action==='rename'){if(items.length!==1){alert('Select exactly one item');return;} const name=prompt('New name'); if(!name)return; body.name=name;} else if(action==='copy'||action==='move'){if(!items.length){alert('Select item(s) first');return;} const dst=prompt('Destination folder path', st.path); if(!dst)return; body.destination=dst;} else if(action==='delete'){if(!items.length){alert('Select item(s) first');return;} if(!confirm(`Move ${items.length} item(s) to trash?`))return;} const j=await api('/api/storage/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); await loadBrowse(); await loadOps(); alert(j.message||'Done');}
+document.addEventListener('click',e=>{const tab=e.target.closest('.storage-tab'); if(tab) setTab(tab.dataset.tab); const open=e.target.closest('[data-open]'); if(open){if(open.dataset.type==='dir'){st.path=open.dataset.open; loadBrowse();} } const act=e.target.closest('[data-action]'); if(act) doAction(act.dataset.action);});
+$('#storage-refresh').onclick=()=>loadBrowse(); $('#storage-go').onclick=()=>{st.path=$('#storage-path').value.trim(); loadBrowse();}; $('#storage-path').addEventListener('keydown',e=>{if(e.key==='Enter')$('#storage-go').click();}); $('#storage-root').onchange=e=>{st.path=e.target.value;loadBrowse();}; $('#storage-up').onclick=()=>{const p=st.path.replace(/\/+$/,''); st.path=p.split('/').slice(0,-1).join('/')||'/'; loadBrowse();}; $('#analysis-run').onclick=()=>loadAnalysis(true); $('#ops-refresh').onclick=loadOps; $('#storage-check-all').onchange=e=>$$('.storage-row-check').forEach(x=>x.checked=e.target.checked);
+$('#storage-save-settings').onclick=async()=>{if(!st.canWrite){alert('Settings save is local/LAN only');return;} const body={allowed_roots:$('#storage-allowed-roots').value.split('\n').map(x=>x.trim()).filter(Boolean), public_readonly:$('#storage-public-readonly').checked, trash_enabled:$('#storage-trash-enabled').checked, max_scan_files:Number($('#storage-max-scan').value||20000)}; try{const j=await api('/api/storage/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); $('#storage-save-result').textContent=j.message||'saved'; await loadBrowse();}catch(e){$('#storage-save-result').textContent='error: '+e.message;}};
+loadBrowse().catch(e=>{$('#storage-meta').textContent='error: '+e.message;});
+</script>
+{% endblock %}
