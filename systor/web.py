@@ -977,7 +977,7 @@ def create_app() -> Flask:
             "/api/snapshot",
             "/api/series",
             "/api/network-series",
-            "/api/alerts",
+            "/api/public-dashboard",
             "/api/version",
             "/health",
         }
@@ -1584,6 +1584,27 @@ def create_app() -> Flask:
         data = _bucket_network_points(data, 600)
         snap = collect_snapshot()
         return jsonify({"ok": True, "hours": hours, "data": data, "current": snap.get("network", {})})
+
+    @app.route("/api/public-dashboard")
+    def api_public_dashboard():
+        """Single bundled read-only payload for the public dashboard.
+        Cuts Cloudflare RTT overhead by collapsing many chart requests into one.
+        """
+        hours = _parse_hours_arg(request.args.get("hours"), 6.0)
+        snap = collect_snapshot()
+        snap["db_stats"] = get_storage().stats()
+        metrics = {
+            "cpu": _bucket_series_points(get_storage().series("cpu_pct", hours=hours), 600),
+            "temp": _bucket_series_points(get_storage().series("cpu_temp", hours=hours), 600),
+            "mem": _bucket_series_points(get_storage().series("mem_used_mb", hours=hours), 600),
+            "disk_read": _bucket_series_points(get_storage().series("disk_read_mbps", hours=hours), 600),
+            "disk_write": _bucket_series_points(get_storage().series("disk_write_mbps", hours=hours), 600),
+            "load1": _bucket_series_points(get_storage().series("load_1m", hours=hours), 600),
+            "load5": _bucket_series_points(get_storage().series("load_5m", hours=hours), 600),
+            "load15": _bucket_series_points(get_storage().series("load_15m", hours=hours), 600),
+        }
+        net = _bucket_network_points(get_storage().network_series(hours=hours), 600)
+        return jsonify({"ok": True, "hours": hours, "snapshot": snap, "metrics": metrics, "network": net})
 
     @app.route("/api/network-usage")
     def api_network_usage():

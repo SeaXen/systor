@@ -146,6 +146,7 @@
 </div>
 {% endif %}
 
+{% if client_private %}
 <div class="table-card compact-table alerts-card">
   <h3><span>Recent Alerts</span></h3>
   <table>
@@ -153,6 +154,7 @@
     <tbody id="dash-alerts-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
   </table>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -188,14 +190,69 @@ function saveSettings(){ /* page controls are temporary; Settings page owns save
 function setLoadState(text){ document.getElementById('load-state').textContent=text; }
 function setupControls(){ const refreshSel=document.getElementById('refresh-sec'); const chartSel=document.getElementById('chart-sec'); const rangeSel=document.getElementById('range-hours'); const pauseBtn=document.getElementById('pause-btn'); refreshSel.value=String(settings.refreshMs); chartSel.value=String(settings.chartMs); rangeSel.value=String(settings.rangeHours); pauseBtn.textContent=settings.paused?'Resume':'Pause'; refreshSel.addEventListener('change',()=>{ settings.refreshMs=Math.max(1000, parseInt(refreshSel.value)); saveSettings(); restartTimers(); refreshAll();}); chartSel.addEventListener('change',()=>{ settings.chartMs=Math.max(1000, parseInt(chartSel.value)); saveSettings(); restartTimers(); refreshCharts();}); rangeSel.addEventListener('change',()=>{ settings.rangeHours=parseFloat(rangeSel.value); saveSettings(); refreshCharts();}); pauseBtn.addEventListener('click',()=>{ settings.paused=!settings.paused; pauseBtn.textContent=settings.paused?'Resume':'Pause'; saveSettings(); restartTimers();}); document.getElementById('manual-refresh-btn').addEventListener('click', refreshAll); const rc=document.getElementById('restart-collector-btn'); const rw=document.getElementById('restart-web-btn'); if(rc){ rc.addEventListener('click', async()=>{ if(!confirm('Restart collector now?')) return; const j=await fetchJSON('/api/restart-collector',{method:'POST'}); setLoadState('collector restarted'); alert(j.message||'collector restarting'); }); } if(rw){ rw.addEventListener('click', async()=>{ if(!confirm('Restart dashboard web now?')) return; const j=await fetchJSON('/api/restart-web',{method:'POST'}); setLoadState('web restarting'); alert(j.message||'web restarting'); }); } }
 let snapTimer, chartTimer, alertTimer, procTimer; const inflight={snap:false, charts:false, alerts:false, procs:false};
-function restartTimers(){ clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer); if(settings.paused) return; snapTimer=setInterval(refresh, settings.refreshMs); chartTimer=setInterval(refreshCharts, settings.chartMs); alertTimer=setInterval(refreshAlerts, Math.max(settings.refreshMs,10000)); procTimer=setInterval(refreshProcs,30000); }
-function refreshAll(){ refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); }
+function restartTimers(){ clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer); if(settings.paused) return; snapTimer=setInterval(refresh, settings.refreshMs); if(IS_PRIVATE){ chartTimer=setInterval(refreshCharts, settings.chartMs); alertTimer=setInterval(refreshAlerts, Math.max(settings.refreshMs,10000)); procTimer=setInterval(refreshProcs,30000); } }
+function refreshAll(){ if(IS_PRIVATE){ refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); } else { refresh(); } }
 function setGlobalHeader(snap, runtime){ const cpu=snap.cpu||{}, mem=snap.memory||{}, web=(runtime&&runtime.web)||{}, collector=(runtime&&runtime.collector)||{}, s=(runtime&&runtime.storage)||{}; const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null; const el=document.getElementById('global-header-meta'); if(!el) return; if(!IS_PRIVATE){ el.innerHTML=`<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span>`; return; } el.innerHTML=`<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(s.total_mb,'MB')}</strong></span>`; }
 async function refresh(){
   if(settings.paused||inflight.snap) return;
   inflight.snap=true;
   setLoadState('loading snapshot…');
   try{
+    if(!IS_PRIVATE){
+      const pub=await fetchJSON('/api/public-dashboard?hours='+settings.rangeHours);
+      const snap=pub.snapshot||{};
+      const runtime=null;
+      document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString();
+      document.getElementById('hostname').textContent=snap.hostname||'systor';
+      const up=snap.uptime_sec||0;
+      document.getElementById('uptime').textContent=Math.floor(up/3600)+'h '+Math.floor((up%3600)/60)+'m';
+      document.getElementById('dbmeta').textContent=(snap.db_stats.samples||0)+' samples';
+      const cpu=snap.cpu||{};
+      document.getElementById('cpu-pct').textContent=fmt(cpu.percent);
+      document.getElementById('load1').textContent=fmt(cpu.load_1m);
+      document.getElementById('load5').textContent=fmt(cpu.load_5m);
+      document.getElementById('load15').textContent=fmt(cpu.load_15m);
+      document.getElementById('kpi-cpu-pct').className='stat-card has-meter '+statusClass(cpu.percent,50,85); document.getElementById('bar-cpu').style.width=Math.max(0,Math.min(100,Number(cpu.percent||0)))+'%';
+      document.getElementById('kpi-load').className='stat-card has-meter '+statusClass(Math.max(cpu.load_1m||0,cpu.load_5m||0),3,6); document.getElementById('bar-load').style.width=Math.max(0,Math.min(100,((Number(cpu.load_1m||0)/8)*100)))+'%';
+      document.getElementById('temp').textContent=fmt(cpu.temp_c);
+      document.getElementById('temp-sub').textContent=(cpu.temp_c===null||cpu.temp_c===undefined)?'sensor n/a':'CPU sensor';
+      document.getElementById('kpi-temp').className='stat-card has-meter '+statusClass(cpu.temp_c,70,85); document.getElementById('bar-temp').style.width=Math.max(0,Math.min(100,Number(cpu.temp_c||0)))+'%';
+      const mem=snap.memory||{};
+      const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null;
+      document.getElementById('mem-pct').textContent=memPct!==null?memPct:'—';
+      document.getElementById('mem-used').textContent=bytes((mem.used_mb||0)*1024*1024);
+      document.getElementById('mem-total').textContent=bytes((mem.total_mb||0)*1024*1024);
+      document.getElementById('kpi-mem').className='stat-card has-meter '+statusClass(memPct,75,90); document.getElementById('bar-mem').style.width=Math.max(0,Math.min(100,Number(memPct||0)))+'%';
+      document.getElementById('swap-used').textContent=mem.swap_used_mb||0;
+      document.getElementById('swap-total').textContent=mem.swap_total_mb||0;
+      const swapPct=(mem.swap_total_mb?((Number(mem.swap_used_mb||0)/Number(mem.swap_total_mb||1))*100):0); document.getElementById('kpi-swap').className='stat-card has-meter '+statusClass(mem.swap_used_mb,2048,4096); document.getElementById('bar-swap').style.width=Math.max(0,Math.min(100,swapPct))+'%';
+      const dio=snap.disk_io||{};
+      document.getElementById('disk-r-mbps').textContent=fmt(dio.read_mbps);
+      document.getElementById('disk-w-mbps').textContent=fmt(dio.write_mbps);
+      document.getElementById('disk-io-devs').textContent='';
+      document.getElementById('kpi-disk-io').className='stat-card has-meter '+statusClass(Math.max(dio.read_mbps||0,dio.write_mbps||0),20,80); document.getElementById('bar-disk').style.width=Math.max(0,Math.min(100,(Math.max(Number(dio.read_mbps||0),Number(dio.write_mbps||0))/100)*100))+'%';
+      const metrics=pub.metrics||{};
+      const cpuSeries=metrics.cpu||[], tempSeries=metrics.temp||[], memSeries=metrics.mem||[], dRead=metrics.disk_read||[], dWrite=metrics.disk_write||[], load1=metrics.load1||[], load5=metrics.load5||[], load15=metrics.load15||[];
+      const netData=pub.network||[];
+      const netRx=(netData||[]).map(p=>[p.ts,p.rx_mbps]);
+      const netTx=(netData||[]).map(p=>[p.ts,p.tx_mbps]);
+      drawChart(document.getElementById('chart-cpu-pct'),[{name:'CPU',unit:'%',data:cpuSeries,color:COLORS.cpu,fill:true}],{ymin:0,ymax:100});
+      drawChart(document.getElementById('chart-temp'),[{name:'Temp',unit:'°C',data:tempSeries,color:COLORS.red,fill:true}],{ymin:null,ymax:null});
+      drawChart(document.getElementById('chart-mem'),[{name:'RAM',unit:'MB',data:memSeries,color:COLORS.ram,fill:true}],{ymin:0,ymax:null});
+      drawChart(document.getElementById('chart-disk-io'),[{name:'Read',unit:'MB/s',data:dRead,color:COLORS.disk,fill:true},{name:'Write',unit:'MB/s',data:dWrite,color:COLORS.disk2}],{ymin:0,ymax:null});
+      drawChart(document.getElementById('chart-load'),[{name:'1m',unit:'',data:load1,color:COLORS.green,fill:true},{name:'5m',unit:'',data:load5,color:COLORS.yellow},{name:'15m',unit:'',data:load15,color:COLORS.blue}],{ymin:0,ymax:null});
+      drawChart(document.getElementById('chart-net'),[{name:'DL',unit:'MB/s',data:netRx,color:COLORS.cyan,fill:true},{name:'UL',unit:'MB/s',data:netTx,color:COLORS.tx}],{ymin:0,ymax:null});
+      document.getElementById('meta-cpu-pct').innerHTML=`<span class="cpu-text"><strong>latest ${fmt(lastVal(cpuSeries),'%')}</strong></span> · avg ${fmt(avgVal(cpuSeries),'%')} · peak ${fmt(maxVal(cpuSeries),'%')}`;
+      document.getElementById('meta-temp').innerHTML=`<strong>latest ${fmt(lastVal(tempSeries),'°C')}</strong> · avg ${fmt(avgVal(tempSeries),'°C')} · peak ${fmt(maxVal(tempSeries),'°C')}`;
+      document.getElementById('meta-mem').innerHTML=`<span class="ram-text"><strong>latest ${fmt(lastVal(memSeries),'MB')}</strong></span> · avg ${fmt(avgVal(memSeries),'MB')} · peak ${fmt(maxVal(memSeries),'MB')}`;
+      document.getElementById('meta-disk-io').innerHTML=`<span class="disk-text"><strong>read ${fmt(lastVal(dRead),'MB/s')}</strong></span> · avg ${fmt(avgVal(dRead),'MB/s')} · <span class="disk2-text"><strong>write ${fmt(lastVal(dWrite),'MB/s')}</strong></span> · avg ${fmt(avgVal(dWrite),'MB/s')}`;
+      document.getElementById('meta-load').innerHTML=`1m ${fmt(lastVal(load1))} avg ${fmt(avgVal(load1))} · 5m ${fmt(lastVal(load5))} avg ${fmt(avgVal(load5))} · 15m ${fmt(lastVal(load15))} avg ${fmt(avgVal(load15))}`;
+      const lastDl=lastVal(netRx), lastUl=lastVal(netTx), maxDl=maxVal(netRx), maxUl=maxVal(netTx); document.getElementById('net-rx').textContent=fmt(lastDl,'MB/s'); document.getElementById('net-tx').textContent=fmt(lastUl,'MB/s'); document.getElementById('kpi-net').className='stat-card '+statusClass(Math.max(lastDl||0,lastUl||0),10,40); document.getElementById('meta-net-chart').innerHTML=`<span class="dl-text"><strong>DL ${fmt(lastDl,'MB/s')}</strong></span> · avg ${fmt(avgVal(netRx),'MB/s')} · <span class="ul-text"><strong>UL ${fmt(lastUl,'MB/s')}</strong></span> · avg ${fmt(avgVal(netTx),'MB/s')}`; document.getElementById('bar-net').style.width=((Math.max(lastDl||0,lastUl||0)/Math.max(1,Math.max(maxDl||0,maxUl||0)))*100).toFixed(1)+'%';
+      document.getElementById('net-sub').textContent='current speed';
+      setGlobalHeader(snap,runtime);
+      setLoadState('public '+new Date().toLocaleTimeString());
+      return;
+    }
     const snap=await fetchJSON('/api/snapshot');
     const runtime=IS_PRIVATE?await fetchJSON('/api/runtime'):null;
     document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString();
@@ -245,6 +302,7 @@ function lastVal(data){ const p=[...(data||[])].reverse().find(x=>x[1]!==null&&x
 function maxVal(data){ const vals=(data||[]).map(x=>x[1]).filter(v=>v!==null&&v!==undefined); return vals.length?Math.max(...vals):null; }
 function avgVal(data){ const vals=(data||[]).map(x=>Number(x[1])).filter(v=>Number.isFinite(v)); return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null; }
 async function refreshCharts(){
+  if(!IS_PRIVATE) return;
   if(settings.paused||inflight.charts) return;
   inflight.charts=true; setLoadState('loading charts…');
   try{
@@ -270,7 +328,7 @@ async function refreshCharts(){
   }catch(e){ console.error(e); setLoadState('charts error'); }
   finally{ inflight.charts=false; }
 }
-async function refreshAlerts(){ if(settings.paused||inflight.alerts) return; inflight.alerts=true; try{ const alerts=await fetchJSON('/api/alerts?limit=20'); const body=document.getElementById('dash-alerts-body'); if(!alerts.length){ body.innerHTML='<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; } body.innerHTML=alerts.map(a=>`<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join(''); }catch(e){ console.error(e); } finally { inflight.alerts=false; } }
+async function refreshAlerts(){ if(!IS_PRIVATE) return; if(settings.paused||inflight.alerts) return; inflight.alerts=true; try{ const alerts=await fetchJSON('/api/alerts?limit=20'); const body=document.getElementById('dash-alerts-body'); if(!alerts.length){ body.innerHTML='<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; } body.innerHTML=alerts.map(a=>`<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join(''); }catch(e){ console.error(e); } finally { inflight.alerts=false; } }
 function procColor(v,warn,danger){ return v>danger?COLORS.red:v>warn?COLORS.yellow:COLORS.text; }
 function esc(s){ return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 async function refreshProcs(){ if(!IS_PRIVATE) return; if(settings.paused||inflight.procs) return; inflight.procs=true; try{ const [cpuTop,memTop]=await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'),fetchJSON('/api/top-processes?by=mem&n=10')]); document.getElementById('top-cpu-body').innerHTML=cpuTop.processes.length?cpuTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; document.getElementById('top-mem-body').innerHTML=memTop.processes.length?memTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; }catch(e){ console.error(e); } finally { inflight.procs=false; } }
