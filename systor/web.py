@@ -567,14 +567,14 @@ _DENY_NAME_RE = re.compile(r"(\.env$|id_rsa|id_ed25519|authorized_keys|token|sec
 
 def _storage_cfg() -> dict:
     cfg = load_config().setdefault("storage_page", {})
-    roots = cfg.get("allowed_roots") or "/mnt/tb"
+    roots = cfg.get("allowed_roots") or "/mnt/tb,/root"
     if isinstance(roots, str):
         allowed = [x.strip() for x in re.split(r"[\n,]+", roots) if x.strip()]
     elif isinstance(roots, list):
         allowed = [str(x).strip() for x in roots if str(x).strip()]
     else:
-        allowed = ["/mnt/tb"]
-    return {"allowed_roots": allowed or ["/mnt/tb"], "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "no_right_click": bool(cfg.get("no_right_click", False)), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
+        allowed = ["/mnt/tb", "/root"]
+    return {"allowed_roots": allowed or ["/mnt/tb", "/root"], "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "no_right_click": bool(cfg.get("no_right_click", False)), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
 
 
 def _client_private() -> bool:
@@ -635,6 +635,26 @@ def _resolve_storage_path(value: str | None, must_exist: bool = True) -> Path:
     if _DENY_NAME_RE.search(sp): abort(403, "blocked secret-like path")
     if not any(_under(root, rp) for root in roots): abort(403, "path escapes allowed roots")
     return rp
+
+
+def _resolve_storage_browse_path(value: str | None) -> tuple[Path, bool]:
+    """Resolve browse path. Returns (path, managed). Managed means actions may be allowed.
+    LAN-only Storage can browse shallow safe system roots, but actions stay restricted to allowlisted roots.
+    """
+    raw=(value or "").strip()
+    if raw == "/":
+        return Path("/"), False
+    p=Path(raw).expanduser()
+    if not p.is_absolute():
+        roots=_safe_roots(); p=(roots[0] / p) if roots else Path("/mnt/tb") / p
+    rp=p.resolve(strict=True)
+    sp=str(rp)
+    if sp == "/" or any(sp == x or sp.startswith(x + "/") for x in _DENY_PREFIXES):
+        abort(403, "blocked system or secret path")
+    if _DENY_NAME_RE.search(sp):
+        abort(403, "blocked secret-like path")
+    managed=any(_under(root, rp) for root in _safe_roots())
+    return rp, managed
 
 
 def _fmt_ts(ts: float) -> str:
@@ -699,7 +719,7 @@ def _virtual_root_entries() -> list[dict]:
                 continue
             st = p.lstat()
             typ = "symlink" if p.is_symlink() else "dir" if p.is_dir() else "file"
-            rows.append({"name": p.name or str(p), "path": str(p), "type": typ, "size": st.st_size if typ == "file" else 0, "mtime": st.st_mtime, "mtime_text": _fmt_ts(st.st_mtime)})
+            rows.append({"name": p.name or str(p), "path": str(p), "type": typ, "size": st.st_size if typ == "file" else None, "mtime": st.st_mtime, "mtime_text": _fmt_ts(st.st_mtime)})
         except Exception:
             continue
     rows.sort(key=lambda r: (r.get("type") != "dir", r.get("name", "").lower()))
@@ -966,9 +986,10 @@ def create_app() -> Flask:
         raw_path = (request.args.get("path") or "").strip()
         if raw_path == "/":
             path = Path("/")
+            managed = False
             entries = _virtual_root_entries()
         else:
-            path = _resolve_storage_path(raw_path, must_exist=True)
+            path, managed = _resolve_storage_browse_path(raw_path)
             if not path.is_dir():
                 return jsonify({"ok": False, "error": "path is not a directory"}), 400
             entries=[]
@@ -976,7 +997,9 @@ def create_app() -> Flask:
                 for child in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
                     try:
                         if _DENY_NAME_RE.search(str(child)): continue
-                        entries.append(_entry_payload(child))
+                        # In unmanaged/root-ish folders, keep dir sizes unknown so root stays fast and not misleading.
+                        rec = _entry_payload(child) if managed else {"name": child.name or str(child), "path": str(child), "type": "symlink" if child.is_symlink() else "dir" if child.is_dir() else "file", "size": child.lstat().st_size if child.is_file() else None, "mtime": child.lstat().st_mtime, "mtime_text": _fmt_ts(child.lstat().st_mtime)}
+                        entries.append(rec)
                     except Exception:
                         continue
             except PermissionError:
@@ -991,12 +1014,12 @@ def create_app() -> Flask:
                 ext = Path(rec.get("name") or rec.get("path") or "").suffix.lower() or "[none]"
                 cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0})
                 cur["count"] += 1; cur["size"] += rec.get("size", 0) or 0
-        return jsonify({"ok": True, "path": str(path), "entries": entries, "summary": {"total_size": total, "files": files, "dirs": dirs}, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True)[:20], "mount": _mount_payload(path), "can_write": _storage_can_write() and str(path) != "/"})
+        return jsonify({"ok": True, "path": str(path), "entries": entries, "summary": {"total_size": total, "files": files, "dirs": dirs}, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True)[:20], "mount": _mount_payload(path), "can_write": _storage_can_write() and managed and str(path) != "/"})
 
     @app.route("/api/storage/analysis")
     def api_storage_analysis():
         raw_path = (request.args.get("path") or "").strip()
-        path = Path("/") if raw_path == "/" else _resolve_storage_path(raw_path, must_exist=True)
+        path = Path("/") if raw_path == "/" else _resolve_storage_browse_path(raw_path)[0]
         if not path.is_dir():
             return jsonify({"ok": False, "error": "path is not a directory"}), 400
         limit = max(1, min(200, int(request.args.get("limit", 25))))
