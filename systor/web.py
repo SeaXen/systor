@@ -957,14 +957,34 @@ def create_app() -> Flask:
 
     @app.context_processor
     def _ctx_access():
-        return {"storage_private": _client_private()}
+        private = _client_private()
+        return {"storage_private": private, "client_private": private}
 
     @app.before_request
-    def _block_public_storage():
+    def _block_public_surfaces():
         path = request.path or ""
-        if path.startswith("/api/storage") and not _client_private():
-            return jsonify({"ok": False, "error": "Storage is LAN/Tailscale/local only"}), 403
-        if path.startswith("/storage") and not _client_private():
+        private = _client_private()
+        if private:
+            return None
+
+        # Public internet: dashboard only.
+        public_pages_blocked = ("/apps", "/network", "/speed", "/alerts", "/logs", "/settings", "/storage")
+        if path in public_pages_blocked or any(path.startswith(p + "/") for p in public_pages_blocked):
+            abort(404)
+
+        # Public internet: allow only read-only dashboard data.
+        public_api_allow = {
+            "/api/snapshot",
+            "/api/series",
+            "/api/network-series",
+            "/api/alerts",
+            "/api/version",
+            "/health",
+        }
+        if path.startswith("/api/") and path not in public_api_allow:
+            return jsonify({"ok": False, "error": "This API is LAN/Tailscale/local only"}), 403
+
+        if path.startswith("/storage"):
             abort(404)
 
     # ---------- API: live snapshot ----------

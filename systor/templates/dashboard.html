@@ -2,6 +2,8 @@
 {% block title %}systor · Dashboard{% endblock %}
 {% block content %}
 
+<script>const IS_PRIVATE = {{ 'true' if client_private else 'false' }};</script>
+
 <div class="dash-toolbar">
   <div class="dash-status">
     <span class="dot green"></span>
@@ -50,8 +52,10 @@
       </select>
     </label>
     <button class="btn secondary compact" id="manual-refresh-btn">Refresh</button>
+    {% if client_private %}
     <button class="btn secondary compact" id="restart-collector-btn">Restart collector</button>
     <button class="btn secondary compact" id="restart-web-btn">Restart web</button>
+    {% endif %}
     <button class="btn secondary compact" id="pause-btn">Pause</button>
   </div>
 </div>
@@ -123,6 +127,7 @@
   </div>
 </div>
 
+{% if client_private %}
 <div class="table-grid">
   <div class="table-card compact-table">
     <h3><span>Top CPU</span><span class="text-muted">10 procs · 30s</span></h3>
@@ -139,6 +144,7 @@
     </table>
   </div>
 </div>
+{% endif %}
 
 <div class="table-card compact-table alerts-card">
   <h3><span>Recent Alerts</span></h3>
@@ -180,17 +186,18 @@ settings.refreshMs=Math.max(1000, Number(settings.refreshMs)||SERVER_DEFAULTS.re
 settings.chartMs=Math.max(1000, Number(settings.chartMs)||SERVER_DEFAULTS.chartMs);
 function saveSettings(){ /* page controls are temporary; Settings page owns saved defaults */ }
 function setLoadState(text){ document.getElementById('load-state').textContent=text; }
-function setupControls(){ const refreshSel=document.getElementById('refresh-sec'); const chartSel=document.getElementById('chart-sec'); const rangeSel=document.getElementById('range-hours'); const pauseBtn=document.getElementById('pause-btn'); refreshSel.value=String(settings.refreshMs); chartSel.value=String(settings.chartMs); rangeSel.value=String(settings.rangeHours); pauseBtn.textContent=settings.paused?'Resume':'Pause'; refreshSel.addEventListener('change',()=>{ settings.refreshMs=Math.max(1000, parseInt(refreshSel.value)); saveSettings(); restartTimers(); refreshAll();}); chartSel.addEventListener('change',()=>{ settings.chartMs=Math.max(1000, parseInt(chartSel.value)); saveSettings(); restartTimers(); refreshCharts();}); rangeSel.addEventListener('change',()=>{ settings.rangeHours=parseFloat(rangeSel.value); saveSettings(); refreshCharts();}); pauseBtn.addEventListener('click',()=>{ settings.paused=!settings.paused; pauseBtn.textContent=settings.paused?'Resume':'Pause'; saveSettings(); restartTimers();}); document.getElementById('manual-refresh-btn').addEventListener('click', refreshAll); document.getElementById('restart-collector-btn').addEventListener('click', async()=>{ if(!confirm('Restart collector now?')) return; const j=await fetchJSON('/api/restart-collector',{method:'POST'}); setLoadState('collector restarted'); alert(j.message||'collector restarting'); }); document.getElementById('restart-web-btn').addEventListener('click', async()=>{ if(!confirm('Restart dashboard web now?')) return; const j=await fetchJSON('/api/restart-web',{method:'POST'}); setLoadState('web restarting'); alert(j.message||'web restarting'); }); }
+function setupControls(){ const refreshSel=document.getElementById('refresh-sec'); const chartSel=document.getElementById('chart-sec'); const rangeSel=document.getElementById('range-hours'); const pauseBtn=document.getElementById('pause-btn'); refreshSel.value=String(settings.refreshMs); chartSel.value=String(settings.chartMs); rangeSel.value=String(settings.rangeHours); pauseBtn.textContent=settings.paused?'Resume':'Pause'; refreshSel.addEventListener('change',()=>{ settings.refreshMs=Math.max(1000, parseInt(refreshSel.value)); saveSettings(); restartTimers(); refreshAll();}); chartSel.addEventListener('change',()=>{ settings.chartMs=Math.max(1000, parseInt(chartSel.value)); saveSettings(); restartTimers(); refreshCharts();}); rangeSel.addEventListener('change',()=>{ settings.rangeHours=parseFloat(rangeSel.value); saveSettings(); refreshCharts();}); pauseBtn.addEventListener('click',()=>{ settings.paused=!settings.paused; pauseBtn.textContent=settings.paused?'Resume':'Pause'; saveSettings(); restartTimers();}); document.getElementById('manual-refresh-btn').addEventListener('click', refreshAll); const rc=document.getElementById('restart-collector-btn'); const rw=document.getElementById('restart-web-btn'); if(rc){ rc.addEventListener('click', async()=>{ if(!confirm('Restart collector now?')) return; const j=await fetchJSON('/api/restart-collector',{method:'POST'}); setLoadState('collector restarted'); alert(j.message||'collector restarting'); }); } if(rw){ rw.addEventListener('click', async()=>{ if(!confirm('Restart dashboard web now?')) return; const j=await fetchJSON('/api/restart-web',{method:'POST'}); setLoadState('web restarting'); alert(j.message||'web restarting'); }); } }
 let snapTimer, chartTimer, alertTimer, procTimer; const inflight={snap:false, charts:false, alerts:false, procs:false};
 function restartTimers(){ clearInterval(snapTimer); clearInterval(chartTimer); clearInterval(alertTimer); clearInterval(procTimer); if(settings.paused) return; snapTimer=setInterval(refresh, settings.refreshMs); chartTimer=setInterval(refreshCharts, settings.chartMs); alertTimer=setInterval(refreshAlerts, Math.max(settings.refreshMs,10000)); procTimer=setInterval(refreshProcs,30000); }
 function refreshAll(){ refresh(); refreshCharts(); refreshAlerts(); refreshProcs(); }
-function setGlobalHeader(snap, runtime){ const cpu=snap.cpu||{}, mem=snap.memory||{}, web=runtime.web||{}, collector=runtime.collector||{}, s=runtime.storage||{}; const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null; const el=document.getElementById('global-header-meta'); if(!el) return; el.innerHTML=`<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(s.total_mb,'MB')}</strong></span>`; }
+function setGlobalHeader(snap, runtime){ const cpu=snap.cpu||{}, mem=snap.memory||{}, web=(runtime&&runtime.web)||{}, collector=(runtime&&runtime.collector)||{}, s=(runtime&&runtime.storage)||{}; const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null; const el=document.getElementById('global-header-meta'); if(!el) return; if(!IS_PRIVATE){ el.innerHTML=`<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span>`; return; } el.innerHTML=`<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(s.total_mb,'MB')}</strong></span>`; }
 async function refresh(){
   if(settings.paused||inflight.snap) return;
   inflight.snap=true;
   setLoadState('loading snapshot…');
   try{
-    const [snap,runtime]=await Promise.all([fetchJSON('/api/snapshot'), fetchJSON('/api/runtime')]);
+    const snap=await fetchJSON('/api/snapshot');
+    const runtime=IS_PRIVATE?await fetchJSON('/api/runtime'):null;
     document.getElementById('updated').textContent='updated '+new Date().toLocaleTimeString();
     document.getElementById('hostname').textContent=snap.hostname||'systor';
     const up=snap.uptime_sec||0;
@@ -266,7 +273,7 @@ async function refreshCharts(){
 async function refreshAlerts(){ if(settings.paused||inflight.alerts) return; inflight.alerts=true; try{ const alerts=await fetchJSON('/api/alerts?limit=20'); const body=document.getElementById('dash-alerts-body'); if(!alerts.length){ body.innerHTML='<tr><td colspan="4" class="empty-cell">No alerts — system healthy</td></tr>'; return; } body.innerHTML=alerts.map(a=>`<tr><td><span class="mono">${timeShort(a.ts)}</span> <span class="text-muted">${timeAgo(a.ts)}</span></td><td><span class="badge ${a.severity}">${a.severity}</span></td><td>${a.metric}</td><td>${a.message}</td></tr>`).join(''); }catch(e){ console.error(e); } finally { inflight.alerts=false; } }
 function procColor(v,warn,danger){ return v>danger?COLORS.red:v>warn?COLORS.yellow:COLORS.text; }
 function esc(s){ return String(s||'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-async function refreshProcs(){ if(settings.paused||inflight.procs) return; inflight.procs=true; try{ const [cpuTop,memTop]=await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'),fetchJSON('/api/top-processes?by=mem&n=10')]); document.getElementById('top-cpu-body').innerHTML=cpuTop.processes.length?cpuTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; document.getElementById('top-mem-body').innerHTML=memTop.processes.length?memTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; }catch(e){ console.error(e); } finally { inflight.procs=false; } }
+async function refreshProcs(){ if(!IS_PRIVATE) return; if(settings.paused||inflight.procs) return; inflight.procs=true; try{ const [cpuTop,memTop]=await Promise.all([fetchJSON('/api/top-processes?by=cpu&n=10'),fetchJSON('/api/top-processes?by=mem&n=10')]); document.getElementById('top-cpu-body').innerHTML=cpuTop.processes.length?cpuTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono" style="color:${procColor(p.cpu_percent,20,50)}">${p.cpu_percent}</td><td class="text-right mono">${p.mem_mb}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; document.getElementById('top-mem-body').innerHTML=memTop.processes.length?memTop.processes.map(p=>`<tr><td class="mono text-muted">${p.pid}</td><td title="${esc(p.cmdline)}">${esc(p.name)}</td><td class="text-muted">${esc(p.user)}</td><td class="text-right mono">${p.mem_mb}</td><td class="text-right mono" style="color:${procColor(p.mem_percent,5,10)}">${p.mem_percent}</td></tr>`).join(''):'<tr><td colspan="5" class="empty-cell">No data</td></tr>'; }catch(e){ console.error(e); } finally { inflight.procs=false; } }
 setupControls(); refreshAll(); restartTimers(); window.addEventListener('resize',()=>{ clearTimeout(window.__chartResize); window.__chartResize=setTimeout(()=>{ refreshCharts(); },150); });
 </script>
 {% endblock %}
