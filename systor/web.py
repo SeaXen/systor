@@ -23,11 +23,15 @@ import threading
 import time
 import subprocess
 import ipaddress
+import zipfile
+import tempfile
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request, abort, Response
+from werkzeug.utils import secure_filename
+
+from flask import Flask, jsonify, render_template, request, abort, Response, send_file, after_this_request
 
 from .config import load_config, save_config
 from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb, read_network_interfaces
@@ -1027,6 +1031,73 @@ def create_app() -> Flask:
         mode = request.args.get("mode", "quick")
         data = _scan_storage(path, min(scfg["max_scan_files"], 20000)) if mode == "deep" and str(path) != "/" else _quick_storage_analysis(path, min(scfg["max_scan_files"], 5000))
         return jsonify({"ok": True, "mode": mode if mode == "deep" else "quick", "path": str(path), "scanned": data["scanned"], "summary": data.get("summary", {}), "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit], "duplicates": data.get("duplicates", [])[:limit]})
+
+    @app.route("/api/storage/upload", methods=["POST"])
+    def api_storage_upload():
+        if not _storage_can_write():
+            return jsonify({"ok": False, "error": "upload is LAN/Tailscale/local only"}), 403
+        dest = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        if not dest.is_dir():
+            return jsonify({"ok": False, "error": "destination is not a folder"}), 400
+        files = request.files.getlist("files")
+        if not files:
+            return jsonify({"ok": False, "error": "no files uploaded"}), 400
+        saved=[]
+        try:
+            for f in files:
+                name = secure_filename(f.filename or "")
+                if not name:
+                    continue
+                target = _resolve_storage_path(str(dest / name), must_exist=False)
+                if target.exists():
+                    stem, suffix = target.stem, target.suffix
+                    i = 1
+                    while target.exists() and i < 1000:
+                        target = dest / f"{stem}-{i}{suffix}"
+                        target = _resolve_storage_path(str(target), must_exist=False)
+                        i += 1
+                f.save(target)
+                saved.append(str(target))
+                _log_storage_op("upload", str(target), True)
+            return jsonify({"ok": True, "message": f"Uploaded {len(saved)} file(s)", "saved": saved})
+        except Exception as e:
+            _log_storage_op("upload", str(dest), False, str(e))
+            return jsonify({"ok": False, "error": str(e)}), 400
+
+    @app.route("/api/storage/download")
+    def api_storage_download():
+        if not _client_private():
+            abort(403, "download is LAN/Tailscale/local only")
+        src = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        if src.is_file():
+            return send_file(src, as_attachment=True, download_name=src.name)
+        if src.is_dir():
+            tmpdir = Path(tempfile.mkdtemp(prefix="systor-download-"))
+            zpath = tmpdir / f"{src.name or 'download'}.zip"
+            with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as zf:
+                base = src.parent
+                count = 0
+                for root, dnames, fnames in os.walk(src):
+                    dnames[:] = [d for d in dnames if d not in (".systor-trash", ".Trash")]
+                    for name in fnames:
+                        fp = Path(root) / name
+                        if fp.is_symlink() or _DENY_NAME_RE.search(str(fp)):
+                            continue
+                        zf.write(fp, fp.relative_to(base))
+                        count += 1
+                        if count >= 5000:
+                            break
+                    if count >= 5000:
+                        break
+            @after_this_request
+            def _cleanup(resp):
+                try:
+                    shutil.rmtree(tmpdir, ignore_errors=True)
+                except Exception:
+                    pass
+                return resp
+            return send_file(zpath, as_attachment=True, download_name=zpath.name)
+        abort(400, "not a downloadable file or folder")
 
     @app.route("/api/storage/action", methods=["POST"])
     def api_storage_action():
