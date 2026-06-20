@@ -607,7 +607,12 @@ def _safe_roots() -> list[Path]:
 
 
 def _storage_roots_payload() -> list[dict]:
-    return [{"path": str(r), "label": r.name or str(r)} for r in _safe_roots()]
+    rows = []
+    for r in _safe_roots():
+        rows.append({"path": str(r), "label": "Data " + str(r) if str(r) == "/mnt/tb" else (r.name or str(r)), "readonly": False})
+    if Path("/").exists():
+        rows.append({"path": "/", "label": "Root / SSD", "readonly": True})
+    return rows
 
 
 def _under(root: Path, path: Path) -> bool:
@@ -685,6 +690,56 @@ def _trash_path(p: Path) -> Path:
     return trash / p.name
 
 
+def _virtual_root_entries() -> list[dict]:
+    rows=[]
+    for p in Path("/").iterdir():
+        try:
+            sp=str(p.resolve())
+            if any(sp == x or sp.startswith(x + "/") for x in _DENY_PREFIXES):
+                continue
+            st = p.lstat()
+            typ = "symlink" if p.is_symlink() else "dir" if p.is_dir() else "file"
+            rows.append({"name": p.name or str(p), "path": str(p), "type": typ, "size": st.st_size if typ == "file" else 0, "mtime": st.st_mtime, "mtime_text": _fmt_ts(st.st_mtime)})
+        except Exception:
+            continue
+    rows.sort(key=lambda r: (r.get("type") != "dir", r.get("name", "").lower()))
+    return rows
+
+
+def _quick_storage_analysis(path: Path, limit: int) -> dict:
+    files=[]; folders=[]; old=[]; type_map={}; scanned=0; now=time.time()
+    if str(path) == "/":
+        entries = _virtual_root_entries()
+    else:
+        try:
+            entries = [_entry_payload(x) for x in path.iterdir() if not x.is_symlink() and x.name not in (".systor-trash", ".Trash")]
+        except Exception:
+            entries = []
+    for e in entries:
+        scanned += 1
+        if scanned > limit:
+            break
+        if e.get("type") == "dir":
+            folders.append({"path": e["path"], "size": int(e.get("size") or 0)})
+        else:
+            size = int(e.get("size") or 0)
+            mtime = float(e.get("mtime") or now)
+            age = int((now-mtime)/86400)
+            rec={"path": e["path"], "size": size, "mtime": mtime, "age_days": age}
+            files.append(rec)
+            if size > 50*1024*1024 and age >= 30: old.append(rec)
+            ext=Path(e["path"]).suffix.lower() or "[none]"
+            cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0}); cur["count"] += 1; cur["size"] += size
+    files.sort(key=lambda x:x["size"], reverse=True); folders.sort(key=lambda x:x["size"], reverse=True); old.sort(key=lambda x:(x["age_days"], x["size"]), reverse=True)
+    dup_map={}
+    for rec in files:
+        key=(Path(rec["path"]).name.lower(), rec["size"]); dup_map.setdefault(key, []).append(rec)
+    dups=[{"name": k[0], "size": k[1], "count": len(v), "paths": [g["path"] for g in v[:6]]} for k,v in dup_map.items() if len(v)>1 and k[1]>0]
+    dups.sort(key=lambda x:(x["count"], x["size"]), reverse=True)
+    types=sorted(type_map.values(), key=lambda x:x["size"], reverse=True)
+    return {"files": files, "folders": folders, "old_files": old, "types": types, "duplicates": dups, "scanned": scanned, "summary": {"files": len(files), "folders": len(folders), "old_large": len(old), "duplicates": len(dups), "types": len(types), "total_file_size": sum(x.get("size",0) for x in files)}}
+
+
 def _scan_storage(path: Path, limit: int) -> dict:
     files=[]; folders=[]; old=[]; type_map={}; scanned=0; now=time.time()
     for root, dnames, fnames in os.walk(path):
@@ -734,6 +789,18 @@ def create_app() -> Flask:
         if path.startswith("/static/") or path.endswith((".css", ".js", ".png", ".svg", ".ico", ".webp", ".woff2")):
             response.headers["Cache-Control"] = "public, max-age=300"
         return response
+
+    @app.context_processor
+    def _ctx_access():
+        return {"storage_private": _client_private()}
+
+    @app.before_request
+    def _block_public_storage():
+        path = request.path or ""
+        if path.startswith("/api/storage") and not _client_private():
+            return jsonify({"ok": False, "error": "Storage is LAN/Tailscale/local only"}), 403
+        if path.startswith("/storage") and not _client_private():
+            abort(404)
 
     # ---------- API: live snapshot ----------
     @app.route("/api/snapshot")
@@ -896,37 +963,47 @@ def create_app() -> Flask:
 
     @app.route("/api/storage/browse")
     def api_storage_browse():
-        path = _resolve_storage_path(request.args.get("path"), must_exist=True)
-        if not path.is_dir():
-            return jsonify({"ok": False, "error": "path is not a directory"}), 400
-        entries=[]; type_map={}; total=files=dirs=0
-        try:
-            for child in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-                try:
-                    if _DENY_NAME_RE.search(str(child)): continue
-                    rec=_entry_payload(child); entries.append(rec)
-                    total += rec.get("size", 0) or 0
-                    if rec["type"] == "dir": dirs += 1
-                    else:
-                        files += 1
-                        ext = child.suffix.lower() or "[none]"
-                        cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0})
-                        cur["count"] += 1; cur["size"] += rec.get("size", 0) or 0
-                except Exception:
-                    continue
-        except PermissionError:
-            return jsonify({"ok": False, "error": "permission denied"}), 403
-        return jsonify({"ok": True, "path": str(path), "entries": entries, "summary": {"total_size": total, "files": files, "dirs": dirs}, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True)[:20], "mount": _mount_payload(path), "can_write": _storage_can_write()})
+        raw_path = (request.args.get("path") or "").strip()
+        if raw_path == "/":
+            path = Path("/")
+            entries = _virtual_root_entries()
+        else:
+            path = _resolve_storage_path(raw_path, must_exist=True)
+            if not path.is_dir():
+                return jsonify({"ok": False, "error": "path is not a directory"}), 400
+            entries=[]
+            try:
+                for child in sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+                    try:
+                        if _DENY_NAME_RE.search(str(child)): continue
+                        entries.append(_entry_payload(child))
+                    except Exception:
+                        continue
+            except PermissionError:
+                return jsonify({"ok": False, "error": "permission denied"}), 403
+        type_map={}; total=files=dirs=0
+        for rec in entries:
+            total += rec.get("size", 0) or 0
+            if rec["type"] == "dir":
+                dirs += 1
+            else:
+                files += 1
+                ext = Path(rec.get("name") or rec.get("path") or "").suffix.lower() or "[none]"
+                cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0})
+                cur["count"] += 1; cur["size"] += rec.get("size", 0) or 0
+        return jsonify({"ok": True, "path": str(path), "entries": entries, "summary": {"total_size": total, "files": files, "dirs": dirs}, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True)[:20], "mount": _mount_payload(path), "can_write": _storage_can_write() and str(path) != "/"})
 
     @app.route("/api/storage/analysis")
     def api_storage_analysis():
-        path = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        raw_path = (request.args.get("path") or "").strip()
+        path = Path("/") if raw_path == "/" else _resolve_storage_path(raw_path, must_exist=True)
         if not path.is_dir():
             return jsonify({"ok": False, "error": "path is not a directory"}), 400
         limit = max(1, min(200, int(request.args.get("limit", 25))))
-        scan_limit = _storage_cfg()["max_scan_files"]
-        data = _scan_storage(path, scan_limit)
-        return jsonify({"ok": True, "path": str(path), "scanned": data["scanned"], "summary": data.get("summary", {}), "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit], "duplicates": data.get("duplicates", [])[:limit]})
+        scfg = _storage_cfg()
+        mode = request.args.get("mode", "quick")
+        data = _scan_storage(path, min(scfg["max_scan_files"], 20000)) if mode == "deep" and str(path) != "/" else _quick_storage_analysis(path, min(scfg["max_scan_files"], 5000))
+        return jsonify({"ok": True, "mode": mode if mode == "deep" else "quick", "path": str(path), "scanned": data["scanned"], "summary": data.get("summary", {}), "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit], "duplicates": data.get("duplicates", [])[:limit]})
 
     @app.route("/api/storage/action", methods=["POST"])
     def api_storage_action():
