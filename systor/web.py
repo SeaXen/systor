@@ -70,6 +70,8 @@ _docker_cache_lock = threading.Lock()
 # every request burst. Short TTL keeps it feeling live while smoothing cost.
 _apps_cache: dict = {"ts": 0.0, "limit": 0, "host_rows": [], "docker_rows": []}
 _apps_cache_lock = threading.Lock()
+_public_dash_cache: dict = {"ts": 0.0, "hours": None, "body": b"", "etag": ""}
+_public_dash_cache_lock = threading.Lock()
 
 
 def _apps_cache_refresh_worker() -> None:
@@ -1589,8 +1591,26 @@ def create_app() -> Flask:
     def api_public_dashboard():
         """Single bundled read-only payload for the public dashboard.
         Cuts Cloudflare RTT overhead by collapsing many chart requests into one.
+        Also uses a tiny in-process cache so burst refreshes don't rebuild all
+        series repeatedly and cause random 3-5s spikes.
         """
         hours = _parse_hours_arg(request.args.get("hours"), 6.0)
+        now = time.time()
+        with _public_dash_cache_lock:
+            cached_ts = float(_public_dash_cache.get("ts") or 0.0)
+            cached_hours = _public_dash_cache.get("hours")
+            cached_body = _public_dash_cache.get("body") or b""
+            cached_etag = _public_dash_cache.get("etag") or ""
+        if cached_body and cached_hours == hours and now - cached_ts < 2.0:
+            if request.headers.get("If-None-Match") == cached_etag:
+                resp = Response(status=304)
+                resp.headers["ETag"] = cached_etag
+                resp.headers["Cache-Control"] = "public, max-age=2"
+                return resp
+            resp = Response(cached_body, mimetype="application/json")
+            resp.headers["ETag"] = cached_etag
+            resp.headers["Cache-Control"] = "public, max-age=2"
+            return resp
         snap = collect_snapshot()
         snap["db_stats"] = get_storage().stats()
         metrics = {
@@ -1604,7 +1624,22 @@ def create_app() -> Flask:
             "load15": _bucket_series_points(get_storage().series("load_15m", hours=hours), 600),
         }
         net = _bucket_network_points(get_storage().network_series(hours=hours), 600)
-        return jsonify({"ok": True, "hours": hours, "snapshot": snap, "metrics": metrics, "network": net})
+        body = json.dumps({"ok": True, "hours": hours, "snapshot": snap, "metrics": metrics, "network": net}, separators=(",", ":")).encode()
+        etag = '"' + hashlib.md5(body).hexdigest()[:16] + '"'
+        with _public_dash_cache_lock:
+            _public_dash_cache["ts"] = now
+            _public_dash_cache["hours"] = hours
+            _public_dash_cache["body"] = body
+            _public_dash_cache["etag"] = etag
+        if request.headers.get("If-None-Match") == etag:
+            resp = Response(status=304)
+            resp.headers["ETag"] = etag
+            resp.headers["Cache-Control"] = "public, max-age=2"
+            return resp
+        resp = Response(body, mimetype="application/json")
+        resp.headers["ETag"] = etag
+        resp.headers["Cache-Control"] = "public, max-age=2"
+        return resp
 
     @app.route("/api/network-usage")
     def api_network_usage():
