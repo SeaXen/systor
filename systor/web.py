@@ -31,6 +31,7 @@ from functools import wraps
 from pathlib import Path
 
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask import Flask, jsonify, render_template, request, abort, Response, send_file, after_this_request
 
@@ -563,7 +564,7 @@ def _looks_masked_secret(value: str) -> bool:
 
 # ---------- Storage/File Manager safety helpers ----------
 STORAGE_OP_LOG = Path("/var/lib/systor/storage_ops.jsonl")
-_storage_deep_state = {"running": False, "done": False, "path": "", "started": 0, "ended": 0, "error": "", "result": None}
+_storage_deep_state = {"running": False, "done": False, "path": "", "started": 0, "ended": 0, "error": "", "result": None, "scanned": 0, "current": "", "folders_found": 0, "files_found": 0}
 _storage_deep_lock = threading.Lock()
 _DENY_PREFIXES = (
     "/etc", "/boot", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/proc", "/sys", "/dev", "/run",
@@ -572,17 +573,80 @@ _DENY_PREFIXES = (
 _DENY_NAME_RE = re.compile(r"(\.env$|id_rsa|id_ed25519|authorized_keys|token|secret|credential|auth\.json)", re.I)
 
 
+def _auto_storage_roots() -> list[str]:
+    roots: list[str] = []
+    # Always keep the common data mount if present. Other entries come from real mountpoints below.
+    for cand in ("/mnt/tb",):
+        try:
+            p = Path(cand)
+            if p.exists() and p.is_dir() and str(p.resolve()) != "/":
+                roots.append(str(p.resolve()))
+        except Exception:
+            pass
+    try:
+        out = subprocess.run(["findmnt", "-rn", "-o", "TARGET,FSTYPE"], capture_output=True, text=True, timeout=4).stdout.splitlines()
+        skip_fs = {"proc", "sysfs", "devtmpfs", "devpts", "tmpfs", "cgroup", "cgroup2", "overlay", "squashfs", "nsfs", "securityfs", "pstore", "bpf", "tracefs", "debugfs", "fusectl", "mqueue", "hugetlbfs", "configfs", "ramfs"}
+        for line in out:
+            parts = line.split(None, 1)
+            if len(parts) < 2:
+                continue
+            target, fstype = parts[0], parts[1]
+            if fstype in skip_fs or target in ("/", "/boot", "/boot/efi"):
+                continue
+            if target.startswith(("/mnt", "/media", "/srv", "/data", "/home")):
+                try:
+                    rp = Path(target).resolve()
+                    if rp.exists() and rp.is_dir() and str(rp) != "/":
+                        roots.append(str(rp))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    clean=[]
+    for r in roots:
+        if r not in clean and not any(r == x or r.startswith(x + "/") for x in _DENY_PREFIXES):
+            clean.append(r)
+    return clean or (["/mnt/tb"] if Path("/mnt/tb").exists() else ["/home"] if Path("/home").exists() else [])
+
+
+def _storage_public_cfg(cfg: dict) -> dict:
+    out = dict(cfg)
+    out.pop("action_password_hash", None)
+    out["has_action_password"] = bool(cfg.get("action_password_hash"))
+    return out
+
+
+def _verify_storage_action_password(body: dict | None = None) -> tuple[bool, str]:
+    cfg = _storage_cfg()
+    if not cfg.get("action_password_required"):
+        return True, ""
+    stored = cfg.get("action_password_hash") or ""
+    if not stored:
+        return False, "Set a Storage action password first in Settings"
+    pw = ""
+    if body:
+        pw = str(body.get("action_password") or "")
+    pw = pw or request.headers.get("X-Storage-Password", "") or request.args.get("pw", "")
+    if not pw:
+        return False, "Action password required"
+    try:
+        return (check_password_hash(stored, pw), "Invalid action password")
+    except Exception:
+        return False, "Invalid action password config"
+
+
 def _storage_cfg() -> dict:
     cfg = load_config().setdefault("storage_page", {})
-    roots = cfg.get("allowed_roots") or "/mnt/tb,/root"
+    roots = cfg.get("allowed_roots") or _auto_storage_roots()
     if isinstance(roots, str):
         allowed = [x.strip() for x in re.split(r"[\n,]+", roots) if x.strip()]
     elif isinstance(roots, list):
         allowed = [str(x).strip() for x in roots if str(x).strip()]
     else:
-        allowed = ["/mnt/tb", "/root"]
-    return {"allowed_roots": allowed or ["/mnt/tb", "/root"], "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "no_right_click": bool(cfg.get("no_right_click", False)), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
-
+        allowed = _auto_storage_roots()
+    if "/root" not in allowed and Path("/root").exists():
+        allowed.append("/root")
+    return {"allowed_roots": allowed or _auto_storage_roots(), "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "no_right_click": bool(cfg.get("no_right_click", False)), "action_password_required": bool(cfg.get("action_password_required", False)), "action_password_hash": str(cfg.get("action_password_hash") or ""), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
 
 def _client_private() -> bool:
     if request.headers.get("CF-Connecting-IP") or request.headers.get("Cf-Ray"):
@@ -616,7 +680,8 @@ def _safe_roots() -> list[Path]:
 def _storage_roots_payload() -> list[dict]:
     rows = []
     for r in _safe_roots():
-        rows.append({"path": str(r), "label": "Data " + str(r) if str(r) == "/mnt/tb" else (r.name or str(r)), "readonly": False})
+        label = "Data " + str(r) if str(r) == "/mnt/tb" else "/root" if str(r) == "/root" else (r.name or str(r))
+        rows.append({"path": str(r), "label": label, "readonly": False})
     if Path("/").exists():
         rows.append({"path": "/", "label": "Root / SSD", "readonly": True})
     return rows
@@ -783,6 +848,10 @@ def _scan_storage(path: Path, limit: int) -> dict:
                 st=fp.stat(); size=st.st_size; ext=fp.suffix.lower() or "[none]"
                 rec={"path": str(fp), "size": size, "mtime": st.st_mtime, "age_days": int((now-st.st_mtime)/86400)}
                 files.append(rec)
+                if scanned == 1 or scanned % 50 == 0:
+                    with _storage_deep_lock:
+                        if _storage_deep_state.get("running"):
+                            _storage_deep_state.update({"scanned": scanned, "current": str(fp), "folders_found": len(folders), "files_found": len(files)})
                 if size > 50*1024*1024 and rec["age_days"] >= 30: old.append(rec)
                 cur=type_map.setdefault(ext, {"ext": ext, "count": 0, "size": 0}); cur["count"] += 1; cur["size"] += size
             except Exception: continue
@@ -962,17 +1031,25 @@ def create_app() -> Flask:
             cfg["storage_page"]["public_readonly"] = bool(body.get("public_readonly", True))
             cfg["storage_page"]["trash_enabled"] = bool(body.get("trash_enabled", True))
             cfg["storage_page"]["no_right_click"] = bool(body.get("no_right_click", False))
+            cfg["storage_page"]["action_password_required"] = bool(body.get("action_password_required", False))
+            new_pw = str(body.get("action_password") or "")
+            if new_pw:
+                cfg["storage_page"]["action_password_hash"] = generate_password_hash(new_pw)
             try: cfg["storage_page"]["max_scan_files"] = max(100, min(200000, int(body.get("max_scan_files", 20000))))
             except Exception: pass
             save_config(cfg)
-            return jsonify({"ok": True, "message": "Storage settings saved", "config": _storage_cfg(), "roots": _storage_roots_payload(), "can_write": _storage_can_write()})
-        return jsonify({"ok": True, "config": scfg, "roots": _storage_roots_payload(), "can_write": _storage_can_write(), "public": not _client_private()})
+            return jsonify({"ok": True, "message": "Storage settings saved", "config": _storage_public_cfg(_storage_cfg()), "roots": _storage_roots_payload(), "can_write": _storage_can_write()})
+        return jsonify({"ok": True, "config": _storage_public_cfg(scfg), "roots": _storage_roots_payload(), "can_write": _storage_can_write(), "public": not _client_private()})
 
     @app.route("/api/storage/mounts")
     def api_storage_mounts():
         rows=[]
         seen=set()
-        for label, path in (("Root / SSD", "/"), ("Data /mnt/tb", "/mnt/tb")):
+        candidates=[("Root / SSD", "/")]
+        for r in _auto_storage_roots():
+            label = "Data " + r if r == "/mnt/tb" else Path(r).name or r
+            candidates.append((label, r))
+        for label, path in candidates:
             try:
                 p=Path(path)
                 if not p.exists():
@@ -1057,7 +1134,7 @@ def create_app() -> Flask:
     def _run_storage_deep_scan(path_str: str, limit: int):
         global _storage_deep_state
         with _storage_deep_lock:
-            _storage_deep_state.update({"running": True, "done": False, "path": path_str, "started": time.time(), "ended": 0, "error": "", "result": None})
+            _storage_deep_state.update({"running": True, "done": False, "path": path_str, "started": time.time(), "ended": 0, "error": "", "result": None, "scanned": 0, "current": "", "folders_found": 0, "files_found": 0})
         try:
             path = _resolve_storage_browse_path(path_str)[0]
             data = _scan_storage(path, limit)
@@ -1072,6 +1149,9 @@ def create_app() -> Flask:
         if not _client_private():
             return jsonify({"ok": False, "error": "deep scan is LAN/Tailscale/local only"}), 403
         body = request.get_json(silent=True) or {}
+        ok, msg = _verify_storage_action_password(body)
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
         path = str(body.get("path") or "/mnt/tb")
         limit = max(100, min(_storage_cfg()["max_scan_files"], int(body.get("limit") or _storage_cfg()["max_scan_files"])))
         with _storage_deep_lock:
@@ -1094,6 +1174,9 @@ def create_app() -> Flask:
     def api_storage_checksum_duplicates():
         if not _client_private():
             return jsonify({"ok": False, "error": "checksum scan is LAN/Tailscale/local only"}), 403
+        ok, msg = _verify_storage_action_password()
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
         path = _resolve_storage_browse_path(request.args.get("path") or "/mnt/tb")[0]
         if not path.is_dir():
             return jsonify({"ok": False, "error": "path is not a directory"}), 400
@@ -1138,10 +1221,55 @@ def create_app() -> Flask:
         groups.sort(key=lambda x: (x["count"], x["size"]), reverse=True)
         return jsonify({"ok": True, "path": str(path), "scanned": scanned, "groups": groups[:50]})
 
+    @app.route("/api/storage/upload-chunk", methods=["POST"])
+    def api_storage_upload_chunk():
+        if not _storage_can_write():
+            return jsonify({"ok": False, "error": "upload is LAN/Tailscale/local only"}), 403
+        ok, msg = _verify_storage_action_password()
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
+        dest = _resolve_storage_path(request.args.get("path"), must_exist=True)
+        if not dest.is_dir():
+            return jsonify({"ok": False, "error": "destination is not a folder"}), 400
+        filename = secure_filename(request.args.get("filename") or "")
+        upload_id = re.sub(r"[^a-zA-Z0-9_.-]", "", request.args.get("upload_id") or "")[:80]
+        if not filename or not upload_id:
+            return jsonify({"ok": False, "error": "missing filename/upload_id"}), 400
+        try:
+            offset = int(request.args.get("offset") or 0)
+            total = int(request.args.get("total") or 0)
+        except Exception:
+            return jsonify({"ok": False, "error": "bad offset/total"}), 400
+        tmpdir = dest / ".systor-upload-tmp"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        part = _resolve_storage_path(str(tmpdir / f"{upload_id}.part"), must_exist=False)
+        data = request.get_data(cache=False)
+        current = part.stat().st_size if part.exists() else 0
+        if current != offset:
+            return jsonify({"ok": False, "error": "offset mismatch", "expected_offset": current}), 409
+        with part.open("ab") as f:
+            f.write(data)
+        written = offset + len(data)
+        if total and written >= total:
+            target = _resolve_storage_path(str(dest / filename), must_exist=False)
+            if target.exists():
+                stem, suffix = target.stem, target.suffix
+                i = 1
+                while target.exists() and i < 1000:
+                    target = _resolve_storage_path(str(dest / f"{stem}-{i}{suffix}"), must_exist=False)
+                    i += 1
+            part.rename(target)
+            _log_storage_op("upload-chunk", str(target), True)
+            return jsonify({"ok": True, "done": True, "saved": str(target), "written": written})
+        return jsonify({"ok": True, "done": False, "written": written})
+
     @app.route("/api/storage/upload", methods=["POST"])
     def api_storage_upload():
         if not _storage_can_write():
             return jsonify({"ok": False, "error": "upload is LAN/Tailscale/local only"}), 403
+        ok, msg = _verify_storage_action_password()
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
         dest = _resolve_storage_path(request.args.get("path"), must_exist=True)
         if not dest.is_dir():
             return jsonify({"ok": False, "error": "destination is not a folder"}), 400
@@ -1174,6 +1302,9 @@ def create_app() -> Flask:
     def api_storage_download():
         if not _client_private():
             abort(403, "download is LAN/Tailscale/local only")
+        ok, msg = _verify_storage_action_password()
+        if not ok:
+            abort(403, msg)
         src = _resolve_storage_path(request.args.get("path"), must_exist=True)
         if src.is_file():
             return send_file(src, as_attachment=True, download_name=src.name)
@@ -1210,6 +1341,9 @@ def create_app() -> Flask:
         if not _storage_can_write():
             return jsonify({"ok": False, "error": "file actions are disabled on public/tunnel access; use LAN/Tailscale/local"}), 403
         body = request.get_json(silent=True) or {}
+        ok, msg = _verify_storage_action_password(body)
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
         action = str(body.get("action") or "").strip().lower()
         base = _resolve_storage_path(body.get("path"), must_exist=True)
         items = body.get("items") or []
@@ -1268,6 +1402,73 @@ def create_app() -> Flask:
         except Exception:
             rows=[]
         return jsonify({"ok": True, "rows": rows})
+
+    @app.route("/api/storage/trash")
+    def api_storage_trash():
+        rows=[]
+        for root in _safe_roots():
+            trash = root / ".systor-trash"
+            if not trash.exists():
+                continue
+            try:
+                for batch in sorted(trash.iterdir(), reverse=True):
+                    if not batch.is_dir():
+                        continue
+                    for item in batch.iterdir():
+                        try:
+                            st=item.lstat()
+                            rows.append({"name": item.name, "path": str(item), "root": str(root), "size": st.st_size if item.is_file() else None, "type": "dir" if item.is_dir() else "file", "mtime": st.st_mtime, "mtime_text": _fmt_ts(st.st_mtime)})
+                        except Exception:
+                            continue
+            except Exception:
+                continue
+        return jsonify({"ok": True, "rows": rows[:300]})
+
+    @app.route("/api/storage/restore", methods=["POST"])
+    def api_storage_restore():
+        if not _storage_can_write():
+            return jsonify({"ok": False, "error": "restore is LAN/Tailscale/local only"}), 403
+        body = request.get_json(silent=True) or {}
+        ok, msg = _verify_storage_action_password(body)
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
+        src = Path(str(body.get("trash_path") or "")).expanduser().resolve(strict=True)
+        root = next((r for r in _safe_roots() if _under(r / ".systor-trash", src)), None)
+        if not root:
+            return jsonify({"ok": False, "error": "not a Systor trash item"}), 403
+        dest_dir = _resolve_storage_path(body.get("destination") or str(root), must_exist=True)
+        if not dest_dir.is_dir():
+            return jsonify({"ok": False, "error": "destination is not a folder"}), 400
+        target = dest_dir / src.name
+        i=1
+        while target.exists():
+            target = dest_dir / f"{src.stem}-restored-{i}{src.suffix}"
+            i += 1
+        shutil.move(str(src), str(target))
+        _log_storage_op("restore", f"{src} -> {target}", True)
+        return jsonify({"ok": True, "message": "Restored", "target": str(target)})
+
+    @app.route("/api/storage/ops/export")
+    def api_storage_ops_export():
+        ok, msg = _verify_storage_action_password()
+        if not ok:
+            abort(403, msg)
+        if not STORAGE_OP_LOG.exists():
+            STORAGE_OP_LOG.parent.mkdir(parents=True, exist_ok=True)
+            STORAGE_OP_LOG.write_text("")
+        return send_file(STORAGE_OP_LOG, as_attachment=True, download_name="systor-storage-ops.jsonl")
+
+    @app.route("/api/storage/ops/clear", methods=["POST"])
+    def api_storage_ops_clear():
+        if not _storage_can_write():
+            return jsonify({"ok": False, "error": "clear is LAN/Tailscale/local only"}), 403
+        body = request.get_json(silent=True) or {}
+        ok, msg = _verify_storage_action_password(body)
+        if not ok:
+            return jsonify({"ok": False, "error": msg}), 403
+        STORAGE_OP_LOG.parent.mkdir(parents=True, exist_ok=True)
+        STORAGE_OP_LOG.write_text("")
+        return jsonify({"ok": True, "message": "Storage operation log cleared"})
 
     @app.route("/api/runtime")
     def api_runtime():
