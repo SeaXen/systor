@@ -574,7 +574,7 @@ def _storage_cfg() -> dict:
         allowed = [str(x).strip() for x in roots if str(x).strip()]
     else:
         allowed = ["/mnt/tb"]
-    return {"allowed_roots": allowed or ["/mnt/tb"], "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
+    return {"allowed_roots": allowed or ["/mnt/tb"], "public_readonly": bool(cfg.get("public_readonly", True)), "trash_enabled": bool(cfg.get("trash_enabled", True)), "no_right_click": bool(cfg.get("no_right_click", False)), "max_scan_files": max(100, min(200000, int(cfg.get("max_scan_files", 20000) or 20000)))}
 
 
 def _client_private() -> bool:
@@ -706,7 +706,17 @@ def _scan_storage(path: Path, limit: int) -> dict:
             except Exception: continue
         if scanned > limit: break
     files.sort(key=lambda x:x["size"], reverse=True); folders.sort(key=lambda x:x["size"], reverse=True); old.sort(key=lambda x:(x["age_days"], x["size"]), reverse=True)
-    return {"files": files, "folders": folders, "old_files": old, "types": sorted(type_map.values(), key=lambda x:x["size"], reverse=True), "scanned": scanned}
+    dup_map={}
+    for rec in files:
+        key=(Path(rec["path"]).name.lower(), rec["size"])
+        dup_map.setdefault(key, []).append(rec)
+    dups=[]
+    for (_name, _size), group in dup_map.items():
+        if len(group) > 1 and _size > 0:
+            dups.append({"name": _name, "size": _size, "count": len(group), "paths": [g["path"] for g in group[:6]]})
+    dups.sort(key=lambda x:(x["count"], x["size"]), reverse=True)
+    types = sorted(type_map.values(), key=lambda x:x["size"], reverse=True)
+    return {"files": files, "folders": folders, "old_files": old, "types": types, "duplicates": dups, "scanned": scanned, "summary": {"files": len(files), "folders": len(folders), "old_large": len(old), "duplicates": len(dups), "types": len(types), "total_file_size": sum(x.get("size",0) for x in files)}}
 
 
 def create_app() -> Flask:
@@ -857,11 +867,32 @@ def create_app() -> Flask:
                 cfg["storage_page"]["allowed_roots"] = ",".join(clean)
             cfg["storage_page"]["public_readonly"] = bool(body.get("public_readonly", True))
             cfg["storage_page"]["trash_enabled"] = bool(body.get("trash_enabled", True))
+            cfg["storage_page"]["no_right_click"] = bool(body.get("no_right_click", False))
             try: cfg["storage_page"]["max_scan_files"] = max(100, min(200000, int(body.get("max_scan_files", 20000))))
             except Exception: pass
             save_config(cfg)
             return jsonify({"ok": True, "message": "Storage settings saved", "config": _storage_cfg(), "roots": _storage_roots_payload(), "can_write": _storage_can_write()})
         return jsonify({"ok": True, "config": scfg, "roots": _storage_roots_payload(), "can_write": _storage_can_write(), "public": not _client_private()})
+
+    @app.route("/api/storage/mounts")
+    def api_storage_mounts():
+        rows=[]
+        seen=set()
+        for label, path in (("Root / SSD", "/"), ("Data /mnt/tb", "/mnt/tb")):
+            try:
+                p=Path(path)
+                if not p.exists():
+                    continue
+                payload=_mount_payload(p)
+                key=(payload.get("total"), payload.get("mount"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                payload.update({"label": label, "path": str(p.resolve())})
+                rows.append(payload)
+            except Exception:
+                continue
+        return jsonify({"ok": True, "mounts": rows})
 
     @app.route("/api/storage/browse")
     def api_storage_browse():
@@ -895,7 +926,7 @@ def create_app() -> Flask:
         limit = max(1, min(200, int(request.args.get("limit", 25))))
         scan_limit = _storage_cfg()["max_scan_files"]
         data = _scan_storage(path, scan_limit)
-        return jsonify({"ok": True, "path": str(path), "scanned": data["scanned"], "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit]})
+        return jsonify({"ok": True, "path": str(path), "scanned": data["scanned"], "summary": data.get("summary", {}), "files": data["files"][:limit], "folders": data["folders"][:limit], "old_files": data["old_files"][:limit], "types": data["types"][:limit], "duplicates": data.get("duplicates", [])[:limit]})
 
     @app.route("/api/storage/action", methods=["POST"])
     def api_storage_action():

@@ -79,6 +79,7 @@ DEFAULT_CONFIG: dict = {
         "allowed_roots": "/mnt/tb",
         "public_readonly": True,
         "trash_enabled": True,
+        "no_right_click": False,
         "max_scan_files": 20000,
     },
     "web": {
