@@ -679,12 +679,27 @@ def _auth_cfg() -> dict:
     if mode not in ("admin_only", "full_app"):
         mode = "admin_only"
     username = str(cfg.get("username") or "admin").strip() or "admin"
+    try:
+        idle_timeout_min = max(0, int(float(cfg.get("idle_timeout_min", 0) or 0)))
+    except Exception:
+        idle_timeout_min = 0
+    try:
+        max_fails = max(2, min(20, int(float(cfg.get("max_fails", _LOGIN_MAX_FAILS) or _LOGIN_MAX_FAILS))))
+    except Exception:
+        max_fails = _LOGIN_MAX_FAILS
+    try:
+        cooldown_sec = max(10, min(3600, int(float(cfg.get("cooldown_sec", _LOGIN_COOLDOWN_SEC) or _LOGIN_COOLDOWN_SEC))))
+    except Exception:
+        cooldown_sec = _LOGIN_COOLDOWN_SEC
     return {
         "enabled": bool(cfg.get("enabled", False)),
         "mode": mode,
         "username": username,
         "password_hash": str(cfg.get("password_hash") or ""),
         "session_secret": str(cfg.get("session_secret") or ""),
+        "idle_timeout_min": idle_timeout_min,
+        "max_fails": max_fails,
+        "cooldown_sec": cooldown_sec,
     }
 
 
@@ -698,39 +713,92 @@ def _request_ip() -> str:
     return raw or "unknown"
 
 
-def _login_rate_status(ip: str) -> tuple[bool, int]:
+def _login_rate_key(scope: str, value: str) -> str:
+    return f"{scope}:{value.strip().lower() if scope == 'user' else value.strip()}"
+
+
+def _login_rate_status(ip: str, username: str = "") -> tuple[bool, int]:
     now = time.time()
+    keys = [_login_rate_key("ip", ip)]
+    if username:
+        keys.append(_login_rate_key("user", username))
     with _login_rate_lock:
-        row = _login_rate_state.get(ip)
-        if not row:
-            return False, 0
-        blocked_until = float(row.get("blocked_until") or 0)
-        if blocked_until > now:
-            return True, max(1, int(blocked_until - now))
-        if blocked_until:
-            row["blocked_until"] = 0.0
-        return False, 0
+        best_wait = 0
+        active = False
+        for key in keys:
+            row = _login_rate_state.get(key)
+            if not row:
+                continue
+            blocked_until = float(row.get("blocked_until") or 0)
+            if blocked_until > now:
+                active = True
+                best_wait = max(best_wait, max(1, int(blocked_until - now)))
+            elif blocked_until:
+                row["blocked_until"] = 0.0
+        return active, best_wait
 
 
-def _login_rate_fail(ip: str) -> tuple[bool, int]:
+def _login_rate_fail(ip: str, username: str = "") -> tuple[bool, int]:
     now = time.time()
+    auth = _auth_cfg()
+    max_fails = int(auth.get("max_fails") or _LOGIN_MAX_FAILS)
+    cooldown_sec = int(auth.get("cooldown_sec") or _LOGIN_COOLDOWN_SEC)
+    keys = [_login_rate_key("ip", ip)]
+    if username:
+        keys.append(_login_rate_key("user", username))
     with _login_rate_lock:
-        row = _login_rate_state.setdefault(ip, {"fails": 0, "blocked_until": 0.0})
-        blocked_until = float(row.get("blocked_until") or 0)
-        if blocked_until > now:
-            return True, max(1, int(blocked_until - now))
-        fails = int(row.get("fails") or 0) + 1
-        row["fails"] = fails
-        if fails >= _LOGIN_MAX_FAILS:
-            row["fails"] = 0
-            row["blocked_until"] = now + _LOGIN_COOLDOWN_SEC
-            return True, _LOGIN_COOLDOWN_SEC
+        best_wait = 0
+        blocked = False
+        for key in keys:
+            row = _login_rate_state.setdefault(key, {"fails": 0, "blocked_until": 0.0})
+            blocked_until = float(row.get("blocked_until") or 0)
+            if blocked_until > now:
+                blocked = True
+                best_wait = max(best_wait, max(1, int(blocked_until - now)))
+                continue
+            fails = int(row.get("fails") or 0) + 1
+            row["fails"] = fails
+            if fails >= max_fails:
+                row["fails"] = 0
+                row["blocked_until"] = now + cooldown_sec
+                blocked = True
+                best_wait = max(best_wait, cooldown_sec)
+        return blocked, best_wait
+
+
+def _login_rate_success(ip: str, username: str = "") -> None:
+    keys = [_login_rate_key("ip", ip)]
+    if username:
+        keys.append(_login_rate_key("user", username))
+    with _login_rate_lock:
+        for key in keys:
+            _login_rate_state.pop(key, None)
+
+
+def _auth_session_expired() -> tuple[bool, int]:
+    if not _auth_logged_in():
         return False, 0
+    timeout_min = int(_auth_cfg().get("idle_timeout_min") or 0)
+    if timeout_min <= 0:
+        return False, 0
+    now = int(time.time())
+    last_seen = int(session.get("systor_last_seen") or 0)
+    if last_seen and now - last_seen > timeout_min * 60:
+        return True, timeout_min
+    return False, timeout_min
 
 
-def _login_rate_success(ip: str) -> None:
-    with _login_rate_lock:
-        _login_rate_state.pop(ip, None)
+def _auth_touch_session() -> None:
+    if not _auth_logged_in():
+        return
+    session.permanent = True
+    session["systor_last_seen"] = int(time.time())
+
+
+def _auth_logout_session() -> None:
+    session.pop("systor_auth", None)
+    session.pop("systor_user", None)
+    session.pop("systor_last_seen", None)
 
 
 def _auth_logged_in() -> bool:
@@ -1071,6 +1139,9 @@ def create_app() -> Flask:
             "auth_enabled": _auth_enabled(),
             "auth_mode": auth.get("mode", "admin_only"),
             "auth_username": auth.get("username", "admin"),
+            "auth_idle_timeout_min": auth.get("idle_timeout_min", 0),
+            "auth_max_fails": auth.get("max_fails", _LOGIN_MAX_FAILS),
+            "auth_cooldown_sec": auth.get("cooldown_sec", _LOGIN_COOLDOWN_SEC),
             "auth_logged_in": _auth_logged_in(),
         }
 
@@ -1079,13 +1150,24 @@ def create_app() -> Flask:
         path = request.path or ""
         private = _client_private()
         if private:
-            if _auth_enabled() and _private_auth_protected(path) and not _auth_logged_in():
-                if path.startswith("/api/"):
-                    return jsonify({"ok": False, "error": "login required"}), 401
-                next_url = request.full_path if request.query_string else request.path
-                if next_url.endswith("?"):
-                    next_url = next_url[:-1]
-                return redirect(url_for("page_login", next=next_url))
+            if _auth_enabled() and _private_auth_protected(path):
+                expired, timeout_min = _auth_session_expired()
+                if expired:
+                    _auth_logout_session()
+                    if path.startswith("/api/"):
+                        return jsonify({"ok": False, "error": f"session expired after {timeout_min}m idle"}), 401
+                    next_url = request.full_path if request.query_string else request.path
+                    if next_url.endswith("?"):
+                        next_url = next_url[:-1]
+                    return redirect(url_for("page_login", next=next_url))
+                if not _auth_logged_in():
+                    if path.startswith("/api/"):
+                        return jsonify({"ok": False, "error": "login required"}), 401
+                    next_url = request.full_path if request.query_string else request.path
+                    if next_url.endswith("?"):
+                        next_url = next_url[:-1]
+                    return redirect(url_for("page_login", next=next_url))
+                _auth_touch_session()
             return None
 
         # Public internet: dashboard only.
@@ -1984,6 +2066,10 @@ def create_app() -> Flask:
         if request.method == "POST":
             auth = _auth_cfg()
             username = str(request.form.get("username") or "").strip()
+            blocked, wait_sec = _login_rate_status(ip, username)
+            if blocked:
+                error = f"Too many failed logins. Try again in {wait_sec}s."
+                return render_template("login.html", error=error, next_url=next_url, wait_sec=wait_sec), 429
             password = str(request.form.get("password") or "")
             if username == auth.get("username") and auth.get("password_hash"):
                 try:
@@ -1991,11 +2077,13 @@ def create_app() -> Flask:
                 except Exception:
                     ok = False
                 if ok:
-                    _login_rate_success(ip)
+                    _login_rate_success(ip, username)
                     session["systor_auth"] = True
                     session["systor_user"] = auth.get("username")
+                    session.permanent = True
+                    session["systor_last_seen"] = int(time.time())
                     return redirect(next_url or "/")
-            blocked, wait_sec = _login_rate_fail(ip)
+            blocked, wait_sec = _login_rate_fail(ip, username)
             if blocked:
                 error = f"Too many failed logins. Try again in {wait_sec}s."
                 return render_template("login.html", error=error, next_url=next_url, wait_sec=wait_sec), 429
@@ -2007,8 +2095,7 @@ def create_app() -> Flask:
     def page_logout():
         if not _client_private():
             abort(404)
-        session.pop("systor_auth", None)
-        session.pop("systor_user", None)
+        _auth_logout_session()
         if _auth_enabled():
             return redirect(url_for("page_login"))
         return redirect(url_for("page_dashboard"))
@@ -2197,6 +2284,15 @@ def create_app() -> Flask:
                 auth["mode"] = str(data.get("auth_mode") or "admin_only").strip()
             if "auth_username" in data:
                 auth["username"] = str(data.get("auth_username") or "admin").strip() or "admin"
+            if "auth_idle_timeout_min" in data and str(data.get("auth_idle_timeout_min") or "") != "":
+                try: auth["idle_timeout_min"] = max(0, min(1440, int(float(data["auth_idle_timeout_min"]))))
+                except (ValueError, TypeError): pass
+            if "auth_max_fails" in data and str(data.get("auth_max_fails") or "") != "":
+                try: auth["max_fails"] = max(2, min(20, int(float(data["auth_max_fails"]))))
+                except (ValueError, TypeError): pass
+            if "auth_cooldown_sec" in data and str(data.get("auth_cooldown_sec") or "") != "":
+                try: auth["cooldown_sec"] = max(10, min(3600, int(float(data["auth_cooldown_sec"]))))
+                except (ValueError, TypeError): pass
             clear_auth_password = _bool(data.get("auth_clear_password")) if "auth_clear_password" in data else False
             pw = str(data.get("auth_password") or "")
             pw2 = str(data.get("auth_password_confirm") or "")

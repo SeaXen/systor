@@ -46,6 +46,9 @@ DEFAULT_CONFIG: dict = {
         "username": "admin",
         "password_hash": "",
         "session_secret": "",
+        "idle_timeout_min": 0,
+        "max_fails": 5,
+        "cooldown_sec": 60,
     },
     "network": {
         "default_hours": 24,

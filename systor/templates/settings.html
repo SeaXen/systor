@@ -1,6 +1,28 @@
 {% extends "base.html" %}
 {% block title %}systor · Settings{% endblock %}
 {% block content %}
+<style>
+.settings-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:8px 0 2px}
+.settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;letter-spacing:.3px;cursor:pointer}
+.settings-tab-btn:hover{border-color:rgba(88,166,255,.5);color:var(--text-bright)}
+.settings-tab-btn.active{background:linear-gradient(180deg,var(--blue-2) 0%,#1a4f9c 100%);border-color:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(31,111,235,.22)}
+.settings-panel{display:none;gap:10px}
+.settings-panel.active{display:block}
+.settings-panel-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:10px}
+.settings-panel-col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.settings-auth-shell{max-width:860px}
+.settings-card h3 .mini-chip{margin-left:8px}
+.auth-mini-grid{display:grid;grid-template-columns:132px minmax(0,1fr);gap:8px 10px;align-items:center}
+.auth-mini-grid .full{grid-column:1 / -1}
+.auth-stat-row{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:900px){.settings-panel-grid{grid-template-columns:1fr}}
+@media (max-width:700px){
+  .settings-tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap;padding-top:4px}
+  .settings-tab-btn{padding:7px 10px;font-size:11px;white-space:nowrap}
+  .settings-auth-shell{max-width:none}
+  .auth-mini-grid{grid-template-columns:1fr}
+}
+</style>
 
 <div class="settings-page">
   <div id="flash"></div>
@@ -25,387 +47,429 @@
   </div>
 
   <form id="settings-form">
-    <div class="settings-grid">
-      <div class="settings-col">
-        <div class="settings-card">
-          <h3>Access</h3>
-          <div class="card-subtle">One bind on <code>0.0.0.0</code> can serve localhost, LAN, Tailscale, and a Cloudflare tunnel target on the same port.</div>
-          <div class="access-list" id="access-list">
-            <div class="access-item"><span class="kind">loading</span><span class="value">Checking access targets…</span></div>
+    <div class="settings-tabs" id="settings-tabs">
+      <button type="button" class="settings-tab-btn active" data-settings-tab="alerts">Alerts</button>
+      <button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button>
+      <button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button>
+      <button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button>
+    </div>
+
+    <section class="settings-panel active" data-settings-panel="alerts">
+      <div class="settings-panel-grid">
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Alert threshold presets</h3>
+            <div class="card-subtle">Quick presets plus lightweight sliders for CPU, RAM, and temperature.</div>
+            <div class="preset-chip-row">
+              <button type="button" class="btn secondary compact threshold-preset" data-preset="safe">Safe</button>
+              <button type="button" class="btn secondary compact threshold-preset" data-preset="balanced">Balanced</button>
+              <button type="button" class="btn secondary compact threshold-preset" data-preset="aggressive">Aggressive</button>
+            </div>
+            <div class="slider-grid">
+              <div class="slider-card">
+                <div class="slider-head"><strong>CPU load</strong><span id="cpu-load-slider-val">4.0</span></div>
+                <input id="cpu-load-slider" type="range" min="1" max="16" step="0.1">
+              </div>
+              <div class="slider-card">
+                <div class="slider-head"><strong>RAM free</strong><span id="mem-free-slider-val">500 MB</span></div>
+                <input id="mem-free-slider" type="range" min="128" max="4096" step="64">
+              </div>
+              <div class="slider-card">
+                <div class="slider-head"><strong>CPU temp</strong><span id="cpu-temp-slider-val">85 °C</span></div>
+                <input id="cpu-temp-slider" type="range" min="50" max="100" step="1">
+              </div>
+            </div>
           </div>
         </div>
-
-        <div class="settings-card">
-          <h3>Runtime</h3>
-          <div class="status-row" id="service-row">
-            <span class="status-chip">loading runtime…</span>
-          </div>
-          <div class="runtime-chip-grid" id="runtime-chip-grid">
-            <span class="status-chip">web pid —</span>
-            <span class="status-chip">collector pid —</span>
-            <span class="status-chip">uptime —</span>
-          </div>
-          <div class="notif-field-grid compact-top">
-            <label>Poll interval</label>
-            <input type="number" value="{{ cfg.collector.poll_interval_sec }}" min="1" step="1" disabled title="Use Dashboard defaults → Sample interval to change this">
-            <label>Web bind host</label>
-            <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
-            <label>Web port</label>
-            <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
-          </div>
-          <div class="notif-actions">
-            <span class="inline-help">Restart collector applies new poll interval immediately. Restart web is only needed for host/port changes.</span>
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Alert thresholds</h3>
+            <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
+            {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
+            {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
+            {% if entry is mapping %}
+              {% set enabled = entry.get("enabled", true) %}
+              {% set value = entry.get("value", default_value) %}
+              {% set duration = entry.get("duration_min", default_min) %}
+            {% else %}
+              {% set enabled = true %}
+              {% set value = entry %}
+              {% set duration = default_min %}
+            {% endif %}
+            <tr>
+              <td>
+                <label class="threshold-name">
+                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
+                  <span>{{ label }}</span>
+                </label>
+              </td>
+              <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
+              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
+              <td class="text-muted">{{ unit }}</td>
+              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
+              <td class="text-muted">min</td>
+            </tr>
+            {%- endmacro %}
+            <table class="threshold-table">
+              <thead>
+                <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
+              </thead>
+              <tbody>
+                {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
+                {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
+                {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
+                {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
+                {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
+              </tbody>
+            </table>
+            <div class="notif-actions">
+              <label class="inline-help">Cooldown</label>
+              <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
+              <span class="inline-help">seconds between repeats per metric</span>
+            </div>
           </div>
         </div>
+      </div>
+    </section>
 
+    <section class="settings-panel" data-settings-panel="notifications">
+      <div class="settings-panel-grid">
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Telegram</h3>
+            <div class="status-row">
+              <span class="status-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-enabled-chip">{% if cfg.telegram.enabled %}enabled{% else %}disabled{% endif %}</span>
+              <span class="status-chip {% if cfg.telegram.bot_token and cfg.telegram.chat_id %}ok{% else %}warn{% endif %}">{% if cfg.telegram.bot_token and cfg.telegram.chat_id %}saved credentials{% else %}credentials missing{% endif %}</span>
+              <span class="status-chip" id="tg-last-status">untested</span>
+            </div>
+            <div class="notif-field-grid">
+              <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
+              <div class="inline-help">Leave token blank to keep the saved one. If the saved token was a masked placeholder, Telegram cannot work until you paste the full real bot token.</div>
+              <label>Bot token</label>
+              <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
+              <label>Chat ID</label>
+              <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
+            </div>
+            <div class="kv-mini-grid">
+              <div><span>Last error</span><code id="tg-last-error">—</code></div>
+              <div><span>Copy test payload</span><button type="button" class="btn secondary compact" id="copy-tg-payload">Copy payload</button></div>
+            </div>
+            <div class="notif-actions">
+              <button type="button" class="btn secondary compact" id="test-tg">Test Telegram</button>
+              <button type="button" class="btn compact" id="save-test-tg">Save + test Telegram</button>
+              <span id="test-tg-result" class="inline-help"></span>
+            </div>
+          </div>
+        </div>
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Discord webhook</h3>
+            <div class="status-row">
+              <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-enabled-chip">{% if cfg.discord.enabled %}enabled{% else %}disabled{% endif %}</span>
+              <span class="status-chip {% if cfg.discord.webhook_url %}ok{% else %}warn{% endif %}">{% if cfg.discord.webhook_url %}webhook saved{% else %}webhook missing{% endif %}</span>
+              <span class="status-chip" id="dc-last-status">untested</span>
+            </div>
+            <div class="notif-field-grid">
+              <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}> Enabled</label>
+              <div class="inline-help">Leave webhook blank to keep the saved one.</div>
+              <label>Webhook URL</label>
+              <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
+            </div>
+            <div class="kv-mini-grid">
+              <div><span>Last error</span><code id="dc-last-error">—</code></div>
+              <div><span>Copy test payload</span><button type="button" class="btn secondary compact" id="copy-dc-payload">Copy payload</button></div>
+            </div>
+            <div class="notif-actions">
+              <button type="button" class="btn secondary compact" id="test-dc">Test Discord</button>
+              <button type="button" class="btn compact" id="save-test-dc">Save + test Discord</button>
+              <span id="test-dc-result" class="inline-help"></span>
+            </div>
+          </div>
+          <div class="settings-card">
+            <h3>Notification history</h3>
+            <div class="card-subtle">Latest delivery results from both channels.</div>
+            <div class="history-list" id="notify-history">
+              <div class="history-item"><span class="text-muted">loading…</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-panel" data-settings-panel="auth">
+      <div class="settings-auth-shell">
         <div class="settings-card">
-          <h3>Security</h3>
-          <div class="card-subtle">Optional single-admin login. Disabled by default. Public/tunnel dashboard can stay read-only while private admin pages require login.</div>
-          <div class="notif-field-grid compact-top network-settings-grid">
+          <h3>Security <span class="status-chip mini-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}">{% if cfg.auth and cfg.auth.enabled %}auth enabled{% else %}auth off{% endif %}</span></h3>
+          <div class="card-subtle">Optional single-admin login. Public/tunnel dashboard can stay read-only while private admin pages require login.</div>
+          <div class="auth-stat-row">
+            <span class="status-chip {% if cfg.auth and cfg.auth.password_hash %}ok{% endif %}">{% if cfg.auth and cfg.auth.password_hash %}saved password set{% else %}no saved password{% endif %}</span>
+            <span class="status-chip">mode {{ (cfg.auth.mode if cfg.auth else 'admin_only') or 'admin_only' }}</span>
+            <span class="status-chip">idle timeout {{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}m</span>
+            <span class="status-chip">fails {{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}</span>
+            <span class="status-chip">cooldown {{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}s</span>
+          </div>
+          <div class="auth-mini-grid compact-top">
             <label>Enable login protection</label>
             <label><input type="checkbox" class="checkbox" name="auth_enabled" {% if cfg.auth and cfg.auth.enabled %}checked{% endif %}> require username + password</label>
+
             <label>Protect mode</label>
             <select name="auth_mode">
               <option value="admin_only" {% if (cfg.auth.mode if cfg.auth else 'admin_only') == 'admin_only' %}selected{% endif %}>admin only</option>
               <option value="full_app" {% if cfg.auth and cfg.auth.mode == 'full_app' %}selected{% endif %}>whole app</option>
             </select>
+
             <label>Username</label>
             <input type="text" name="auth_username" value="{{ (cfg.auth.username if cfg.auth else 'admin') or 'admin' }}" placeholder="admin" autocomplete="username">
-            <label>Password status</label>
-            <div class="status-row">
-              <span class="status-chip {% if cfg.auth and cfg.auth.password_hash %}ok{% endif %}">{% if cfg.auth and cfg.auth.password_hash %}saved password set{% else %}no saved password{% endif %}</span>
-            </div>
+
+            <label>Idle auto-logout</label>
+            <input type="number" name="auth_idle_timeout_min" value="{{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}" min="0" max="1440" step="1" placeholder="0 = off">
+
+            <label>Fail limit</label>
+            <input type="number" name="auth_max_fails" value="{{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}" min="2" max="20" step="1">
+
+            <label>Cooldown</label>
+            <input type="number" name="auth_cooldown_sec" value="{{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}" min="10" max="3600" step="10">
+
             <label>New password</label>
             <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it{% else %}set admin password{% endif %}" autocomplete="new-password">
+
             <label>Confirm new password</label>
             <input type="password" name="auth_password_confirm" value="" placeholder="repeat new password" autocomplete="new-password">
+
             <label>Delete saved password</label>
             <label><input type="checkbox" class="checkbox" name="auth_clear_password"> clear saved password</label>
           </div>
           <div class="notif-actions">
-            <span class="inline-help">One dashboard, one admin account. Leave password blank to keep the saved one. Enter a new password to change it. Clear password only after disabling login protection or together with a replacement password.</span>
-          </div>
-        </div>
-
-        <div class="settings-card">
-          <h3>Alert threshold presets</h3>
-          <div class="card-subtle">Quick presets plus lightweight sliders for CPU, RAM, and temperature.</div>
-          <div class="preset-chip-row">
-            <button type="button" class="btn secondary compact threshold-preset" data-preset="safe">Safe</button>
-            <button type="button" class="btn secondary compact threshold-preset" data-preset="balanced">Balanced</button>
-            <button type="button" class="btn secondary compact threshold-preset" data-preset="aggressive">Aggressive</button>
-          </div>
-          <div class="slider-grid">
-            <div class="slider-card">
-              <div class="slider-head"><strong>CPU load</strong><span id="cpu-load-slider-val">4.0</span></div>
-              <input id="cpu-load-slider" type="range" min="1" max="16" step="0.1">
-            </div>
-            <div class="slider-card">
-              <div class="slider-head"><strong>RAM free</strong><span id="mem-free-slider-val">500 MB</span></div>
-              <input id="mem-free-slider" type="range" min="128" max="4096" step="64">
-            </div>
-            <div class="slider-card">
-              <div class="slider-head"><strong>CPU temp</strong><span id="cpu-temp-slider-val">85 °C</span></div>
-              <input id="cpu-temp-slider" type="range" min="50" max="100" step="1">
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-card">
-          <h3>Dashboard defaults</h3>
-          <div class="card-subtle">Saved defaults used on page load. Dashboard page controls are temporary live overrides and do not silently overwrite Settings.</div>
-          <div class="notif-field-grid compact-top network-settings-grid">
-            <label>Default time view</label>
-            <select name="dashboard_default_hours">
-              <option value="0.25" {% if cfg.dashboard.default_hours == 0.25 %}selected{% endif %}>15m</option>
-              <option value="0.5" {% if cfg.dashboard.default_hours == 0.5 %}selected{% endif %}>30m</option>
-              <option value="1" {% if cfg.dashboard.default_hours == 1 %}selected{% endif %}>1h</option>
-              <option value="6" {% if cfg.dashboard.default_hours == 6 %}selected{% endif %}>6h</option>
-              <option value="24" {% if cfg.dashboard.default_hours == 24 %}selected{% endif %}>24h</option>
-              <option value="72" {% if cfg.dashboard.default_hours == 72 %}selected{% endif %}>3d</option>
-              <option value="168" {% if cfg.dashboard.default_hours == 168 %}selected{% endif %}>7d</option>
-              <option value="720" {% if cfg.dashboard.default_hours == 720 %}selected{% endif %}>30d</option>
-              <option value="2160" {% if cfg.dashboard.default_hours == 2160 %}selected{% endif %}>90d</option>
-              <option value="8760" {% if cfg.dashboard.default_hours == 8760 %}selected{% endif %}>1y</option>
-              <option value="87600" {% if cfg.dashboard.default_hours == 87600 %}selected{% endif %}>all</option>
-            </select>
-            <label>Refresh</label>
-            <select name="dashboard_refresh_sec">
-              <option value="1" {% if cfg.dashboard.refresh_sec == 1 %}selected{% endif %}>1s</option>
-              <option value="3" {% if cfg.dashboard.refresh_sec == 3 %}selected{% endif %}>3s</option>
-              <option value="5" {% if cfg.dashboard.refresh_sec == 5 %}selected{% endif %}>5s</option>
-              <option value="10" {% if cfg.dashboard.refresh_sec == 10 %}selected{% endif %}>10s</option>
-              <option value="15" {% if cfg.dashboard.refresh_sec == 15 %}selected{% endif %}>15s</option>
-              <option value="30" {% if cfg.dashboard.refresh_sec == 30 %}selected{% endif %}>30s</option>
-              <option value="60" {% if cfg.dashboard.refresh_sec == 60 %}selected{% endif %}>1m</option>
-            </select>
-            <label>Sample interval</label>
-            <select name="poll_interval_sec">
-              <option value="1" {% if cfg.collector.poll_interval_sec == 1 %}selected{% endif %}>1s</option>
-              <option value="5" {% if cfg.collector.poll_interval_sec == 5 %}selected{% endif %}>5s</option>
-              <option value="10" {% if cfg.collector.poll_interval_sec == 10 %}selected{% endif %}>10s</option>
-              <option value="15" {% if cfg.collector.poll_interval_sec == 15 %}selected{% endif %}>15s</option>
-              <option value="30" {% if cfg.collector.poll_interval_sec == 30 %}selected{% endif %}>30s</option>
-              <option value="60" {% if cfg.collector.poll_interval_sec == 60 %}selected{% endif %}>1m</option>
-            </select>
-            <label>Chart refresh</label>
-            <select name="dashboard_chart_refresh_sec">
-              <option value="1" {% if cfg.dashboard.chart_refresh_sec == 1 %}selected{% endif %}>1s</option>
-              <option value="3" {% if cfg.dashboard.chart_refresh_sec == 3 %}selected{% endif %}>3s</option>
-              <option value="5" {% if cfg.dashboard.chart_refresh_sec == 5 %}selected{% endif %}>5s</option>
-              <option value="10" {% if cfg.dashboard.chart_refresh_sec == 10 %}selected{% endif %}>10s</option>
-              <option value="15" {% if cfg.dashboard.chart_refresh_sec == 15 %}selected{% endif %}>15s</option>
-              <option value="30" {% if cfg.dashboard.chart_refresh_sec == 30 %}selected{% endif %}>30s</option>
-              <option value="60" {% if cfg.dashboard.chart_refresh_sec == 60 %}selected{% endif %}>1m</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="settings-card">
-          <h3>Network page defaults</h3>
-          <div class="card-subtle">Network page defaults control its period, bucket view, refresh load, and interface filtering.</div>
-          <div class="notif-field-grid compact-top network-settings-grid">
-            <label>Default rate view</label>
-            <select name="network_default_hours">
-              <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
-              <option value="0.5" {% if cfg.network.default_hours == 0.5 %}selected{% endif %}>30m</option>
-              <option value="1" {% if cfg.network.default_hours == 1 %}selected{% endif %}>1h</option>
-              <option value="6" {% if cfg.network.default_hours == 6 %}selected{% endif %}>6h</option>
-              <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
-              <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
-              <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
-              <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
-              <option value="2160" {% if cfg.network.default_hours == 2160 %}selected{% endif %}>90d</option>
-              <option value="8760" {% if cfg.network.default_hours == 8760 %}selected{% endif %}>1y</option>
-              <option value="87600" {% if cfg.network.default_hours == 87600 %}selected{% endif %}>all</option>
-            </select>
-            <label>Default usage view</label>
-            <select name="network_default_granularity">
-              <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
-              <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
-              <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
-            </select>
-            <label>Auto refresh</label>
-            <select name="network_auto_refresh_sec">
-              <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
-              <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
-              <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
-              <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
-              <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
-              <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
-              <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
-            </select>
-            <label>Default bar days</label>
-            <select name="network_default_bar_days">
-              {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
-              <option value="{{ n }}" {% if (cfg.network.default_bar_days or 90) == n %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-              <option value="all" {% if cfg.network.default_bar_days == 'all' %}selected{% endif %}>all</option>
-            </select>
-            <label>Default table days</label>
-            <select name="network_default_table_days">
-              {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
-              <option value="{{ n }}" {% if (cfg.network.default_table_days or 90) == n %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-              <option value="all" {% if cfg.network.default_table_days == 'all' %}selected{% endif %}>all</option>
-            </select>
-            <label>Default iface</label>
-            <input type="text" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0">
-            <label>Hide docker/bridge/veth by default</label>
-            <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
-          </div>
-        </div>
-
-        <div class="settings-card">
-          <h3>Apps page defaults</h3>
-          <div class="card-subtle">Default scope, sort order, and refresh for the apps/process view.</div>
-          <div class="notif-field-grid compact-top network-settings-grid">
-            <label>Scope</label>
-            <select name="apps_default_scope">
-              <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
-              <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host only</option>
-              <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker only</option>
-            </select>
-            <label>Sort</label>
-            <select name="apps_default_sort">
-              <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
-              <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
-              <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
-              <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
-            </select>
-            <label>Auto refresh</label>
-            <select name="apps_auto_refresh_sec">
-              <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
-              <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
-              <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
-              <option value="10" {% if cfg.apps.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
-              <option value="15" {% if cfg.apps.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
-              <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
-              <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
-            </select>
-            <label>Rows per card</label>
-            <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
-          </div>
-        </div>
-
-        <div class="settings-card">
-          <h3>Alert thresholds</h3>
-          <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
-          {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
-          {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
-          {% if entry is mapping %}
-            {% set enabled = entry.get("enabled", true) %}
-            {% set value = entry.get("value", default_value) %}
-            {% set duration = entry.get("duration_min", default_min) %}
-          {% else %}
-            {% set enabled = true %}
-            {% set value = entry %}
-            {% set duration = default_min %}
-          {% endif %}
-          <tr>
-            <td>
-              <label class="threshold-name">
-                <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
-                <span>{{ label }}</span>
-              </label>
-            </td>
-            <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
-            <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
-            <td class="text-muted">{{ unit }}</td>
-            <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
-            <td class="text-muted">min</td>
-          </tr>
-          {%- endmacro %}
-          <table class="threshold-table">
-            <thead>
-              <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
-            </thead>
-            <tbody>
-              {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
-              {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
-              {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
-              {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
-              {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
-            </tbody>
-          </table>
-          <div class="notif-actions">
-            <label class="inline-help">Cooldown</label>
-            <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
-            <span class="inline-help">seconds between repeats per metric</span>
+            <span class="inline-help full">Per-IP and per-username brute-force tracking is enabled. Use idle timeout <code>0</code> to disable auto-logout.</span>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="settings-col">
-        <div class="settings-card">
-          <h3>Telegram</h3>
-          <div class="status-row">
-            <span class="status-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-enabled-chip">{% if cfg.telegram.enabled %}enabled{% else %}disabled{% endif %}</span>
-            <span class="status-chip {% if cfg.telegram.bot_token and cfg.telegram.chat_id %}ok{% else %}warn{% endif %}">{% if cfg.telegram.bot_token and cfg.telegram.chat_id %}saved credentials{% else %}credentials missing{% endif %}</span>
-            <span class="status-chip" id="tg-last-status">untested</span>
+    <section class="settings-panel" data-settings-panel="access">
+      <div class="settings-panel-grid">
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Access</h3>
+            <div class="card-subtle">One bind on <code>0.0.0.0</code> can serve localhost, LAN, Tailscale, and a Cloudflare tunnel target on the same port.</div>
+            <div class="access-list" id="access-list">
+              <div class="access-item"><span class="kind">loading</span><span class="value">Checking access targets…</span></div>
+            </div>
           </div>
-          <div class="notif-field-grid">
-            <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
-            <div class="inline-help">Leave token blank to keep the saved one. If the saved token was a masked placeholder, Telegram cannot work until you paste the full real bot token.</div>
-            <label>Bot token</label>
-            <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
-            <label>Chat ID</label>
-            <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
+
+          <div class="settings-card">
+            <h3>Runtime</h3>
+            <div class="status-row" id="service-row">
+              <span class="status-chip">loading runtime…</span>
+            </div>
+            <div class="runtime-chip-grid" id="runtime-chip-grid">
+              <span class="status-chip">web pid —</span>
+              <span class="status-chip">collector pid —</span>
+              <span class="status-chip">uptime —</span>
+            </div>
+            <div class="notif-field-grid compact-top">
+              <label>Poll interval</label>
+              <input type="number" value="{{ cfg.collector.poll_interval_sec }}" min="1" step="1" disabled title="Use Dashboard defaults → Sample interval to change this">
+              <label>Web bind host</label>
+              <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
+              <label>Web port</label>
+              <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
+            </div>
+            <div class="notif-actions">
+              <span class="inline-help">Restart collector applies new poll interval immediately. Restart web is only needed for host/port changes.</span>
+            </div>
           </div>
-          <div class="kv-mini-grid">
-            <div><span>Last error</span><code id="tg-last-error">—</code></div>
-            <div><span>Copy test payload</span><button type="button" class="btn secondary compact" id="copy-tg-payload">Copy payload</button></div>
+
+          <div class="settings-card">
+            <h3>Dashboard defaults</h3>
+            <div class="card-subtle">Saved defaults used on page load. Dashboard page controls are temporary live overrides and do not silently overwrite Settings.</div>
+            <div class="notif-field-grid compact-top network-settings-grid">
+              <label>Default time view</label>
+              <select name="dashboard_default_hours">
+                <option value="0.25" {% if cfg.dashboard.default_hours == 0.25 %}selected{% endif %}>15m</option>
+                <option value="0.5" {% if cfg.dashboard.default_hours == 0.5 %}selected{% endif %}>30m</option>
+                <option value="1" {% if cfg.dashboard.default_hours == 1 %}selected{% endif %}>1h</option>
+                <option value="6" {% if cfg.dashboard.default_hours == 6 %}selected{% endif %}>6h</option>
+                <option value="24" {% if cfg.dashboard.default_hours == 24 %}selected{% endif %}>24h</option>
+                <option value="72" {% if cfg.dashboard.default_hours == 72 %}selected{% endif %}>3d</option>
+                <option value="168" {% if cfg.dashboard.default_hours == 168 %}selected{% endif %}>7d</option>
+                <option value="720" {% if cfg.dashboard.default_hours == 720 %}selected{% endif %}>30d</option>
+                <option value="2160" {% if cfg.dashboard.default_hours == 2160 %}selected{% endif %}>90d</option>
+                <option value="8760" {% if cfg.dashboard.default_hours == 8760 %}selected{% endif %}>1y</option>
+                <option value="87600" {% if cfg.dashboard.default_hours == 87600 %}selected{% endif %}>all</option>
+              </select>
+              <label>Refresh</label>
+              <select name="dashboard_refresh_sec">
+                <option value="1" {% if cfg.dashboard.refresh_sec == 1 %}selected{% endif %}>1s</option>
+                <option value="3" {% if cfg.dashboard.refresh_sec == 3 %}selected{% endif %}>3s</option>
+                <option value="5" {% if cfg.dashboard.refresh_sec == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if cfg.dashboard.refresh_sec == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if cfg.dashboard.refresh_sec == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if cfg.dashboard.refresh_sec == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if cfg.dashboard.refresh_sec == 60 %}selected{% endif %}>1m</option>
+              </select>
+              <label>Sample interval</label>
+              <select name="poll_interval_sec">
+                <option value="1" {% if cfg.collector.poll_interval_sec == 1 %}selected{% endif %}>1s</option>
+                <option value="5" {% if cfg.collector.poll_interval_sec == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if cfg.collector.poll_interval_sec == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if cfg.collector.poll_interval_sec == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if cfg.collector.poll_interval_sec == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if cfg.collector.poll_interval_sec == 60 %}selected{% endif %}>1m</option>
+              </select>
+              <label>Chart refresh</label>
+              <select name="dashboard_chart_refresh_sec">
+                <option value="1" {% if cfg.dashboard.chart_refresh_sec == 1 %}selected{% endif %}>1s</option>
+                <option value="3" {% if cfg.dashboard.chart_refresh_sec == 3 %}selected{% endif %}>3s</option>
+                <option value="5" {% if cfg.dashboard.chart_refresh_sec == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if cfg.dashboard.chart_refresh_sec == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if cfg.dashboard.chart_refresh_sec == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if cfg.dashboard.chart_refresh_sec == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if cfg.dashboard.chart_refresh_sec == 60 %}selected{% endif %}>1m</option>
+              </select>
+            </div>
           </div>
-          <div class="notif-actions">
-            <button type="button" class="btn secondary compact" id="test-tg">Test Telegram</button>
-            <button type="button" class="btn compact" id="save-test-tg">Save + test Telegram</button>
-            <span id="test-tg-result" class="inline-help"></span>
+
+          <div class="settings-card">
+            <h3>Network page defaults</h3>
+            <div class="card-subtle">Network page defaults control its period, bucket view, refresh load, and interface filtering.</div>
+            <div class="notif-field-grid compact-top network-settings-grid">
+              <label>Default rate view</label>
+              <select name="network_default_hours">
+                <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
+                <option value="0.5" {% if cfg.network.default_hours == 0.5 %}selected{% endif %}>30m</option>
+                <option value="1" {% if cfg.network.default_hours == 1 %}selected{% endif %}>1h</option>
+                <option value="6" {% if cfg.network.default_hours == 6 %}selected{% endif %}>6h</option>
+                <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
+                <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
+                <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
+                <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
+                <option value="2160" {% if cfg.network.default_hours == 2160 %}selected{% endif %}>90d</option>
+                <option value="8760" {% if cfg.network.default_hours == 8760 %}selected{% endif %}>1y</option>
+                <option value="87600" {% if cfg.network.default_hours == 87600 %}selected{% endif %}>all</option>
+              </select>
+              <label>Default usage view</label>
+              <select name="network_default_granularity">
+                <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
+                <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
+                <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
+              </select>
+              <label>Auto refresh</label>
+              <select name="network_auto_refresh_sec">
+                <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+                <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
+                <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+              </select>
+              <label>Default bar days</label>
+              <select name="network_default_bar_days">
+                {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
+                <option value="{{ n }}" {% if (cfg.network.default_bar_days or 90) == n %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+                <option value="all" {% if cfg.network.default_bar_days == 'all' %}selected{% endif %}>all</option>
+              </select>
+              <label>Default table days</label>
+              <select name="network_default_table_days">
+                {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
+                <option value="{{ n }}" {% if (cfg.network.default_table_days or 90) == n %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+                <option value="all" {% if cfg.network.default_table_days == 'all' %}selected{% endif %}>all</option>
+              </select>
+              <label>Default iface</label>
+              <input type="text" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0">
+              <label>Hide docker/bridge/veth by default</label>
+              <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
+            </div>
           </div>
         </div>
 
-        <div class="settings-card">
-          <h3>Discord webhook</h3>
-          <div class="status-row">
-            <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-enabled-chip">{% if cfg.discord.enabled %}enabled{% else %}disabled{% endif %}</span>
-            <span class="status-chip {% if cfg.discord.webhook_url %}ok{% else %}warn{% endif %}">{% if cfg.discord.webhook_url %}webhook saved{% else %}webhook missing{% endif %}</span>
-            <span class="status-chip" id="dc-last-status">untested</span>
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Apps page defaults</h3>
+            <div class="card-subtle">Default scope, sort order, and refresh for the apps/process view.</div>
+            <div class="notif-field-grid compact-top network-settings-grid">
+              <label>Scope</label>
+              <select name="apps_default_scope">
+                <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
+                <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host only</option>
+                <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker only</option>
+              </select>
+              <label>Sort</label>
+              <select name="apps_default_sort">
+                <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
+                <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
+                <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
+                <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
+              </select>
+              <label>Auto refresh</label>
+              <select name="apps_auto_refresh_sec">
+                <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+                <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
+                <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if cfg.apps.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if cfg.apps.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+              </select>
+              <label>Rows per card</label>
+              <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
+            </div>
           </div>
-          <div class="notif-field-grid">
-            <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}> Enabled</label>
-            <div class="inline-help">Leave webhook blank to keep the saved one.</div>
-            <label>Webhook URL</label>
-            <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
-          </div>
-          <div class="kv-mini-grid">
-            <div><span>Last error</span><code id="dc-last-error">—</code></div>
-            <div><span>Copy test payload</span><button type="button" class="btn secondary compact" id="copy-dc-payload">Copy payload</button></div>
-          </div>
-          <div class="notif-actions">
-            <button type="button" class="btn secondary compact" id="test-dc">Test Discord</button>
-            <button type="button" class="btn compact" id="save-test-dc">Save + test Discord</button>
-            <span id="test-dc-result" class="inline-help"></span>
-          </div>
-        </div>
 
-
-
-        <div class="settings-card">
-          <h3>Speed defaults</h3>
-          <div class="card-subtle">Speed page defaults, auto WAN tests, local iperf port, and notification thresholds.</div>
-          <div class="notif-field-grid compact-top network-settings-grid">
-            <label>Page refresh</label>
-            <select name="speed_page_refresh_sec">
-              <option value="5" {% if (cfg.speed.page_refresh_sec or 15) == 5 %}selected{% endif %}>5s</option>
-              <option value="10" {% if (cfg.speed.page_refresh_sec or 15) == 10 %}selected{% endif %}>10s</option>
-              <option value="15" {% if (cfg.speed.page_refresh_sec or 15) == 15 %}selected{% endif %}>15s</option>
-              <option value="30" {% if (cfg.speed.page_refresh_sec or 15) == 30 %}selected{% endif %}>30s</option>
-              <option value="60" {% if (cfg.speed.page_refresh_sec or 15) == 60 %}selected{% endif %}>1m</option>
-            </select>
-            <label>Default provider</label>
-            <select name="speed_default_provider">
-              <option value="ookla" {% if (cfg.speed.default_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
-              <option value="librespeed" {% if (cfg.speed.default_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
-              <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
-              <option value="cloudflare" {% if (cfg.speed.default_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
-            </select>
-            <label><input type="checkbox" class="checkbox" name="speed_auto_enabled" {% if cfg.speed.auto_enabled %}checked{% endif %}> Auto speed test</label>
-            <div class="inline-help">Runs inside the collector loop. Keep intervals sane; WAN tests are heavier than normal metrics.</div>
-            <label>Auto provider</label>
-            <select name="speed_auto_provider">
-              <option value="ookla" {% if (cfg.speed.auto_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
-              <option value="librespeed" {% if (cfg.speed.auto_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
-              <option value="notion" {% if (cfg.speed.auto_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
-              <option value="cloudflare" {% if (cfg.speed.auto_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
-            </select>
-            <label>Auto interval</label>
-            <input type="number" name="speed_auto_interval_min" value="{{ cfg.speed.auto_interval_min or 180 }}" min="5" step="5">
-            <label><input type="checkbox" class="checkbox" name="speed_notify_enabled" {% if cfg.speed.notify_enabled %}checked{% endif %}> Notify on low speed</label>
-            <div class="inline-help">Uses Telegram + Discord if enabled and saved.</div>
-            <label>Min download</label>
-            <input type="number" name="speed_min_download_mbps" value="{{ cfg.speed.min_download_mbps or 50 }}" min="0" step="0.1">
-            <label>Min upload</label>
-            <input type="number" name="speed_min_upload_mbps" value="{{ cfg.speed.min_upload_mbps or 20 }}" min="0" step="0.1">
-            <label>LibreSpeed server ID</label>
-            <input type="text" name="speed_librespeed_server_id" value="{{ cfg.speed.librespeed_server_id or '' }}" placeholder="blank = auto">
-            <label>Ookla server ID</label>
-            <input type="text" name="speed_ookla_server_id" value="{{ cfg.speed.ookla_server_id or '' }}" placeholder="blank = auto">
-            <label>Local LibreSpeed port</label>
-            <input type="number" name="speed_local_librespeed_port" value="{{ cfg.speed.local_librespeed_port or 8077 }}" min="1" max="65535" step="1">
-            <label>History page size</label>
-            <input type="number" name="speed_history_page_size" value="{{ cfg.speed.history_page_size or 25 }}" min="5" max="100" step="5">
-            <label>iperf port</label>
-            <input type="number" name="speed_iperf_port" value="{{ cfg.speed.iperf_port or 5201 }}" min="1" max="65535" step="1">
-          </div>
-        </div>
-        <div class="settings-card">
-          <h3>Notification history</h3>
-          <div class="card-subtle">Latest delivery results from both channels.</div>
-          <div class="history-list" id="notify-history">
-            <div class="history-item"><span class="text-muted">loading…</span></div>
+          <div class="settings-card">
+            <h3>Speed defaults</h3>
+            <div class="card-subtle">Speed page defaults, auto WAN tests, local iperf port, and notification thresholds.</div>
+            <div class="notif-field-grid compact-top network-settings-grid">
+              <label>Page refresh</label>
+              <select name="speed_page_refresh_sec">
+                <option value="5" {% if (cfg.speed.page_refresh_sec or 15) == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if (cfg.speed.page_refresh_sec or 15) == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if (cfg.speed.page_refresh_sec or 15) == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if (cfg.speed.page_refresh_sec or 15) == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if (cfg.speed.page_refresh_sec or 15) == 60 %}selected{% endif %}>1m</option>
+              </select>
+              <label>Default provider</label>
+              <select name="speed_default_provider">
+                <option value="ookla" {% if (cfg.speed.default_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
+                <option value="librespeed" {% if (cfg.speed.default_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
+                <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
+                <option value="cloudflare" {% if (cfg.speed.default_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
+              </select>
+              <label><input type="checkbox" class="checkbox" name="speed_auto_enabled" {% if cfg.speed.auto_enabled %}checked{% endif %}> Auto speed test</label>
+              <div class="inline-help">Runs inside the collector loop. Keep intervals sane; WAN tests are heavier than normal metrics.</div>
+              <label>Auto provider</label>
+              <select name="speed_auto_provider">
+                <option value="ookla" {% if (cfg.speed.auto_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
+                <option value="librespeed" {% if (cfg.speed.auto_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
+                <option value="notion" {% if (cfg.speed.auto_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
+                <option value="cloudflare" {% if (cfg.speed.auto_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
+              </select>
+              <label>Auto interval</label>
+              <input type="number" name="speed_auto_interval_min" value="{{ cfg.speed.auto_interval_min or 180 }}" min="5" step="5">
+              <label><input type="checkbox" class="checkbox" name="speed_notify_enabled" {% if cfg.speed.notify_enabled %}checked{% endif %}> Notify on low speed</label>
+              <div class="inline-help">Uses Telegram + Discord if enabled and saved.</div>
+              <label>Min download</label>
+              <input type="number" name="speed_min_download_mbps" value="{{ cfg.speed.min_download_mbps or 50 }}" min="0" step="0.1">
+              <label>Min upload</label>
+              <input type="number" name="speed_min_upload_mbps" value="{{ cfg.speed.min_upload_mbps or 20 }}" min="0" step="0.1">
+              <label>LibreSpeed server ID</label>
+              <input type="text" name="speed_librespeed_server_id" value="{{ cfg.speed.librespeed_server_id or '' }}" placeholder="blank = auto">
+              <label>Ookla server ID</label>
+              <input type="text" name="speed_ookla_server_id" value="{{ cfg.speed.ookla_server_id or '' }}" placeholder="blank = auto">
+              <label>Local LibreSpeed port</label>
+              <input type="number" name="speed_local_librespeed_port" value="{{ cfg.speed.local_librespeed_port or 8077 }}" min="1" max="65535" step="1">
+              <label>History page size</label>
+              <input type="number" name="speed_history_page_size" value="{{ cfg.speed.history_page_size or 25 }}" min="5" max="100" step="5">
+              <label>iperf port</label>
+              <input type="number" name="speed_iperf_port" value="{{ cfg.speed.iperf_port or 5201 }}" min="1" max="65535" step="1">
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </form>
 </div>
 {% endblock %}
@@ -426,6 +490,19 @@ function fmtUptime(sec) {
   if (d) return `${d}d ${h}h`;
   if (h) return `${h}h ${m}m`;
   return `${m}m`;
+}
+function setSettingsTab(name) {
+  document.querySelectorAll('[data-settings-tab]').forEach(btn => btn.classList.toggle('active', btn.dataset.settingsTab === name));
+  document.querySelectorAll('[data-settings-panel]').forEach(panel => panel.classList.toggle('active', panel.dataset.settingsPanel === name));
+  try { localStorage.setItem('systor.settings.tab', name); } catch (e) {}
+}
+function initSettingsTabs() {
+  const fallback = 'alerts';
+  let wanted = fallback;
+  try { wanted = localStorage.getItem('systor.settings.tab') || fallback; } catch (e) {}
+  if (!document.querySelector(`[data-settings-panel="${wanted}"]`)) wanted = fallback;
+  setSettingsTab(wanted);
+  document.querySelectorAll('[data-settings-tab]').forEach(btn => btn.addEventListener('click', () => setSettingsTab(btn.dataset.settingsTab)));
 }
 function formToJSON(form) {
   const fd = new FormData(form);
@@ -485,6 +562,7 @@ async function saveSettings(thenApply) {
   }
   setSaveState('saved', 'ok');
   await Promise.all([refreshStatus(), loadRuntime()]);
+  updateAuthSummaryChip();
 }
 async function testChannel(channel) {
   const data = formToJSON(document.getElementById('settings-form'));
@@ -519,6 +597,12 @@ async function saveThenTest(channel) {
   } catch (e) {
     showFlash('err', e.message || 'save failed');
   }
+}
+function updateAuthSummaryChip() {
+  const chip = document.getElementById('auth-summary');
+  const enabled = !!document.querySelector('[name="auth_enabled"]')?.checked;
+  chip.textContent = enabled ? 'auth enabled' : 'auth off';
+  chip.className = 'status-chip ' + (enabled ? 'ok' : '');
 }
 async function loadAccess() {
   try {
@@ -648,12 +732,14 @@ document.getElementById('save-test-dc').addEventListener('click', () => saveThen
 document.getElementById('copy-tg-payload').addEventListener('click', () => copyPayload('telegram'));
 document.getElementById('copy-dc-payload').addEventListener('click', () => copyPayload('discord'));
 Array.from(document.querySelectorAll('#settings-form input, #settings-form select')).forEach(el => {
-  el.addEventListener('change', () => setSaveState('unsaved', 'warn'));
-  el.addEventListener('input', () => setSaveState('unsaved', 'warn'));
+  el.addEventListener('change', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); });
+  el.addEventListener('input', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); });
 });
+initSettingsTabs();
 syncPresetSliders();
 loadAccess();
 loadRuntime();
 refreshStatus();
+updateAuthSummaryChip();
 </script>
 {% endblock %}

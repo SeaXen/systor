@@ -3,6 +3,7 @@ from pathlib import Path
 from werkzeug.security import generate_password_hash
 
 from systor import config as cfgmod
+from systor import web as webmod
 from systor.web import create_app
 
 
@@ -15,6 +16,7 @@ def _make_app(monkeypatch, tmp_path: Path, config_text: str):
     conf = tmp_path / "config.yaml"
     _write_config(conf, config_text)
     monkeypatch.setattr(cfgmod, "CONFIG_PATHS", [conf])
+    webmod._login_rate_state.clear()
     app = create_app()
     app.config.update(TESTING=True)
     return app
@@ -129,3 +131,60 @@ auth:
     blocked = client.post("/login", data={"username": "admin", "password": "wrong"})
     assert blocked.status_code == 429
     assert b"Too many failed logins" in blocked.data
+
+
+def test_login_rate_limit_tracks_username_across_ips(monkeypatch, tmp_path):
+    password_hash = generate_password_hash("secret123")
+    app = _make_app(
+        monkeypatch,
+        tmp_path,
+        f"""
+web:
+  host: "0.0.0.0"
+  port: 6677
+auth:
+  enabled: true
+  mode: "admin_only"
+  username: "admin"
+  password_hash: "{password_hash}"
+  session_secret: "test-secret"
+  max_fails: 3
+  cooldown_sec: 120
+""",
+    )
+    client = app.test_client()
+    r1 = client.post("/login", headers={"X-Forwarded-For": "10.0.0.1"}, data={"username": "admin", "password": "wrong"})
+    r2 = client.post("/login", headers={"X-Forwarded-For": "10.0.0.2"}, data={"username": "admin", "password": "wrong"})
+    r3 = client.post("/login", headers={"X-Forwarded-For": "10.0.0.3"}, data={"username": "admin", "password": "wrong"})
+    assert r1.status_code == 401
+    assert r2.status_code == 401
+    assert r3.status_code == 429
+
+
+def test_session_expires_after_idle_timeout(monkeypatch, tmp_path):
+    password_hash = generate_password_hash("secret123")
+    app = _make_app(
+        monkeypatch,
+        tmp_path,
+        f"""
+web:
+  host: "0.0.0.0"
+  port: 6677
+auth:
+  enabled: true
+  mode: "admin_only"
+  username: "admin"
+  password_hash: "{password_hash}"
+  session_secret: "test-secret"
+  idle_timeout_min: 1
+""",
+    )
+    client = app.test_client()
+    base = 1_700_000_000
+    monkeypatch.setattr(webmod.time, "time", lambda: base)
+    login = client.post("/login", data={"username": "admin", "password": "secret123"})
+    assert login.status_code == 302
+    monkeypatch.setattr(webmod.time, "time", lambda: base + 61)
+    after = client.get("/settings", follow_redirects=False)
+    assert after.status_code == 302
+    assert "/login" in after.headers["Location"]
