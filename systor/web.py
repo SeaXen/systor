@@ -848,6 +848,15 @@ def _public_page_enabled(name: str) -> bool:
     return bool(_public_cfg().get(name, False))
 
 
+def _config_saved_at(path: Path | None = None) -> str:
+    p = path or Path("/etc/systor/config.yaml")
+    try:
+        ts = p.stat().st_mtime
+        return datetime.fromtimestamp(ts).isoformat(timespec="seconds")
+    except Exception:
+        return ""
+
+
 def _storage_can_write() -> bool:
     return _client_private() and (not _auth_enabled() or _auth_logged_in())
 
@@ -2204,7 +2213,7 @@ def create_app() -> Flask:
             path = save_config(cfg)
         except PermissionError as e:
             return jsonify({"ok": False, "message": f"Could not save imported settings: {e}"}), 500
-        return jsonify({"ok": True, "message": f"Imported settings from {up.filename} into {path}."})
+        return jsonify({"ok": True, "message": f"Imported settings from {up.filename} into {path}.", "saved_at": _config_saved_at(path)})
 
     @app.route("/settings", methods=["GET", "POST"])
     def page_settings():
@@ -2394,10 +2403,10 @@ def create_app() -> Flask:
             except PermissionError as e:
                 msg = f"Could not save: {e}. Run install.sh or chmod the config file."
                 return jsonify({"ok": False, "message": msg}), 500
-            return jsonify({"ok": True, "message": msg})
+            return jsonify({"ok": True, "message": msg, "saved_at": _config_saved_at(path)})
         # GET
         cfg = load_config()
-        return render_template("settings.html", cfg=cfg)
+        return render_template("settings.html", cfg=cfg, cfg_defaults=DEFAULT_CONFIG, settings_saved_at=_config_saved_at())
 
     @app.route("/api/test-telegram", methods=["POST"])
     def api_test_telegram():

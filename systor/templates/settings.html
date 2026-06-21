@@ -33,6 +33,12 @@
 .settings-tool-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .settings-inline-file{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .settings-inline-file input[type=file]{max-width:230px}
+.import-modal-backdrop{position:fixed;inset:0;background:rgba(5,8,13,.72);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
+.import-modal-backdrop.open{display:flex}
+.import-modal{width:min(520px,100%);background:linear-gradient(180deg,rgba(18,24,34,.98),rgba(10,14,21,.99));border:1px solid rgba(88,166,255,.28);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.45);padding:18px}
+.import-modal h3{margin:0 0 8px}
+.import-modal .modal-file{display:inline-flex;max-width:100%;padding:6px 10px;border-radius:999px;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.24);font-size:12px;color:var(--text-bright)}
+.import-modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
 @media (max-width:1100px){
   .settings-page .sticky-actions{grid-template-columns:1fr;align-items:start}
   .settings-toolbar-tabs{justify-content:flex-start}
@@ -49,6 +55,17 @@
 
 <div class="settings-page">
   <div id="flash"></div>
+  <div class="import-modal-backdrop" id="import-modal-backdrop" aria-hidden="true">
+    <div class="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+      <h3 id="import-modal-title">Import settings backup?</h3>
+      <p class="card-subtle">This will replace the current saved settings file. Use it for restore or rollback.</p>
+      <p><span class="modal-file" id="import-modal-file">No file selected</span></p>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary compact" id="import-modal-cancel">Cancel</button>
+        <button type="button" class="btn compact" id="import-modal-confirm">Import now</button>
+      </div>
+    </div>
+  </div>
 
   <form id="settings-form">
     <div class="sticky-actions">
@@ -56,6 +73,7 @@
         <strong>Settings</strong>
         <span class="status-chip" id="save-state">ready</span>
         <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
+        <span class="status-chip settings-meta-chip" id="last-saved-summary">saved {{ settings_saved_at or '—' }}</span>
         <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
         <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
         <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
@@ -71,6 +89,7 @@
         </div>
       </div>
       <div class="actions">
+        <button type="button" class="btn secondary compact" id="restore-defaults-tab">Restore defaults</button>
         <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
         <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
         <button type="button" class="btn secondary compact" id="export-settings">Export</button>
@@ -506,6 +525,7 @@
               <button type="button" class="btn secondary compact" id="export-settings-inline">Export settings</button>
               <button type="button" class="btn secondary compact" id="import-settings-inline">Import settings</button>
               <button type="button" class="btn secondary compact" id="reset-tab-inline">Reset active tab</button>
+              <button type="button" class="btn secondary compact" id="restore-defaults-inline">Restore tab defaults</button>
             </div>
             <div class="settings-inline-file">
               <span class="inline-help" id="import-file-name">No import file selected.</span>
@@ -545,6 +565,9 @@
 
 {% block scripts %}
 <script>
+const SETTINGS_DEFAULTS = {{ cfg_defaults|tojson }};
+let LAST_SAVED_AT = {{ settings_saved_at|tojson }};
+let pendingImportFile = null;
 function showFlash(type, msg, ms = 7000) {
   const el = document.getElementById('flash');
   el.className = 'flash ' + type;
@@ -612,6 +635,108 @@ function updateDirtyState(){
   chip.textContent = dirty ? `${dirty} changed` : 'clean';
   chip.className = 'status-chip settings-meta-chip ' + (dirty ? 'warn' : 'ok');
 }
+function updateLastSavedChip(value = LAST_SAVED_AT){
+  LAST_SAVED_AT = value || '';
+  document.getElementById('last-saved-summary').textContent = `saved ${LAST_SAVED_AT || '—'}`;
+}
+function tabDefaultValues(name){
+  const d = SETTINGS_DEFAULTS || {};
+  if (name === 'general') return {
+    threshold_cpu_load_1m_enabled: String((((d.thresholds||{}).cpu_load_1m||{}).enabled ?? true)),
+    threshold_cpu_load_1m_value: String((((d.thresholds||{}).cpu_load_1m||{}).value ?? 4.0)),
+    threshold_cpu_load_1m_duration: String((((d.thresholds||{}).cpu_load_1m||{}).duration_min ?? 2)),
+    threshold_cpu_temp_c_enabled: String((((d.thresholds||{}).cpu_temp_c||{}).enabled ?? true)),
+    threshold_cpu_temp_c_value: String((((d.thresholds||{}).cpu_temp_c||{}).value ?? 85.0)),
+    threshold_cpu_temp_c_duration: String((((d.thresholds||{}).cpu_temp_c||{}).duration_min ?? 2)),
+    threshold_mem_free_mb_enabled: String((((d.thresholds||{}).mem_free_mb||{}).enabled ?? true)),
+    threshold_mem_free_mb_value: String((((d.thresholds||{}).mem_free_mb||{}).value ?? 500)),
+    threshold_mem_free_mb_duration: String((((d.thresholds||{}).mem_free_mb||{}).duration_min ?? 2)),
+    threshold_swap_used_mb_enabled: String((((d.thresholds||{}).swap_used_mb||{}).enabled ?? true)),
+    threshold_swap_used_mb_value: String((((d.thresholds||{}).swap_used_mb||{}).value ?? 1024)),
+    threshold_swap_used_mb_duration: String((((d.thresholds||{}).swap_used_mb||{}).duration_min ?? 2)),
+    threshold_disk_used_pct_enabled: String((((d.thresholds||{}).disk_used_pct||{}).enabled ?? true)),
+    threshold_disk_used_pct_value: String((((d.thresholds||{}).disk_used_pct||{}).value ?? 90)),
+    threshold_disk_used_pct_duration: String((((d.thresholds||{}).disk_used_pct||{}).duration_min ?? 2)),
+    cooldown_sec: String((d.thresholds||{}).cooldown_sec ?? 0),
+    dashboard_default_hours: String((d.dashboard||{}).default_hours ?? 6),
+    dashboard_refresh_sec: String((d.dashboard||{}).refresh_sec ?? 5),
+    dashboard_chart_refresh_sec: String((d.dashboard||{}).chart_refresh_sec ?? 5),
+    poll_interval_sec: String((d.collector||{}).poll_interval_sec ?? 5),
+    apps_default_scope: String((d.apps||{}).default_scope ?? 'all'),
+    apps_default_sort: String((d.apps||{}).default_sort ?? 'cpu'),
+    apps_auto_refresh_sec: String((d.apps||{}).auto_refresh_sec ?? 15),
+    apps_default_limit: String((d.apps||{}).default_limit ?? 10),
+    network_default_hours: String((d.network||{}).default_hours ?? 1),
+    network_default_granularity: String((d.network||{}).default_granularity ?? 'day'),
+    network_auto_refresh_sec: String((d.network||{}).auto_refresh_sec ?? 5),
+    network_default_bar_days: String((d.network||{}).default_bar_days ?? 90),
+    network_default_table_days: String((d.network||{}).default_table_days ?? 90),
+    network_default_iface: String((d.network||{}).default_iface ?? 'all'),
+    network_hide_virtual_default: String((d.network||{}).hide_virtual_default ?? true),
+    speed_page_refresh_sec: String((d.speed||{}).page_refresh_sec ?? 0),
+    speed_default_provider: String((d.speed||{}).default_provider ?? 'ookla'),
+    speed_auto_enabled: String((d.speed||{}).auto_enabled ?? false),
+    speed_auto_provider: String((d.speed||{}).auto_provider ?? 'ookla'),
+    speed_auto_interval_min: String((d.speed||{}).auto_interval_min ?? 60),
+    speed_notify_enabled: String((d.speed||{}).notify_enabled ?? false),
+    speed_min_download_mbps: String((d.speed||{}).min_download_mbps ?? 0),
+    speed_min_upload_mbps: String((d.speed||{}).min_upload_mbps ?? 0),
+    speed_librespeed_server_id: String((d.speed||{}).librespeed_server_id ?? ''),
+    speed_ookla_server_id: String((d.speed||{}).ookla_server_id ?? ''),
+    speed_local_librespeed_port: String((d.speed||{}).local_librespeed_port ?? 8077),
+    speed_history_page_size: String((d.speed||{}).history_page_size ?? 25),
+    speed_iperf_port: String((d.speed||{}).iperf_port ?? 5201),
+  };
+  if (name === 'notifications') return {
+    telegram_enabled: String((d.telegram||{}).enabled ?? false),
+    telegram_bot_token: '',
+    telegram_chat_id: String((d.telegram||{}).chat_id ?? ''),
+    discord_enabled: String((d.discord||{}).enabled ?? false),
+    discord_webhook_url: '',
+  };
+  if (name === 'auth') return {
+    auth_enabled: String((d.auth||{}).enabled ?? false),
+    auth_mode: String((d.auth||{}).mode ?? 'admin_only'),
+    auth_username: String((d.auth||{}).username ?? 'admin'),
+    auth_password: '',
+    auth_password_confirm: '',
+    auth_clear_password: 'false',
+    auth_idle_timeout_min: String((d.auth||{}).idle_timeout_min ?? 0),
+    auth_max_fails: String((d.auth||{}).max_fails ?? 5),
+    auth_cooldown_sec: String((d.auth||{}).cooldown_sec ?? 60),
+  };
+  if (name === 'access') return {
+    public_dashboard: String((d.public||{}).dashboard ?? true),
+    public_alerts: String((d.public||{}).alerts ?? false),
+    web_host: String((d.web||{}).host ?? '0.0.0.0'),
+    web_port: String((d.web||{}).port ?? 6677),
+  };
+  return {};
+}
+function restoreActiveTabDefaults(){
+  const panel = activePanel();
+  if (!panel) return;
+  const tabName = panel.dataset.settingsPanel;
+  const vals = tabDefaultValues(tabName);
+  Object.entries(vals).forEach(([name,val]) => {
+    const el = panel.querySelector(`[name="${name}"]`);
+    if (el) setFieldValue(el, val);
+  });
+  syncPresetSliders();
+  updateAuthSummaryChip();
+  updateDirtyState();
+  setSaveState('unsaved', 'warn');
+  showFlash('ok', 'Built-in defaults loaded for active tab');
+}
+function openImportModal(file){
+  pendingImportFile = file;
+  document.getElementById('import-modal-file').textContent = file ? file.name : 'No file selected';
+  document.getElementById('import-modal-backdrop').classList.add('open');
+}
+function closeImportModal(){
+  pendingImportFile = null;
+  document.getElementById('import-modal-backdrop').classList.remove('open');
+}
 function resetActiveTab(){
   const panel = activePanel();
   if (!panel) return;
@@ -672,6 +797,7 @@ async function saveSettings(thenApply) {
   Object.assign(INITIAL_FORM_DATA, formToJSON(document.getElementById('settings-form')));
   setSaveState('saved', 'ok');
   updateDirtyState();
+  updateLastSavedChip(j.saved_at);
   await Promise.all([refreshStatus(), loadRuntime()]);
   updateAuthSummaryChip();
 }
@@ -690,6 +816,7 @@ async function saveActiveTab(thenApply = false) {
   Object.assign(INITIAL_FORM_DATA, formToJSON(document.getElementById('settings-form')));
   setSaveState('saved', 'ok');
   updateDirtyState();
+  updateLastSavedChip(j.saved_at);
   await Promise.all([refreshStatus(), loadRuntime()]);
   updateAuthSummaryChip();
 }
@@ -708,6 +835,7 @@ async function importSettingsFile(file) {
   const r = await fetch('/api/settings/import', { method:'POST', body: fd });
   const j = await r.json();
   if (!r.ok || !j.ok) throw new Error(j.message || j.error || ('HTTP ' + r.status));
+  updateLastSavedChip(j.saved_at);
   showFlash('ok', j.message || 'Settings imported. Reloading…', 9000);
   setTimeout(() => location.reload(), 800);
 }
@@ -861,6 +989,8 @@ function syncPresetSliders() {
 }
 document.getElementById('settings-form').addEventListener('submit', e => { e.preventDefault(); saveSettings(false); });
 document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
+document.getElementById('restore-defaults-tab').addEventListener('click', restoreActiveTabDefaults);
+document.getElementById('restore-defaults-inline').addEventListener('click', restoreActiveTabDefaults);
 document.getElementById('save-tab').addEventListener('click', () => saveActiveTab(false));
 document.getElementById('reset-tab').addEventListener('click', resetActiveTab);
 document.getElementById('reset-tab-inline').addEventListener('click', resetActiveTab);
@@ -868,13 +998,19 @@ document.getElementById('export-settings').addEventListener('click', exportSetti
 document.getElementById('export-settings-inline').addEventListener('click', exportSettings);
 document.getElementById('import-settings-btn').addEventListener('click', chooseImportFile);
 document.getElementById('import-settings-inline').addEventListener('click', chooseImportFile);
+document.getElementById('import-modal-cancel').addEventListener('click', closeImportModal);
+document.getElementById('import-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'import-modal-backdrop') closeImportModal(); });
+document.getElementById('import-modal-confirm').addEventListener('click', async () => {
+  const file = pendingImportFile;
+  closeImportModal();
+  try { await importSettingsFile(file); }
+  catch (err) { setSaveState('ready'); showFlash('err', err.message || 'Import failed'); }
+});
 document.getElementById('import-settings-file').addEventListener('change', async (e) => {
   const file = e.target.files && e.target.files[0];
   document.getElementById('import-file-name').textContent = file ? file.name : 'No import file selected.';
-  if (!file) return;
-  try { await importSettingsFile(file); }
-  catch (err) { setSaveState('ready'); showFlash('err', err.message || 'Import failed'); }
-  finally { e.target.value = ''; }
+  if (file) openImportModal(file);
+  e.target.value = '';
 });
 document.getElementById('restart-collector').addEventListener('click', async () => {
   if (!confirm('Restart the collector now? It will be down briefly.')) return;
@@ -904,6 +1040,7 @@ loadAccess();
 loadRuntime();
 refreshStatus();
 updateAuthSummaryChip();
+updateLastSavedChip();
 updateDirtyState();
 </script>
 {% endblock %}
