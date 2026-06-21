@@ -242,6 +242,14 @@ Message formatting is different per channel so alerts stay readable.
 
 ---
 
+## Releases and changelog
+
+- First public release: **v0.1.0**
+- Human-readable change history: [`CHANGELOG.md`](CHANGELOG.md)
+- GitHub releases: use the Releases tab for tagged snapshots and release notes
+
+---
+
 ## API
 
 The front-end consumes JSON endpoints under `/api/`.
