@@ -13,6 +13,7 @@
       <span class="status-chip" id="svc-summary">loading services…</span>
       <span class="status-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary">telegram {% if cfg.telegram.enabled %}enabled{% else %}off{% endif %}</span>
       <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary">discord {% if cfg.discord.enabled %}enabled{% else %}off{% endif %}</span>
+      <span class="status-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}" id="auth-summary">auth {% if cfg.auth and cfg.auth.enabled %}enabled{% else %}off{% endif %}</span>
     </div>
     <div class="actions">
       <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
@@ -70,13 +71,19 @@
             </select>
             <label>Username</label>
             <input type="text" name="auth_username" value="{{ (cfg.auth.username if cfg.auth else 'admin') or 'admin' }}" placeholder="admin" autocomplete="username">
-            <label>Password</label>
-            <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}leave blank to keep saved password{% else %}set admin password{% endif %}" autocomplete="new-password">
-            <label>Confirm password</label>
-            <input type="password" name="auth_password_confirm" value="" placeholder="repeat password" autocomplete="new-password">
+            <label>Password status</label>
+            <div class="status-row">
+              <span class="status-chip {% if cfg.auth and cfg.auth.password_hash %}ok{% endif %}">{% if cfg.auth and cfg.auth.password_hash %}saved password set{% else %}no saved password{% endif %}</span>
+            </div>
+            <label>New password</label>
+            <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it{% else %}set admin password{% endif %}" autocomplete="new-password">
+            <label>Confirm new password</label>
+            <input type="password" name="auth_password_confirm" value="" placeholder="repeat new password" autocomplete="new-password">
+            <label>Delete saved password</label>
+            <label><input type="checkbox" class="checkbox" name="auth_clear_password"> clear saved password</label>
           </div>
           <div class="notif-actions">
-            <span class="inline-help">One dashboard, one admin account. Leave password blank to keep the saved one. If enabled, private pages/APIs will require login.</span>
+            <span class="inline-help">One dashboard, one admin account. Leave password blank to keep the saved one. Enter a new password to change it. Clear password only after disabling login protection or together with a replacement password.</span>
           </div>
         </div>
 
@@ -423,7 +430,7 @@ function fmtUptime(sec) {
 function formToJSON(form) {
   const fd = new FormData(form);
   const data = Object.fromEntries(fd.entries());
-  ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default', 'speed_auto_enabled', 'speed_notify_enabled', 'auth_enabled'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
+  ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default', 'speed_auto_enabled', 'speed_notify_enabled', 'auth_enabled', 'auth_clear_password'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
   ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
     data[`threshold_${k}_enabled`] = fd.has(`threshold_${k}_enabled`) ? 'true' : 'false';
   });

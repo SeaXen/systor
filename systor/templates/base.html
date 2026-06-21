@@ -30,6 +30,7 @@
       {% endif %}
     </nav>
     {% if client_private_raw and auth_enabled %}
+      <span class="status-chip ok" title="Single-admin login protection enabled">auth on</span>
       {% if auth_logged_in %}
       <a href="/logout" class="btn secondary compact" title="Sign out">Logout</a>
       {% else %}

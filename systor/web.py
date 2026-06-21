@@ -73,6 +73,10 @@ _apps_cache: dict = {"ts": 0.0, "limit": 0, "host_rows": [], "docker_rows": []}
 _apps_cache_lock = threading.Lock()
 _public_dash_cache: dict = {"ts": 0.0, "hours": None, "body": b"", "etag": ""}
 _public_dash_cache_lock = threading.Lock()
+_login_rate_lock = threading.Lock()
+_login_rate_state: dict[str, dict] = {}
+_LOGIN_MAX_FAILS = 5
+_LOGIN_COOLDOWN_SEC = 60
 
 
 def _apps_cache_refresh_worker() -> None:
@@ -687,6 +691,46 @@ def _auth_cfg() -> dict:
 def _auth_enabled() -> bool:
     cfg = _auth_cfg()
     return bool(cfg.get("enabled") and cfg.get("username") and cfg.get("password_hash"))
+
+
+def _request_ip() -> str:
+    raw = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    return raw or "unknown"
+
+
+def _login_rate_status(ip: str) -> tuple[bool, int]:
+    now = time.time()
+    with _login_rate_lock:
+        row = _login_rate_state.get(ip)
+        if not row:
+            return False, 0
+        blocked_until = float(row.get("blocked_until") or 0)
+        if blocked_until > now:
+            return True, max(1, int(blocked_until - now))
+        if blocked_until:
+            row["blocked_until"] = 0.0
+        return False, 0
+
+
+def _login_rate_fail(ip: str) -> tuple[bool, int]:
+    now = time.time()
+    with _login_rate_lock:
+        row = _login_rate_state.setdefault(ip, {"fails": 0, "blocked_until": 0.0})
+        blocked_until = float(row.get("blocked_until") or 0)
+        if blocked_until > now:
+            return True, max(1, int(blocked_until - now))
+        fails = int(row.get("fails") or 0) + 1
+        row["fails"] = fails
+        if fails >= _LOGIN_MAX_FAILS:
+            row["fails"] = 0
+            row["blocked_until"] = now + _LOGIN_COOLDOWN_SEC
+            return True, _LOGIN_COOLDOWN_SEC
+        return False, 0
+
+
+def _login_rate_success(ip: str) -> None:
+    with _login_rate_lock:
+        _login_rate_state.pop(ip, None)
 
 
 def _auth_logged_in() -> bool:
@@ -1931,6 +1975,12 @@ def create_app() -> Flask:
         next_url = str(request.values.get("next") or "/")
         if not next_url.startswith("/") or next_url.startswith("//"):
             next_url = "/"
+        ip = _request_ip()
+        blocked, wait_sec = _login_rate_status(ip)
+        if blocked:
+            error = f"Too many failed logins. Try again in {wait_sec}s."
+            status = 429 if request.method == "POST" else 200
+            return render_template("login.html", error=error, next_url=next_url, wait_sec=wait_sec), status
         if request.method == "POST":
             auth = _auth_cfg()
             username = str(request.form.get("username") or "").strip()
@@ -1941,12 +1991,17 @@ def create_app() -> Flask:
                 except Exception:
                     ok = False
                 if ok:
+                    _login_rate_success(ip)
                     session["systor_auth"] = True
                     session["systor_user"] = auth.get("username")
                     return redirect(next_url or "/")
+            blocked, wait_sec = _login_rate_fail(ip)
+            if blocked:
+                error = f"Too many failed logins. Try again in {wait_sec}s."
+                return render_template("login.html", error=error, next_url=next_url, wait_sec=wait_sec), 429
             error = "Invalid username or password"
-            return render_template("login.html", error=error, next_url=next_url), 401
-        return render_template("login.html", error=error, next_url=next_url)
+            return render_template("login.html", error=error, next_url=next_url, wait_sec=0), 401
+        return render_template("login.html", error=error, next_url=next_url, wait_sec=0)
 
     @app.route("/logout", methods=["GET", "POST"])
     def page_logout():
@@ -2142,8 +2197,11 @@ def create_app() -> Flask:
                 auth["mode"] = str(data.get("auth_mode") or "admin_only").strip()
             if "auth_username" in data:
                 auth["username"] = str(data.get("auth_username") or "admin").strip() or "admin"
+            clear_auth_password = _bool(data.get("auth_clear_password")) if "auth_clear_password" in data else False
             pw = str(data.get("auth_password") or "")
             pw2 = str(data.get("auth_password_confirm") or "")
+            if clear_auth_password:
+                auth["password_hash"] = ""
             if pw or pw2:
                 if pw != pw2:
                     return jsonify({"ok": False, "message": "Auth password confirmation does not match."}), 400

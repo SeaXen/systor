@@ -103,3 +103,29 @@ auth:
     assert dashboard.status_code == 200
     blocked = client.get("/settings", headers=pub)
     assert blocked.status_code == 404
+
+
+def test_login_rate_limit_blocks_after_repeated_failures(monkeypatch, tmp_path):
+    password_hash = generate_password_hash("secret123")
+    app = _make_app(
+        monkeypatch,
+        tmp_path,
+        f"""
+web:
+  host: "0.0.0.0"
+  port: 6677
+auth:
+  enabled: true
+  mode: "admin_only"
+  username: "admin"
+  password_hash: "{password_hash}"
+  session_secret: "test-secret"
+""",
+    )
+    client = app.test_client()
+    for _ in range(4):
+        r = client.post("/login", data={"username": "admin", "password": "wrong"})
+        assert r.status_code == 401
+    blocked = client.post("/login", data={"username": "admin", "password": "wrong"})
+    assert blocked.status_code == 429
+    assert b"Too many failed logins" in blocked.data
