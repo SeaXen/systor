@@ -9,10 +9,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/SeaXen/systor/releases/tag/v0.1.0"><img alt="release" src="https://img.shields.io/github/v/release/SeaXen/systor?display_name=tag&sort=semver&color=1f6feb"></a>
   <a href="https://github.com/SeaXen/systor/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-3fb950"></a>
   <img alt="python" src="https://img.shields.io/badge/python-3.9%2B-58a6ff">
+  <a href="https://systor.xuup.top/"><img alt="demo" src="https://img.shields.io/badge/demo-live_dashboard-8957e5"></a>
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-8892a0">
-  <img alt="stack" src="https://img.shields.io/badge/stack-Flask%20%2B%20Waitress%20%2B%20SQLite-1f6feb">
 </p>
 
 ---
