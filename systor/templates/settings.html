@@ -176,54 +176,6 @@
               <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
             </div>
           </div>
-        </div>
-        <div class="settings-panel-col">
-          <div class="settings-card">
-            <h3>Alert thresholds</h3>
-            <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
-            {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
-            {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
-            {% if entry is mapping %}
-              {% set enabled = entry.get("enabled", true) %}
-              {% set value = entry.get("value", default_value) %}
-              {% set duration = entry.get("duration_min", default_min) %}
-            {% else %}
-              {% set enabled = true %}
-              {% set value = entry %}
-              {% set duration = default_min %}
-            {% endif %}
-            <tr>
-              <td>
-                <label class="threshold-name">
-                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
-                  <span>{{ label }}</span>
-                </label>
-              </td>
-              <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
-              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
-              <td class="text-muted">{{ unit }}</td>
-              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
-              <td class="text-muted">min</td>
-            </tr>
-            {%- endmacro %}
-            <table class="threshold-table">
-              <thead>
-                <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
-              </thead>
-              <tbody>
-                {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
-                {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
-                {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
-                {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
-                {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
-              </tbody>
-            </table>
-            <div class="notif-actions">
-              <label class="inline-help">Cooldown</label>
-              <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
-              <span class="inline-help">seconds between repeats per metric</span>
-            </div>
-          </div>
 
           <div class="settings-card">
             <h3>Network page defaults</h3>
@@ -277,6 +229,54 @@
               <input type="text" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0">
               <label>Hide docker/bridge/veth by default</label>
               <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
+            </div>
+          </div>
+        </div>
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Alert thresholds</h3>
+            <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
+            {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
+            {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
+            {% if entry is mapping %}
+              {% set enabled = entry.get("enabled", true) %}
+              {% set value = entry.get("value", default_value) %}
+              {% set duration = entry.get("duration_min", default_min) %}
+            {% else %}
+              {% set enabled = true %}
+              {% set value = entry %}
+              {% set duration = default_min %}
+            {% endif %}
+            <tr>
+              <td>
+                <label class="threshold-name">
+                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
+                  <span>{{ label }}</span>
+                </label>
+              </td>
+              <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
+              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
+              <td class="text-muted">{{ unit }}</td>
+              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
+              <td class="text-muted">min</td>
+            </tr>
+            {%- endmacro %}
+            <table class="threshold-table">
+              <thead>
+                <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
+              </thead>
+              <tbody>
+                {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
+                {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
+                {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
+                {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
+                {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
+              </tbody>
+            </table>
+            <div class="notif-actions">
+              <label class="inline-help">Cooldown</label>
+              <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
+              <span class="inline-help">seconds between repeats per metric</span>
             </div>
           </div>
 
@@ -360,8 +360,6 @@
               <span id="test-tg-result" class="inline-help"></span>
             </div>
           </div>
-        </div>
-        <div class="settings-panel-col">
           <div class="settings-card">
             <h3>Discord webhook</h3>
             <div class="status-row">
@@ -385,6 +383,8 @@
               <span id="test-dc-result" class="inline-help"></span>
             </div>
           </div>
+        </div>
+        <div class="settings-panel-col">
           <div class="settings-card">
             <h3>Notification history</h3>
             <div class="card-subtle">Latest delivery results from both channels.</div>
@@ -397,50 +397,65 @@
     </section>
 
     <section class="settings-panel" data-settings-panel="auth">
-      <div class="settings-auth-shell">
-        <div class="settings-card">
-          <h3>Security <span class="status-chip mini-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}">{% if cfg.auth and cfg.auth.enabled %}auth enabled{% else %}auth off{% endif %}</span></h3>
-          <div class="card-subtle">Optional single-admin login. Public/tunnel dashboard can stay read-only while private admin pages require login.</div>
-          <div class="auth-stat-row">
-            <span class="status-chip {% if cfg.auth and cfg.auth.password_hash %}ok{% endif %}">{% if cfg.auth and cfg.auth.password_hash %}saved password set{% else %}no saved password{% endif %}</span>
-            <span class="status-chip">mode {{ (cfg.auth.mode if cfg.auth else 'admin_only') or 'admin_only' }}</span>
-            <span class="status-chip">idle timeout {{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}m</span>
-            <span class="status-chip">fails {{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}</span>
-            <span class="status-chip">cooldown {{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}s</span>
+      <div class="settings-panel-grid">
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Security <span class="status-chip mini-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}">{% if cfg.auth and cfg.auth.enabled %}auth on{% else %}auth off{% endif %}</span></h3>
+            <div class="card-subtle">Optional single-admin login. Public/tunnel dashboard can stay read-only while private admin pages require login.</div>
+            <div class="auth-stat-row">
+              <span class="status-chip {% if cfg.auth and cfg.auth.password_hash %}ok{% endif %}">{% if cfg.auth and cfg.auth.password_hash %}password set{% else %}no password{% endif %}</span>
+              <span class="status-chip">mode {{ (cfg.auth.mode if cfg.auth else 'admin_only') or 'admin_only' }}</span>
+              <span class="status-chip">idle {{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}m</span>
+              <span class="status-chip">fails {{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}</span>
+              <span class="status-chip">cooldown {{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}s</span>
+            </div>
+            <div class="auth-mini-grid compact-top">
+              <label>Enable login</label>
+              <label><input type="checkbox" class="checkbox" name="auth_enabled" {% if cfg.auth and cfg.auth.enabled %}checked{% endif %}> require username + password</label>
+
+              <label>Protect mode</label>
+              <select name="auth_mode">
+                <option value="admin_only" {% if (cfg.auth.mode if cfg.auth else 'admin_only') == 'admin_only' %}selected{% endif %}>admin only</option>
+                <option value="full_app" {% if cfg.auth and cfg.auth.mode == 'full_app' %}selected{% endif %}>whole app</option>
+              </select>
+
+              <label>Username</label>
+              <input type="text" name="auth_username" value="{{ (cfg.auth.username if cfg.auth else 'admin') or 'admin' }}" placeholder="admin" autocomplete="username">
+            </div>
           </div>
-          <div class="auth-mini-grid compact-top">
-            <label>Enable login protection</label>
-            <label><input type="checkbox" class="checkbox" name="auth_enabled" {% if cfg.auth and cfg.auth.enabled %}checked{% endif %}> require username + password</label>
 
-            <label>Protect mode</label>
-            <select name="auth_mode">
-              <option value="admin_only" {% if (cfg.auth.mode if cfg.auth else 'admin_only') == 'admin_only' %}selected{% endif %}>admin only</option>
-              <option value="full_app" {% if cfg.auth and cfg.auth.mode == 'full_app' %}selected{% endif %}>whole app</option>
-            </select>
+          <div class="settings-card">
+            <h3>Password</h3>
+            <div class="card-subtle">Set or rotate the single admin password. Leave blank to keep the current password.</div>
+            <div class="auth-mini-grid compact-top">
+              <label>New password</label>
+              <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it{% else %}set admin password{% endif %}" autocomplete="new-password">
 
-            <label>Username</label>
-            <input type="text" name="auth_username" value="{{ (cfg.auth.username if cfg.auth else 'admin') or 'admin' }}" placeholder="admin" autocomplete="username">
+              <label>Confirm password</label>
+              <input type="password" name="auth_password_confirm" value="" placeholder="repeat new password" autocomplete="new-password">
 
-            <label>Idle auto-logout</label>
-            <input type="number" name="auth_idle_timeout_min" value="{{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}" min="0" max="1440" step="1" placeholder="0 = off">
-
-            <label>Fail limit</label>
-            <input type="number" name="auth_max_fails" value="{{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}" min="2" max="20" step="1">
-
-            <label>Cooldown</label>
-            <input type="number" name="auth_cooldown_sec" value="{{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}" min="10" max="3600" step="10">
-
-            <label>New password</label>
-            <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it{% else %}set admin password{% endif %}" autocomplete="new-password">
-
-            <label>Confirm new password</label>
-            <input type="password" name="auth_password_confirm" value="" placeholder="repeat new password" autocomplete="new-password">
-
-            <label>Delete saved password</label>
-            <label><input type="checkbox" class="checkbox" name="auth_clear_password"> clear saved password</label>
+              <label>Delete saved password</label>
+              <label><input type="checkbox" class="checkbox" name="auth_clear_password"> clear saved password</label>
+            </div>
           </div>
-          <div class="notif-actions">
-            <span class="inline-help full">Per-IP and per-username brute-force tracking is enabled. Use idle timeout <code>0</code> to disable auto-logout.</span>
+        </div>
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Session & lockout</h3>
+            <div class="card-subtle">Idle logout and brute-force protection for the admin login.</div>
+            <div class="auth-mini-grid compact-top">
+              <label>Idle auto-logout</label>
+              <input type="number" name="auth_idle_timeout_min" value="{{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}" min="0" max="1440" step="1" placeholder="0 = off">
+
+              <label>Fail limit</label>
+              <input type="number" name="auth_max_fails" value="{{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}" min="2" max="20" step="1">
+
+              <label>Cooldown</label>
+              <input type="number" name="auth_cooldown_sec" value="{{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}" min="10" max="3600" step="10">
+            </div>
+            <div class="notif-actions">
+              <span class="inline-help full">Per-IP and per-username brute-force tracking is enabled. Use idle timeout <code>0</code> to disable auto-logout.</span>
+            </div>
           </div>
         </div>
       </div>
@@ -456,7 +471,9 @@
               <div class="access-item"><span class="kind">loading</span><span class="value">Checking access targets…</span></div>
             </div>
           </div>
+        </div>
 
+        <div class="settings-panel-col">
           <div class="settings-card">
             <h3>Runtime</h3>
             <div class="status-row" id="service-row">
@@ -479,9 +496,6 @@
               <span class="inline-help">Restart collector applies new poll interval immediately. Restart web is only needed for host/port changes.</span>
             </div>
           </div>
-        </div>
-
-        <div class="settings-panel-col">
         </div>
       </div>
     </section>
