@@ -2,15 +2,22 @@
 {% block title %}systor · Settings{% endblock %}
 {% block content %}
 <style>
-.settings-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:0}
+.settings-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:0;align-items:center}
+.settings-tab-item{display:inline-flex;align-items:center;gap:5px}
 .settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;letter-spacing:.28px;cursor:pointer;line-height:1;white-space:nowrap}
 .settings-tab-btn:hover{border-color:rgba(88,166,255,.5);color:var(--text-bright)}
 .settings-tab-btn.active{background:linear-gradient(180deg,var(--blue-2) 0%,#1a4f9c 100%);border-color:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(31,111,235,.22)}
-.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:8px;align-items:center}
-.settings-page .sticky-actions .meta{display:flex;flex-wrap:wrap;gap:7px;align-items:center;min-width:0}
-.settings-toolbar-tabs{display:flex;justify-content:center;align-items:center;min-width:0}
-.settings-toolbar-tabs .settings-tabs{justify-content:center}
+.tab-restore-btn{appearance:none;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.22);color:var(--muted);border-radius:999px;padding:6px 8px;font-size:10px;font-weight:700;line-height:1;cursor:pointer}
+.tab-restore-btn:hover{color:var(--text-bright);border-color:rgba(88,166,255,.45);background:rgba(25,42,68,.92)}
+.settings-page .sticky-actions{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.settings-toolbar-top,.settings-toolbar-bottom{display:flex;gap:8px;align-items:center;justify-content:space-between;min-width:0}
+.settings-page .sticky-actions .meta{display:flex;flex-wrap:wrap;gap:7px;align-items:center;min-width:0;flex:1 1 auto}
+.settings-toolbar-tabs{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
+.settings-toolbar-tabs .settings-tabs{justify-content:flex-start}
 .settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:7px}
+.settings-action-group{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding-left:7px;border-left:1px solid rgba(88,166,255,.12)}
+.settings-action-group:first-child{padding-left:0;border-left:0}
+.mobile-only{display:none !important}
 .settings-panel{display:none;gap:8px}
 .settings-panel.active{display:block}
 .settings-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
@@ -40,16 +47,21 @@
 .import-modal .modal-file{display:inline-flex;max-width:100%;padding:6px 10px;border-radius:999px;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.24);font-size:12px;color:var(--text-bright)}
 .import-modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
 @media (max-width:1100px){
-  .settings-page .sticky-actions{grid-template-columns:1fr;align-items:start}
-  .settings-toolbar-tabs{justify-content:flex-start}
-  .settings-page .sticky-actions .actions{justify-content:flex-start}
+  .settings-toolbar-top,.settings-toolbar-bottom{flex-direction:column;align-items:flex-start}
+  .settings-toolbar-tabs{justify-content:flex-start;width:100%}
+  .settings-page .sticky-actions .actions{justify-content:flex-start;width:100%}
 }
-@media (max-width:900px){.settings-panel-grid{grid-template-columns:1fr}}
+@media (max-width:900px){
+  .settings-panel-grid{grid-template-columns:1fr}
+  .desktop-only{display:none !important}
+  .mobile-only{display:inline-flex !important}
+}
 @media (max-width:700px){
   .settings-tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap}
   .settings-tab-btn{padding:7px 9px;font-size:10px}
   .auth-mini-grid{grid-template-columns:1fr}
   .settings-meta-chip{font-size:9px;padding:3px 6px}
+  .settings-action-group{padding-left:0;border-left:0}
 }
 </style>
 
@@ -69,37 +81,47 @@
 
   <form id="settings-form">
     <div class="sticky-actions">
-      <div class="meta">
-        <strong>Settings</strong>
-        <span class="status-chip" id="save-state">ready</span>
-        <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
-        <span class="status-chip settings-meta-chip" id="last-saved-summary">saved {{ settings_saved_at or '—' }}</span>
-        <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
-        <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
-        <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
-        <span class="status-chip settings-meta-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary"><span class="ico">◎</span><span>{% if cfg.discord.enabled %}on{% else %}off{% endif %}</span></span>
-        <span class="status-chip settings-meta-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}" id="auth-summary">auth {% if cfg.auth and cfg.auth.enabled %}on{% else %}off{% endif %}</span>
-      </div>
-      <div class="settings-toolbar-tabs">
-        <div class="settings-tabs" id="settings-tabs">
-          <button type="button" class="settings-tab-btn active" data-settings-tab="general">General</button>
-          <button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button>
-          <button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button>
-          <button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button>
+      <div class="settings-toolbar-top">
+        <div class="meta">
+          <strong>Settings</strong>
+          <span class="status-chip" id="save-state">ready</span>
+          <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
+          <span class="status-chip settings-meta-chip" id="last-saved-summary" title="{{ settings_saved_at or '' }}">saved {{ settings_saved_at or '—' }}</span>
+          <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
+          <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
+          <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
+          <span class="status-chip settings-meta-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary"><span class="ico">◎</span><span>{% if cfg.discord.enabled %}on{% else %}off{% endif %}</span></span>
+          <span class="status-chip settings-meta-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}" id="auth-summary">auth {% if cfg.auth and cfg.auth.enabled %}on{% else %}off{% endif %}</span>
         </div>
       </div>
-      <div class="actions">
-        <button type="button" class="btn secondary compact" id="restore-defaults-tab">Restore defaults</button>
-        <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
-        <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
-        <button type="button" class="btn secondary compact" id="export-settings">Export</button>
-        <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
-        <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
-        <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
-        <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
-        <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
-        <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
-        <button type="submit" class="btn compact">Save settings</button>
+      <div class="settings-toolbar-bottom">
+        <div class="settings-toolbar-tabs">
+          <div class="settings-tabs" id="settings-tabs">
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn active" data-settings-tab="general">General</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="general" title="Restore General defaults">↺</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="notifications" title="Restore Notifications defaults">↺</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="auth" title="Restore Auth defaults">↺</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="access" title="Restore Access defaults">↺</button></div>
+          </div>
+          <button type="button" class="btn secondary compact mobile-only" id="restore-defaults-tab">Restore defaults</button>
+        </div>
+        <div class="actions">
+          <div class="settings-action-group">
+            <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
+            <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
+            <button type="button" class="btn secondary compact" id="export-settings">Export</button>
+            <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
+            <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
+            <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
+          </div>
+          <div class="settings-action-group desktop-only">
+            <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
+            <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
+          </div>
+          <div class="settings-action-group">
+            <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
+            <button type="submit" class="btn compact">Save settings</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -635,9 +657,25 @@ function updateDirtyState(){
   chip.textContent = dirty ? `${dirty} changed` : 'clean';
   chip.className = 'status-chip settings-meta-chip ' + (dirty ? 'warn' : 'ok');
 }
+function relativeTimeFromIso(iso) {
+  if (!iso) return 'saved —';
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return `saved ${iso}`;
+  const diffSec = Math.max(0, Math.round((Date.now() - t.getTime()) / 1000));
+  if (diffSec < 15) return 'saved just now';
+  if (diffSec < 60) return `saved ${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `saved ${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `saved ${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `saved ${diffDay}d ago`;
+}
 function updateLastSavedChip(value = LAST_SAVED_AT){
   LAST_SAVED_AT = value || '';
-  document.getElementById('last-saved-summary').textContent = `saved ${LAST_SAVED_AT || '—'}`;
+  const chip = document.getElementById('last-saved-summary');
+  chip.textContent = relativeTimeFromIso(LAST_SAVED_AT);
+  chip.title = LAST_SAVED_AT || '';
 }
 function tabDefaultValues(name){
   const d = SETTINGS_DEFAULTS || {};
@@ -713,11 +751,12 @@ function tabDefaultValues(name){
   };
   return {};
 }
-function restoreActiveTabDefaults(){
-  const panel = activePanel();
+function restoreActiveTabDefaults(tabName = null){
+  const panel = tabName ? document.querySelector(`[data-settings-panel="${tabName}"]`) : activePanel();
   if (!panel) return;
-  const tabName = panel.dataset.settingsPanel;
-  const vals = tabDefaultValues(tabName);
+  if (tabName) setSettingsTab(tabName);
+  const effectiveTab = panel.dataset.settingsPanel;
+  const vals = tabDefaultValues(effectiveTab);
   Object.entries(vals).forEach(([name,val]) => {
     const el = panel.querySelector(`[name="${name}"]`);
     if (el) setFieldValue(el, val);
@@ -989,7 +1028,8 @@ function syncPresetSliders() {
 }
 document.getElementById('settings-form').addEventListener('submit', e => { e.preventDefault(); saveSettings(false); });
 document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
-document.getElementById('restore-defaults-tab').addEventListener('click', restoreActiveTabDefaults);
+if (document.getElementById('restore-defaults-tab')) document.getElementById('restore-defaults-tab').addEventListener('click', () => restoreActiveTabDefaults());
+document.querySelectorAll('[data-restore-tab]').forEach(btn => btn.addEventListener('click', () => restoreActiveTabDefaults(btn.dataset.restoreTab)));
 document.getElementById('restore-defaults-inline').addEventListener('click', restoreActiveTabDefaults);
 document.getElementById('save-tab').addEventListener('click', () => saveActiveTab(false));
 document.getElementById('reset-tab').addEventListener('click', resetActiveTab);
@@ -1042,5 +1082,6 @@ refreshStatus();
 updateAuthSummaryChip();
 updateLastSavedChip();
 updateDirtyState();
+setInterval(() => updateLastSavedChip(), 30000);
 </script>
 {% endblock %}
