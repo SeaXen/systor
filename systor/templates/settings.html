@@ -36,6 +36,7 @@
 #dirty-summary.ok{color:#9ae6b4;border-color:rgba(52,211,153,.32);background:rgba(10,44,33,.75)}
 #dirty-summary.warn{color:#ffd27d;border-color:rgba(245,158,11,.36);background:rgba(52,34,10,.78)}
 #dirty-summary.err{color:#ff9b9b;border-color:rgba(239,68,68,.36);background:rgba(52,18,18,.78)}
+.icon-only{min-width:36px;padding-inline:0;display:inline-flex;align-items:center;justify-content:center}
 #settings-form input.is-dirty,#settings-form select.is-dirty{border-color:rgba(245,158,11,.72)!important;box-shadow:0 0 0 1px rgba(245,158,11,.25),0 0 0 4px rgba(245,158,11,.08)}
 .settings-tool-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .settings-inline-file{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -84,10 +85,7 @@
       <div class="settings-toolbar-top">
         <div class="meta">
           <strong>Settings</strong>
-          <span class="status-chip" id="save-state">ready</span>
-          <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
           <span class="status-chip settings-meta-chip" id="last-saved-summary" title="{{ settings_saved_at or '' }}">saved {{ settings_saved_at or '—' }}</span>
-          <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
           <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
           <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
           <span class="status-chip settings-meta-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary"><span class="ico">◎</span><span>{% if cfg.discord.enabled %}on{% else %}off{% endif %}</span></span>
@@ -97,27 +95,15 @@
       <div class="settings-toolbar-bottom">
         <div class="settings-toolbar-tabs">
           <div class="settings-tabs" id="settings-tabs">
-            <div class="settings-tab-item"><button type="button" class="settings-tab-btn active" data-settings-tab="general">General</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="general" title="Restore General defaults">↺</button></div>
-            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="notifications" title="Restore Notifications defaults">↺</button></div>
-            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="auth" title="Restore Auth defaults">↺</button></div>
-            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button><button type="button" class="tab-restore-btn desktop-only" data-restore-tab="access" title="Restore Access defaults">↺</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn active" data-settings-tab="general">General</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button></div>
+            <div class="settings-tab-item"><button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button></div>
           </div>
-          <button type="button" class="btn secondary compact mobile-only" id="restore-defaults-tab">Restore defaults</button>
         </div>
         <div class="actions">
           <div class="settings-action-group">
-            <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
-            <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
-            <button type="button" class="btn secondary compact" id="export-settings">Export</button>
-            <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
-            <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
-            <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
-          </div>
-          <div class="settings-action-group desktop-only">
-            <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
-            <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
-          </div>
-          <div class="settings-action-group">
+            <button type="button" class="btn secondary compact icon-only" id="reload-page" title="Reload">↻</button>
             <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
             <button type="submit" class="btn compact">Save settings</button>
           </div>
@@ -542,12 +528,22 @@
 
           <div class="settings-card">
             <h3>Settings tools</h3>
-            <div class="card-subtle">Backup, restore, and quick rollback helpers.</div>
+            <div class="card-subtle">Backup, restore, restart, and tab-level settings actions.</div>
+            <div class="status-row">
+              <span class="status-chip" id="save-state">ready</span>
+              <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
+            </div>
             <div class="settings-tool-row">
-              <button type="button" class="btn secondary compact" id="export-settings-inline">Export settings</button>
-              <button type="button" class="btn secondary compact" id="import-settings-inline">Import settings</button>
-              <button type="button" class="btn secondary compact" id="reset-tab-inline">Reset active tab</button>
+              <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
+              <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
               <button type="button" class="btn secondary compact" id="restore-defaults-inline">Restore tab defaults</button>
+            </div>
+            <div class="settings-tool-row">
+              <button type="button" class="btn secondary compact" id="export-settings">Export</button>
+              <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
+              <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
+              <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
+              <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
             </div>
             <div class="settings-inline-file">
               <span class="inline-help" id="import-file-name">No import file selected.</span>
@@ -654,6 +650,7 @@ function updateDirtyState(){
     if (changed) dirty += 1;
   });
   const chip = document.getElementById('dirty-summary');
+  if (!chip) return;
   chip.textContent = dirty ? `${dirty} changed` : 'clean';
   chip.className = 'status-chip settings-meta-chip ' + (dirty ? 'warn' : 'ok');
 }
@@ -788,6 +785,7 @@ function resetActiveTab(){
 }
 function setSaveState(text, cls='') {
   const el = document.getElementById('save-state');
+  if (!el) return;
   el.textContent = text; el.className = 'status-chip ' + cls;
 }
 function explainNotifyError(err) {
@@ -931,12 +929,18 @@ async function loadAccess() {
       await navigator.clipboard.writeText(btn.dataset.url || '');
       showFlash('ok', 'URL copied');
     }));
-    document.getElementById('access-summary').textContent = `${(j.lan_urls||[]).length} LAN · ${(j.tailscale_urls||[]).length} TS · ${j.cloudflare && j.cloudflare.running ? 'CF on' : 'CF off'}`;
-    document.getElementById('access-summary').className = 'status-chip settings-meta-chip ok';
+    const accessSummary = document.getElementById('access-summary');
+    if (accessSummary) {
+      accessSummary.textContent = `${(j.lan_urls||[]).length} LAN · ${(j.tailscale_urls||[]).length} TS · ${j.cloudflare && j.cloudflare.running ? 'CF on' : 'CF off'}`;
+      accessSummary.className = 'status-chip settings-meta-chip ok';
+    }
   } catch (e) {
     document.getElementById('access-list').innerHTML = `<div class="access-item"><span class="kind">error</span><span class="value">${esc(e.message)}</span></div>`;
-    document.getElementById('access-summary').textContent = 'net · failed';
-    document.getElementById('access-summary').className = 'status-chip settings-meta-chip err';
+    const accessSummary = document.getElementById('access-summary');
+    if (accessSummary) {
+      accessSummary.textContent = 'net · failed';
+      accessSummary.className = 'status-chip settings-meta-chip err';
+    }
   }
 }
 async function loadRuntime() {
@@ -1028,16 +1032,11 @@ function syncPresetSliders() {
 }
 document.getElementById('settings-form').addEventListener('submit', e => { e.preventDefault(); saveSettings(false); });
 document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
-if (document.getElementById('restore-defaults-tab')) document.getElementById('restore-defaults-tab').addEventListener('click', () => restoreActiveTabDefaults());
-document.querySelectorAll('[data-restore-tab]').forEach(btn => btn.addEventListener('click', () => restoreActiveTabDefaults(btn.dataset.restoreTab)));
 document.getElementById('restore-defaults-inline').addEventListener('click', restoreActiveTabDefaults);
 document.getElementById('save-tab').addEventListener('click', () => saveActiveTab(false));
 document.getElementById('reset-tab').addEventListener('click', resetActiveTab);
-document.getElementById('reset-tab-inline').addEventListener('click', resetActiveTab);
 document.getElementById('export-settings').addEventListener('click', exportSettings);
-document.getElementById('export-settings-inline').addEventListener('click', exportSettings);
 document.getElementById('import-settings-btn').addEventListener('click', chooseImportFile);
-document.getElementById('import-settings-inline').addEventListener('click', chooseImportFile);
 document.getElementById('import-modal-cancel').addEventListener('click', closeImportModal);
 document.getElementById('import-modal-backdrop').addEventListener('click', (e) => { if (e.target.id === 'import-modal-backdrop') closeImportModal(); });
 document.getElementById('import-modal-confirm').addEventListener('click', async () => {
