@@ -2,21 +2,19 @@
 {% block title %}systor · Settings{% endblock %}
 {% block content %}
 <style>
-.settings-tabs{display:flex;gap:8px;flex-wrap:wrap;padding:0;align-items:center}
+.settings-tabs{display:flex;gap:8px;flex-wrap:nowrap;padding:0;align-items:center}
 .settings-tab-item{display:inline-flex;align-items:center;gap:5px}
 .settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;letter-spacing:.28px;cursor:pointer;line-height:1;white-space:nowrap}
 .settings-tab-btn:hover{border-color:rgba(88,166,255,.5);color:var(--text-bright)}
 .settings-tab-btn.active{background:linear-gradient(180deg,var(--blue-2) 0%,#1a4f9c 100%);border-color:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(31,111,235,.22)}
-.tab-restore-btn{appearance:none;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.22);color:var(--muted);border-radius:999px;padding:6px 8px;font-size:10px;font-weight:700;line-height:1;cursor:pointer}
-.tab-restore-btn:hover{color:var(--text-bright);border-color:rgba(88,166,255,.45);background:rgba(25,42,68,.92)}
-.settings-page .sticky-actions{display:flex;flex-direction:column;gap:8px;align-items:stretch}
-.settings-toolbar-top,.settings-toolbar-bottom{display:flex;gap:8px;align-items:center;justify-content:space-between;min-width:0}
-.settings-page .sticky-actions .meta{display:flex;flex-wrap:wrap;gap:7px;align-items:center;min-width:0;flex:1 1 auto}
-.settings-toolbar-tabs{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 auto}
-.settings-toolbar-tabs .settings-tabs{justify-content:flex-start}
-.settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:7px}
-.settings-action-group{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding-left:7px;border-left:1px solid rgba(88,166,255,.12)}
-.settings-action-group:first-child{padding-left:0;border-left:0}
+.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(240px,1fr) auto;gap:8px;align-items:center}
+.settings-toolbar-top,.settings-toolbar-bottom{display:contents}
+.settings-page .sticky-actions .meta{display:flex;flex-wrap:nowrap;gap:7px;align-items:center;min-width:0;flex:1 1 auto}
+.settings-page .sticky-actions .meta > *{flex:0 0 auto}
+.settings-toolbar-tabs{display:flex;align-items:center;gap:8px;min-width:0;justify-content:center;overflow:hidden}
+.settings-toolbar-tabs .settings-tabs{justify-content:center;min-width:0;overflow:auto hidden;scrollbar-width:none}
+.settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:nowrap;gap:7px}
+.settings-action-group{display:flex;flex-wrap:nowrap;gap:7px;align-items:center}
 .mobile-only{display:none !important}
 .settings-panel{display:none;gap:8px}
 .settings-panel.active{display:block}
@@ -29,9 +27,6 @@
 .settings-meta-chip{font-size:10px;padding:3px 8px;gap:4px;border-color:rgba(88,166,255,.28);background:rgba(23,32,45,.92)}
 .settings-meta-chip .ico{font-size:11px;line-height:1}
 .settings-card .card-subtle{margin-top:-2px}
-.settings-card.auth-premium{border-color:rgba(88,166,255,.28);box-shadow:0 10px 30px rgba(12,18,28,.22), inset 0 1px 0 rgba(255,255,255,.02);background:linear-gradient(180deg,rgba(18,24,34,.98),rgba(12,17,25,.98))}
-.settings-card.auth-premium h3{letter-spacing:.2px}
-.settings-card.auth-premium .status-chip{border-color:rgba(88,166,255,.24)}
 .status-chip.mini-chip{padding:3px 8px;font-size:10px}
 #dirty-summary.ok{color:#9ae6b4;border-color:rgba(52,211,153,.32);background:rgba(10,44,33,.75)}
 #dirty-summary.warn{color:#ffd27d;border-color:rgba(245,158,11,.36);background:rgba(52,34,10,.78)}
@@ -48,9 +43,12 @@
 .import-modal .modal-file{display:inline-flex;max-width:100%;padding:6px 10px;border-radius:999px;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.24);font-size:12px;color:var(--text-bright)}
 .import-modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
 @media (max-width:1100px){
-  .settings-toolbar-top,.settings-toolbar-bottom{flex-direction:column;align-items:flex-start}
+  .settings-page .sticky-actions{grid-template-columns:1fr;align-items:start}
+  .settings-toolbar-top,.settings-toolbar-bottom{display:block}
+  .settings-page .sticky-actions .meta{flex-wrap:wrap}
   .settings-toolbar-tabs{justify-content:flex-start;width:100%}
-  .settings-page .sticky-actions .actions{justify-content:flex-start;width:100%}
+  .settings-page .sticky-actions .actions{justify-content:flex-start;width:100%;flex-wrap:wrap}
+  .settings-action-group{flex-wrap:wrap}
 }
 @media (max-width:900px){
   .settings-panel-grid{grid-template-columns:1fr}
@@ -442,7 +440,7 @@
     <section class="settings-panel" data-settings-panel="auth">
       <div class="settings-panel-grid">
         <div class="settings-panel-col">
-          <div class="settings-card auth-premium">
+          <div class="settings-card">
             <h3>Security core <span class="status-chip mini-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}">{% if cfg.auth and cfg.auth.enabled %}auth on{% else %}auth off{% endif %}</span></h3>
             <div class="card-subtle">Optional single-admin login. Keep the public tunnel read-only while private admin pages require login.</div>
             <div class="auth-stat-row">
@@ -467,7 +465,7 @@
             </div>
           </div>
 
-          <div class="settings-card auth-premium">
+          <div class="settings-card">
             <h3>Password</h3>
             <div class="card-subtle">Set or rotate the admin password. Leave blank to keep the current one.</div>
             <div class="auth-mini-grid compact-top">
@@ -525,30 +523,6 @@
               <div class="inline-help">Read-only alerts page. Test buttons and delivery log stay private.</div>
             </div>
           </div>
-
-          <div class="settings-card">
-            <h3>Settings tools</h3>
-            <div class="card-subtle">Backup, restore, restart, and tab-level settings actions.</div>
-            <div class="status-row">
-              <span class="status-chip" id="save-state">ready</span>
-              <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
-            </div>
-            <div class="settings-tool-row">
-              <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
-              <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
-              <button type="button" class="btn secondary compact" id="restore-defaults-inline">Restore tab defaults</button>
-            </div>
-            <div class="settings-tool-row">
-              <button type="button" class="btn secondary compact" id="export-settings">Export</button>
-              <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
-              <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
-              <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
-              <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
-            </div>
-            <div class="settings-inline-file">
-              <span class="inline-help" id="import-file-name">No import file selected.</span>
-            </div>
-          </div>
         </div>
 
         <div class="settings-panel-col">
@@ -572,6 +546,30 @@
             </div>
             <div class="notif-actions">
               <span class="inline-help">Restart collector applies new poll interval immediately. Restart web is only needed for host/port changes.</span>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Settings tools</h3>
+            <div class="card-subtle">Backup, restore, restart, and tab-level settings actions.</div>
+            <div class="status-row">
+              <span class="status-chip" id="save-state">ready</span>
+              <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
+            </div>
+            <div class="settings-tool-row">
+              <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
+              <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
+              <button type="button" class="btn secondary compact" id="restore-defaults-inline">Restore tab defaults</button>
+            </div>
+            <div class="settings-tool-row">
+              <button type="button" class="btn secondary compact" id="export-settings">Export</button>
+              <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
+              <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
+              <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
+              <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
+            </div>
+            <div class="settings-inline-file">
+              <span class="inline-help" id="import-file-name">No import file selected.</span>
             </div>
           </div>
         </div>
