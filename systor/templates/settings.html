@@ -2,13 +2,18 @@
 {% block title %}systor · Settings{% endblock %}
 {% block content %}
 <style>
-.settings-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 2px}
-.settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;letter-spacing:.28px;cursor:pointer;line-height:1}
+.settings-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:0}
+.settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;letter-spacing:.28px;cursor:pointer;line-height:1;white-space:nowrap}
 .settings-tab-btn:hover{border-color:rgba(88,166,255,.5);color:var(--text-bright)}
 .settings-tab-btn.active{background:linear-gradient(180deg,var(--blue-2) 0%,#1a4f9c 100%);border-color:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(31,111,235,.22)}
+.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:10px;align-items:center}
+.settings-page .sticky-actions .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.settings-toolbar-tabs{display:flex;justify-content:center;align-items:center;min-width:0}
+.settings-toolbar-tabs .settings-tabs{justify-content:center}
+.settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
 .settings-panel{display:none;gap:10px}
 .settings-panel.active{display:block}
-.settings-panel-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:10px}
+.settings-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
 .settings-panel-col{display:flex;flex-direction:column;gap:10px;min-width:0}
 .settings-auth-shell{max-width:860px}
 .settings-card h3 .mini-chip{margin-left:8px}
@@ -17,10 +22,15 @@
 .auth-stat-row{display:flex;gap:8px;flex-wrap:wrap}
 .settings-meta-chip{font-size:10px;padding:3px 7px;gap:4px}
 .settings-meta-chip .ico{font-size:11px;line-height:1}
+@media (max-width:1100px){
+  .settings-page .sticky-actions{grid-template-columns:1fr;align-items:start}
+  .settings-toolbar-tabs{justify-content:flex-start}
+  .settings-page .sticky-actions .actions{justify-content:flex-start}
+}
 @media (max-width:900px){.settings-panel-grid{grid-template-columns:1fr}}
 @media (max-width:700px){
-  .settings-tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap;padding-top:4px}
-  .settings-tab-btn{padding:7px 9px;font-size:10px;white-space:nowrap}
+  .settings-tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap}
+  .settings-tab-btn{padding:7px 9px;font-size:10px}
   .settings-auth-shell{max-width:none}
   .auth-mini-grid{grid-template-columns:1fr}
   .settings-meta-chip{font-size:9px;padding:3px 6px}
@@ -30,31 +40,32 @@
 <div class="settings-page">
   <div id="flash"></div>
 
-  <div class="sticky-actions">
-    <div class="meta">
-      <strong>Settings</strong>
-      <span class="status-chip" id="save-state">ready</span>
-      <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
-      <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
-      <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
-      <span class="status-chip settings-meta-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary"><span class="ico">◎</span><span>{% if cfg.discord.enabled %}on{% else %}off{% endif %}</span></span>
-      <span class="status-chip settings-meta-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}" id="auth-summary">auth {% if cfg.auth and cfg.auth.enabled %}on{% else %}off{% endif %}</span>
-    </div>
-    <div class="actions">
-      <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
-      <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
-      <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
-      <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
-      <button type="submit" form="settings-form" class="btn compact">Save settings</button>
-    </div>
-  </div>
-
   <form id="settings-form">
-    <div class="settings-tabs" id="settings-tabs">
-      <button type="button" class="settings-tab-btn active" data-settings-tab="general">General</button>
-      <button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button>
-      <button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button>
-      <button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button>
+    <div class="sticky-actions">
+      <div class="meta">
+        <strong>Settings</strong>
+        <span class="status-chip" id="save-state">ready</span>
+        <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
+        <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
+        <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
+        <span class="status-chip settings-meta-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-summary"><span class="ico">◎</span><span>{% if cfg.discord.enabled %}on{% else %}off{% endif %}</span></span>
+        <span class="status-chip settings-meta-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}" id="auth-summary">auth {% if cfg.auth and cfg.auth.enabled %}on{% else %}off{% endif %}</span>
+      </div>
+      <div class="settings-toolbar-tabs">
+        <div class="settings-tabs" id="settings-tabs">
+          <button type="button" class="settings-tab-btn active" data-settings-tab="general">General</button>
+          <button type="button" class="settings-tab-btn" data-settings-tab="notifications">Notifications</button>
+          <button type="button" class="settings-tab-btn" data-settings-tab="auth">Auth</button>
+          <button type="button" class="settings-tab-btn" data-settings-tab="access">Access</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
+        <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
+        <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
+        <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
+        <button type="submit" class="btn compact">Save settings</button>
+      </div>
     </div>
 
     <section class="settings-panel active" data-settings-panel="general">
@@ -81,54 +92,6 @@
                 <div class="slider-head"><strong>CPU temp</strong><span id="cpu-temp-slider-val">85 °C</span></div>
                 <input id="cpu-temp-slider" type="range" min="50" max="100" step="1">
               </div>
-            </div>
-          </div>
-        </div>
-        <div class="settings-panel-col">
-          <div class="settings-card">
-            <h3>Alert thresholds</h3>
-            <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
-            {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
-            {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
-            {% if entry is mapping %}
-              {% set enabled = entry.get("enabled", true) %}
-              {% set value = entry.get("value", default_value) %}
-              {% set duration = entry.get("duration_min", default_min) %}
-            {% else %}
-              {% set enabled = true %}
-              {% set value = entry %}
-              {% set duration = default_min %}
-            {% endif %}
-            <tr>
-              <td>
-                <label class="threshold-name">
-                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
-                  <span>{{ label }}</span>
-                </label>
-              </td>
-              <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
-              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
-              <td class="text-muted">{{ unit }}</td>
-              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
-              <td class="text-muted">min</td>
-            </tr>
-            {%- endmacro %}
-            <table class="threshold-table">
-              <thead>
-                <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
-              </thead>
-              <tbody>
-                {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
-                {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
-                {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
-                {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
-                {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
-              </tbody>
-            </table>
-            <div class="notif-actions">
-              <label class="inline-help">Cooldown</label>
-              <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
-              <span class="inline-help">seconds between repeats per metric</span>
             </div>
           </div>
 
@@ -179,6 +142,86 @@
                 <option value="30" {% if cfg.dashboard.chart_refresh_sec == 30 %}selected{% endif %}>30s</option>
                 <option value="60" {% if cfg.dashboard.chart_refresh_sec == 60 %}selected{% endif %}>1m</option>
               </select>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Apps page defaults</h3>
+            <div class="card-subtle">Default scope, sort order, and refresh for the apps/process view.</div>
+            <div class="notif-field-grid compact-top network-settings-grid">
+              <label>Scope</label>
+              <select name="apps_default_scope">
+                <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
+                <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host only</option>
+                <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker only</option>
+              </select>
+              <label>Sort</label>
+              <select name="apps_default_sort">
+                <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
+                <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
+                <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
+                <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
+              </select>
+              <label>Auto refresh</label>
+              <select name="apps_auto_refresh_sec">
+                <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+                <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
+                <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+                <option value="10" {% if cfg.apps.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+                <option value="15" {% if cfg.apps.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+                <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+                <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+              </select>
+              <label>Rows per card</label>
+              <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
+            </div>
+          </div>
+        </div>
+        <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Alert thresholds</h3>
+            <div class="card-subtle">Compact table: enable, trigger value, and hold time.</div>
+            {% macro threshold_row(metric_key, label, unit, default_value, default_min, higher_is_worse=true) -%}
+            {% set entry = cfg.thresholds.get(metric_key, {"enabled": true, "value": default_value, "duration_min": default_min}) %}
+            {% if entry is mapping %}
+              {% set enabled = entry.get("enabled", true) %}
+              {% set value = entry.get("value", default_value) %}
+              {% set duration = entry.get("duration_min", default_min) %}
+            {% else %}
+              {% set enabled = true %}
+              {% set value = entry %}
+              {% set duration = default_min %}
+            {% endif %}
+            <tr>
+              <td>
+                <label class="threshold-name">
+                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
+                  <span>{{ label }}</span>
+                </label>
+              </td>
+              <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
+              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
+              <td class="text-muted">{{ unit }}</td>
+              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
+              <td class="text-muted">min</td>
+            </tr>
+            {%- endmacro %}
+            <table class="threshold-table">
+              <thead>
+                <tr><th>Metric</th><th>When</th><th>Value</th><th>Unit</th><th>Hold</th><th></th></tr>
+              </thead>
+              <tbody>
+                {{ threshold_row("cpu_load_1m",   "CPU load (1m)",   "",   4.0, 2, True) }}
+                {{ threshold_row("cpu_temp_c",    "CPU temp",        "°C", 85.0, 3, True) }}
+                {{ threshold_row("mem_free_mb",   "Memory free",     "MB", 500, 2, False) }}
+                {{ threshold_row("swap_used_mb",  "Swap used",       "MB", 4096, 2, True) }}
+                {{ threshold_row("disk_used_pct", "Disk used",       "%", 90, 5, True) }}
+              </tbody>
+            </table>
+            <div class="notif-actions">
+              <label class="inline-help">Cooldown</label>
+              <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
+              <span class="inline-help">seconds between repeats per metric</span>
             </div>
           </div>
 
@@ -234,38 +277,6 @@
               <input type="text" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0">
               <label>Hide docker/bridge/veth by default</label>
               <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <h3>Apps page defaults</h3>
-            <div class="card-subtle">Default scope, sort order, and refresh for the apps/process view.</div>
-            <div class="notif-field-grid compact-top network-settings-grid">
-              <label>Scope</label>
-              <select name="apps_default_scope">
-                <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
-                <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host only</option>
-                <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker only</option>
-              </select>
-              <label>Sort</label>
-              <select name="apps_default_sort">
-                <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
-                <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
-                <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
-                <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
-              </select>
-              <label>Auto refresh</label>
-              <select name="apps_auto_refresh_sec">
-                <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
-                <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
-                <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
-                <option value="10" {% if cfg.apps.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
-                <option value="15" {% if cfg.apps.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
-                <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
-                <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
-              </select>
-              <label>Rows per card</label>
-              <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
             </div>
           </div>
 
