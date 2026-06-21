@@ -10,8 +10,10 @@
   </div>
   <div class="dash-controls">
     <button class="btn secondary compact" id="refresh-alerts">Refresh</button>
+    {% if client_private %}
     <button class="btn secondary compact" id="test-telegram">Test Telegram</button>
     <button class="btn secondary compact" id="test-discord">Test Discord</button>
+    {% endif %}
   </div>
 </div>
 
@@ -25,6 +27,7 @@
   </table>
 </div>
 
+{% if client_private %}
 <div class="table-card compact-table">
   <h3><span>Notification Delivery Log</span><span class="text-muted">latest 100</span></h3>
   <table>
@@ -32,9 +35,11 @@
     <tbody id="notif-body"><tr><td colspan="4" class="empty-cell">Loading…</td></tr></tbody>
   </table>
 </div>
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>
+const IS_PRIVATE = {{ 'true' if client_private else 'false' }};
 function timeShort(ts) { return new Date(ts * 1000).toLocaleTimeString(); }
 function timeAgo(ts) {
   const s = Math.floor(Date.now() / 1000 - ts);
@@ -59,11 +64,12 @@ function flash(type, msg) {
 async function loadAlerts() {
   const dot = document.getElementById('alert-dot');
   try {
-    const [a, n] = await Promise.all([
-      fetchJSON('/api/alerts?limit=200'),
-      fetchJSON('/api/notifications?limit=100'),
-    ]);
-    document.getElementById('alerts-body').innerHTML = a.length ? a.map(x => `
+    const alerts = await fetchJSON('/api/alerts?limit=200');
+    let notifs = [];
+    if (IS_PRIVATE) {
+      notifs = await fetchJSON('/api/notifications?limit=100');
+    }
+    document.getElementById('alerts-body').innerHTML = alerts.length ? alerts.map(x => `
       <tr>
         <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">${timeAgo(x.ts)}</span></td>
         <td><span class="badge ${esc(x.severity)}">${esc(x.severity)}</span></td>
@@ -73,17 +79,21 @@ async function loadAlerts() {
         <td>${esc(x.message)}</td>
       </tr>`).join('') : '<tr><td colspan="6" class="empty-cell">No alerts</td></tr>';
 
-    document.getElementById('notif-body').innerHTML = n.length ? n.map(x => `
-      <tr>
-        <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">${timeAgo(x.ts)}</span></td>
-        <td>${esc(x.channel)}</td>
-        <td><span class="badge ${x.success ? 'ok' : 'fail'}">${x.success ? 'sent' : 'failed'}</span></td>
-        <td class="mono text-muted">${esc(x.error || '')}</td>
-      </tr>`).join('') : '<tr><td colspan="4" class="empty-cell">No notifications sent yet</td></tr>';
+    if (IS_PRIVATE) {
+      document.getElementById('notif-body').innerHTML = notifs.length ? notifs.map(x => `
+        <tr>
+          <td><span class="mono">${timeShort(x.ts)}</span> <span class="text-muted">${timeAgo(x.ts)}</span></td>
+          <td>${esc(x.channel)}</td>
+          <td><span class="badge ${x.success ? 'ok' : 'fail'}">${x.success ? 'sent' : 'failed'}</span></td>
+          <td class="mono text-muted">${esc(x.error || '')}</td>
+        </tr>`).join('') : '<tr><td colspan="4" class="empty-cell">No notifications sent yet</td></tr>';
+    }
 
-    const failures = n.filter(x => !x.success).length;
-    document.getElementById('alert-status').textContent = `${a.length} alerts · ${n.length} deliveries · ${failures} failed · ${new Date().toLocaleTimeString()}`;
-    dot.className = 'dot ' + (failures ? 'yellow' : 'green');
+    const failures = notifs.filter(x => !x.success).length;
+    document.getElementById('alert-status').textContent = IS_PRIVATE
+      ? `${alerts.length} alerts · ${notifs.length} deliveries · ${failures} failed · ${new Date().toLocaleTimeString()}`
+      : `${alerts.length} alerts · ${new Date().toLocaleTimeString()}`;
+    dot.className = 'dot ' + (IS_PRIVATE && failures ? 'yellow' : 'green');
   } catch (e) {
     dot.className = 'dot red';
     document.getElementById('alert-status').textContent = 'failed: ' + e.message;
@@ -100,8 +110,10 @@ async function testChannel(channel) {
   await loadAlerts();
 }
 document.getElementById('refresh-alerts').addEventListener('click', loadAlerts);
-document.getElementById('test-telegram').addEventListener('click', () => testChannel('telegram'));
-document.getElementById('test-discord').addEventListener('click', () => testChannel('discord'));
+if (IS_PRIVATE) {
+  document.getElementById('test-telegram').addEventListener('click', () => testChannel('telegram'));
+  document.getElementById('test-discord').addEventListener('click', () => testChannel('discord'));
+}
 loadAlerts();
 setInterval(loadAlerts, 10000);
 </script>

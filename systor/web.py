@@ -36,7 +36,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask import Flask, jsonify, render_template, request, abort, Response, send_file, after_this_request, session, redirect, url_for
 
-from .config import load_config, save_config
+from .config import load_config, save_config, _yaml_to_dict, DEFAULT_CONFIG
 from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb, read_network_interfaces
 from .notifier import Notifier, send_telegram, send_discord
 from .storage import Storage, DEFAULT_DB_PATH
@@ -836,6 +836,18 @@ def _effective_private_ui() -> bool:
     return _auth_logged_in()
 
 
+def _public_cfg() -> dict:
+    cfg = load_config().get("public", {}) or {}
+    return {
+        "dashboard": bool(cfg.get("dashboard", True)),
+        "alerts": bool(cfg.get("alerts", False)),
+    }
+
+
+def _public_page_enabled(name: str) -> bool:
+    return bool(_public_cfg().get(name, False))
+
+
 def _storage_can_write() -> bool:
     return _client_private() and (not _auth_enabled() or _auth_logged_in())
 
@@ -1136,6 +1148,7 @@ def create_app() -> Flask:
             "storage_private": effective_private,
             "client_private": effective_private,
             "client_private_raw": private,
+            "public_pages": _public_cfg(),
             "auth_enabled": _auth_enabled(),
             "auth_mode": auth.get("mode", "admin_only"),
             "auth_username": auth.get("username", "admin"),
@@ -1170,20 +1183,34 @@ def create_app() -> Flask:
                 _auth_touch_session()
             return None
 
-        # Public internet: dashboard only.
-        public_pages_blocked = ("/apps", "/network", "/speed", "/alerts", "/logs", "/settings", "/storage", "/login", "/logout")
+        # Public internet: allow only explicitly enabled read-only pages.
+        public_pages = _public_cfg()
+        public_page_map = {
+            "/": public_pages.get("dashboard", True),
+            "/alerts": public_pages.get("alerts", False),
+        }
+        public_pages_blocked = ("/apps", "/network", "/speed", "/logs", "/settings", "/storage", "/login", "/logout")
         if path in public_pages_blocked or any(path.startswith(p + "/") for p in public_pages_blocked):
             abort(404)
+        if path == "/alerts" and not public_page_map.get("/alerts"):
+            abort(404)
 
-        # Public internet: allow only read-only dashboard data.
+        # Public internet: allow only read-only data for enabled pages.
         public_api_allow = {
-            "/api/snapshot",
-            "/api/series",
-            "/api/network-series",
-            "/api/public-dashboard",
-            "/api/version",
             "/health",
+            "/api/version",
         }
+        if public_page_map.get("/"):
+            public_api_allow.update({
+                "/api/snapshot",
+                "/api/series",
+                "/api/network-series",
+                "/api/public-dashboard",
+            })
+        if public_page_map.get("/alerts"):
+            public_api_allow.update({
+                "/api/alerts",
+            })
         if path.startswith("/api/") and path not in public_api_allow:
             return jsonify({"ok": False, "error": "This API is LAN/Tailscale/local only"}), 403
 
@@ -2134,6 +2161,51 @@ def create_app() -> Flask:
         cfg = load_config()
         return render_template("storage.html", cfg=cfg)
 
+    @app.route("/api/settings/export")
+    def api_settings_export():
+        cfg = load_config()
+        body = json.dumps(cfg, indent=2, sort_keys=True).encode()
+        ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        return Response(
+            body,
+            mimetype="application/json",
+            headers={"Content-Disposition": f'attachment; filename="systor-settings-{ts}.json"'}
+        )
+
+    @app.route("/api/settings/import", methods=["POST"])
+    def api_settings_import():
+        up = request.files.get("file")
+        if not up or not up.filename:
+            return jsonify({"ok": False, "message": "Choose a settings file first."}), 400
+        raw = up.read().decode("utf-8", errors="replace")
+        try:
+            if up.filename.lower().endswith(".json"):
+                incoming = json.loads(raw)
+            else:
+                incoming = _yaml_to_dict(raw)
+        except Exception as e:
+            return jsonify({"ok": False, "message": f"Could not parse settings file: {e}"}), 400
+        if not isinstance(incoming, dict):
+            return jsonify({"ok": False, "message": "Imported settings must be a JSON/YAML object."}), 400
+        cfg = json.loads(json.dumps(DEFAULT_CONFIG))
+        def _deep_merge_local(base: dict, overlay: dict) -> dict:
+            for k, v in (overlay or {}).items():
+                if isinstance(v, dict) and isinstance(base.get(k), dict):
+                    base[k] = _deep_merge_local(base[k], v)
+                else:
+                    base[k] = v
+            return base
+        cfg = _deep_merge_local(cfg, incoming)
+        auth = (cfg.get("auth") or {})
+        if auth.get("enabled") and not auth.get("session_secret"):
+            auth["session_secret"] = secrets.token_hex(32)
+            cfg["auth"] = auth
+        try:
+            path = save_config(cfg)
+        except PermissionError as e:
+            return jsonify({"ok": False, "message": f"Could not save imported settings: {e}"}), 500
+        return jsonify({"ok": True, "message": f"Imported settings from {up.filename} into {path}."})
+
     @app.route("/settings", methods=["GET", "POST"])
     def page_settings():
         if request.method == "POST":
@@ -2270,6 +2342,11 @@ def create_app() -> Flask:
             if "speed_iperf_port" in data and data["speed_iperf_port"]:
                 try: cfg["speed"]["iperf_port"] = max(1, min(65535, int(data["speed_iperf_port"])))
                 except (ValueError, TypeError): pass
+            cfg.setdefault("public", {})
+            if "public_dashboard" in data:
+                cfg["public"]["dashboard"] = _bool(data.get("public_dashboard"))
+            if "public_alerts" in data:
+                cfg["public"]["alerts"] = _bool(data.get("public_alerts"))
             # Update web (host/port)
             if "web_host" in data and data["web_host"]:
                 cfg["web"]["host"] = data["web_host"]

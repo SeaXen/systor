@@ -6,22 +6,33 @@
 .settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;letter-spacing:.28px;cursor:pointer;line-height:1;white-space:nowrap}
 .settings-tab-btn:hover{border-color:rgba(88,166,255,.5);color:var(--text-bright)}
 .settings-tab-btn.active{background:linear-gradient(180deg,var(--blue-2) 0%,#1a4f9c 100%);border-color:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(31,111,235,.22)}
-.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:10px;align-items:center}
-.settings-page .sticky-actions .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(260px,1fr) auto;gap:8px;align-items:center}
+.settings-page .sticky-actions .meta{display:flex;flex-wrap:wrap;gap:7px;align-items:center;min-width:0}
 .settings-toolbar-tabs{display:flex;justify-content:center;align-items:center;min-width:0}
 .settings-toolbar-tabs .settings-tabs{justify-content:center}
-.settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}
-.settings-panel{display:none;gap:10px}
+.settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:7px}
+.settings-panel{display:none;gap:8px}
 .settings-panel.active{display:block}
-.settings-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
-.settings-panel-col{display:flex;flex-direction:column;gap:10px;min-width:0}
-.settings-auth-shell{max-width:860px}
+.settings-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
+.settings-panel-col{display:flex;flex-direction:column;gap:8px;min-width:0}
 .settings-card h3 .mini-chip{margin-left:8px}
-.auth-mini-grid{display:grid;grid-template-columns:132px minmax(0,1fr);gap:8px 10px;align-items:center}
+.auth-mini-grid{display:grid;grid-template-columns:128px minmax(0,1fr);gap:7px 10px;align-items:center}
 .auth-mini-grid .full{grid-column:1 / -1}
-.auth-stat-row{display:flex;gap:8px;flex-wrap:wrap}
-.settings-meta-chip{font-size:10px;padding:3px 7px;gap:4px}
+.auth-stat-row{display:flex;gap:7px;flex-wrap:wrap}
+.settings-meta-chip{font-size:10px;padding:3px 8px;gap:4px;border-color:rgba(88,166,255,.28);background:rgba(23,32,45,.92)}
 .settings-meta-chip .ico{font-size:11px;line-height:1}
+.settings-card .card-subtle{margin-top:-2px}
+.settings-card.auth-premium{border-color:rgba(88,166,255,.28);box-shadow:0 10px 30px rgba(12,18,28,.22), inset 0 1px 0 rgba(255,255,255,.02);background:linear-gradient(180deg,rgba(18,24,34,.98),rgba(12,17,25,.98))}
+.settings-card.auth-premium h3{letter-spacing:.2px}
+.settings-card.auth-premium .status-chip{border-color:rgba(88,166,255,.24)}
+.status-chip.mini-chip{padding:3px 8px;font-size:10px}
+#dirty-summary.ok{color:#9ae6b4;border-color:rgba(52,211,153,.32);background:rgba(10,44,33,.75)}
+#dirty-summary.warn{color:#ffd27d;border-color:rgba(245,158,11,.36);background:rgba(52,34,10,.78)}
+#dirty-summary.err{color:#ff9b9b;border-color:rgba(239,68,68,.36);background:rgba(52,18,18,.78)}
+#settings-form input.is-dirty,#settings-form select.is-dirty{border-color:rgba(245,158,11,.72)!important;box-shadow:0 0 0 1px rgba(245,158,11,.25),0 0 0 4px rgba(245,158,11,.08)}
+.settings-tool-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.settings-inline-file{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.settings-inline-file input[type=file]{max-width:230px}
 @media (max-width:1100px){
   .settings-page .sticky-actions{grid-template-columns:1fr;align-items:start}
   .settings-toolbar-tabs{justify-content:flex-start}
@@ -31,7 +42,6 @@
 @media (max-width:700px){
   .settings-tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap}
   .settings-tab-btn{padding:7px 9px;font-size:10px}
-  .settings-auth-shell{max-width:none}
   .auth-mini-grid{grid-template-columns:1fr}
   .settings-meta-chip{font-size:9px;padding:3px 6px}
 }
@@ -45,6 +55,7 @@
       <div class="meta">
         <strong>Settings</strong>
         <span class="status-chip" id="save-state">ready</span>
+        <span class="status-chip settings-meta-chip" id="dirty-summary">clean</span>
         <span class="status-chip settings-meta-chip" id="access-summary">net · loading…</span>
         <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
         <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>
@@ -60,6 +71,11 @@
         </div>
       </div>
       <div class="actions">
+        <button type="button" class="btn secondary compact" id="reset-tab">Reset tab</button>
+        <button type="button" class="btn secondary compact" id="save-tab">Save tab</button>
+        <button type="button" class="btn secondary compact" id="export-settings">Export</button>
+        <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
+        <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
         <button type="button" class="btn secondary compact" id="reload-page">Reload</button>
         <button type="button" class="btn secondary compact" id="apply-now">Save &amp; apply</button>
         <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
@@ -399,21 +415,21 @@
     <section class="settings-panel" data-settings-panel="auth">
       <div class="settings-panel-grid">
         <div class="settings-panel-col">
-          <div class="settings-card">
-            <h3>Security <span class="status-chip mini-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}">{% if cfg.auth and cfg.auth.enabled %}auth on{% else %}auth off{% endif %}</span></h3>
-            <div class="card-subtle">Optional single-admin login. Public/tunnel dashboard can stay read-only while private admin pages require login.</div>
+          <div class="settings-card auth-premium">
+            <h3>Security core <span class="status-chip mini-chip {% if cfg.auth and cfg.auth.enabled %}ok{% endif %}">{% if cfg.auth and cfg.auth.enabled %}auth on{% else %}auth off{% endif %}</span></h3>
+            <div class="card-subtle">Optional single-admin login. Keep the public tunnel read-only while private admin pages require login.</div>
             <div class="auth-stat-row">
               <span class="status-chip {% if cfg.auth and cfg.auth.password_hash %}ok{% endif %}">{% if cfg.auth and cfg.auth.password_hash %}password set{% else %}no password{% endif %}</span>
-              <span class="status-chip">mode {{ (cfg.auth.mode if cfg.auth else 'admin_only') or 'admin_only' }}</span>
+              <span class="status-chip">{{ (cfg.auth.mode if cfg.auth else 'admin_only') or 'admin_only' }}</span>
               <span class="status-chip">idle {{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}m</span>
               <span class="status-chip">fails {{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}</span>
               <span class="status-chip">cooldown {{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}s</span>
             </div>
             <div class="auth-mini-grid compact-top">
-              <label>Enable login</label>
+              <label>Login</label>
               <label><input type="checkbox" class="checkbox" name="auth_enabled" {% if cfg.auth and cfg.auth.enabled %}checked{% endif %}> require username + password</label>
 
-              <label>Protect mode</label>
+              <label>Scope</label>
               <select name="auth_mode">
                 <option value="admin_only" {% if (cfg.auth.mode if cfg.auth else 'admin_only') == 'admin_only' %}selected{% endif %}>admin only</option>
                 <option value="full_app" {% if cfg.auth and cfg.auth.mode == 'full_app' %}selected{% endif %}>whole app</option>
@@ -424,17 +440,17 @@
             </div>
           </div>
 
-          <div class="settings-card">
+          <div class="settings-card auth-premium">
             <h3>Password</h3>
-            <div class="card-subtle">Set or rotate the single admin password. Leave blank to keep the current password.</div>
+            <div class="card-subtle">Set or rotate the admin password. Leave blank to keep the current one.</div>
             <div class="auth-mini-grid compact-top">
               <label>New password</label>
               <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it{% else %}set admin password{% endif %}" autocomplete="new-password">
 
-              <label>Confirm password</label>
+              <label>Confirm</label>
               <input type="password" name="auth_password_confirm" value="" placeholder="repeat new password" autocomplete="new-password">
 
-              <label>Delete saved password</label>
+              <label>Clear saved</label>
               <label><input type="checkbox" class="checkbox" name="auth_clear_password"> clear saved password</label>
             </div>
           </div>
@@ -469,6 +485,30 @@
             <div class="card-subtle">One bind on <code>0.0.0.0</code> can serve localhost, LAN, Tailscale, and a Cloudflare tunnel target on the same port.</div>
             <div class="access-list" id="access-list">
               <div class="access-item"><span class="kind">loading</span><span class="value">Checking access targets…</span></div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Public surface</h3>
+            <div class="card-subtle">Safe read-only pages for the public tunnel. Admin and write pages stay private.</div>
+            <div class="notif-field-grid compact-top">
+              <label><input type="checkbox" class="checkbox" name="public_dashboard" {% if cfg.public and cfg.public.dashboard %}checked{% endif %}> Public dashboard</label>
+              <div class="inline-help">Keeps <code>/</code> readable from the public tunnel.</div>
+              <label><input type="checkbox" class="checkbox" name="public_alerts" {% if cfg.public and cfg.public.alerts %}checked{% endif %}> Public alerts</label>
+              <div class="inline-help">Read-only alerts page. Test buttons and delivery log stay private.</div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3>Settings tools</h3>
+            <div class="card-subtle">Backup, restore, and quick rollback helpers.</div>
+            <div class="settings-tool-row">
+              <button type="button" class="btn secondary compact" id="export-settings-inline">Export settings</button>
+              <button type="button" class="btn secondary compact" id="import-settings-inline">Import settings</button>
+              <button type="button" class="btn secondary compact" id="reset-tab-inline">Reset active tab</button>
+            </div>
+            <div class="settings-inline-file">
+              <span class="inline-help" id="import-file-name">No import file selected.</span>
             </div>
           </div>
         </div>
@@ -534,14 +574,53 @@ function initSettingsTabs() {
   setSettingsTab(wanted);
   document.querySelectorAll('[data-settings-tab]').forEach(btn => btn.addEventListener('click', () => setSettingsTab(btn.dataset.settingsTab)));
 }
-function formToJSON(form) {
+function formToJSON(form, scopeEl = null) {
   const fd = new FormData(form);
   const data = Object.fromEntries(fd.entries());
-  ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default', 'speed_auto_enabled', 'speed_notify_enabled', 'auth_enabled', 'auth_clear_password'].forEach(k => { data[k] = fd.has(k) ? 'true' : 'false'; });
-  ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
-    data[`threshold_${k}_enabled`] = fd.has(`threshold_${k}_enabled`) ? 'true' : 'false';
+  const boolKeys = ['telegram_enabled', 'discord_enabled', 'network_hide_virtual_default', 'speed_auto_enabled', 'speed_notify_enabled', 'auth_enabled', 'auth_clear_password', 'public_dashboard', 'public_alerts'];
+  boolKeys.forEach(k => {
+    if (!scopeEl || scopeEl.querySelector(`[name="${k}"]`)) data[k] = fd.has(k) ? 'true' : 'false';
   });
-  return data;
+  ['cpu_load_1m', 'cpu_temp_c', 'mem_free_mb', 'swap_used_mb', 'disk_used_pct'].forEach(k => {
+    const name = `threshold_${k}_enabled`;
+    if (!scopeEl || scopeEl.querySelector(`[name="${name}"]`)) data[name] = fd.has(name) ? 'true' : 'false';
+  });
+  if (!scopeEl) return data;
+  const filtered = {};
+  scopeEl.querySelectorAll('[name]').forEach(el => {
+    filtered[el.name] = Object.prototype.hasOwnProperty.call(data, el.name) ? data[el.name] : (el.type === 'checkbox' ? 'false' : '');
+  });
+  return filtered;
+}
+const INITIAL_FORM_DATA = {};
+function activePanel(){ return document.querySelector('[data-settings-panel].active'); }
+function captureInitialState(){ Object.assign(INITIAL_FORM_DATA, formToJSON(document.getElementById('settings-form'))); }
+function setFieldValue(el, value){
+  if (el.type === 'checkbox') el.checked = String(value) === 'true';
+  else el.value = value ?? '';
+}
+function updateDirtyState(){
+  const form = document.getElementById('settings-form');
+  const now = formToJSON(form);
+  let dirty = 0;
+  form.querySelectorAll('[name]').forEach(el => {
+    const changed = String(now[el.name] ?? '') !== String(INITIAL_FORM_DATA[el.name] ?? '');
+    el.classList.toggle('is-dirty', changed);
+    if (changed) dirty += 1;
+  });
+  const chip = document.getElementById('dirty-summary');
+  chip.textContent = dirty ? `${dirty} changed` : 'clean';
+  chip.className = 'status-chip settings-meta-chip ' + (dirty ? 'warn' : 'ok');
+}
+function resetActiveTab(){
+  const panel = activePanel();
+  if (!panel) return;
+  panel.querySelectorAll('[name]').forEach(el => setFieldValue(el, INITIAL_FORM_DATA[el.name]));
+  syncPresetSliders();
+  updateAuthSummaryChip();
+  updateDirtyState();
+  setSaveState('ready');
+  showFlash('ok', 'Active tab reset to saved values');
 }
 function setSaveState(text, cls='') {
   const el = document.getElementById('save-state');
@@ -590,9 +669,47 @@ async function saveSettings(thenApply) {
   } else {
     showFlash('ok', j.message || 'Saved.');
   }
+  Object.assign(INITIAL_FORM_DATA, formToJSON(document.getElementById('settings-form')));
   setSaveState('saved', 'ok');
+  updateDirtyState();
   await Promise.all([refreshStatus(), loadRuntime()]);
   updateAuthSummaryChip();
+}
+async function saveActiveTab(thenApply = false) {
+  const panel = activePanel();
+  if (!panel) return;
+  setSaveState('saving…');
+  const data = formToJSON(document.getElementById('settings-form'), panel);
+  const j = await fetchJSON('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  if (thenApply) {
+    const j2 = await fetchJSON('/api/apply', { method:'POST' });
+    showFlash('ok', (j.message || 'Saved tab.') + ' · ' + (j2.message || 'Applied.'));
+  } else {
+    showFlash('ok', j.message || 'Saved active tab.');
+  }
+  Object.assign(INITIAL_FORM_DATA, formToJSON(document.getElementById('settings-form')));
+  setSaveState('saved', 'ok');
+  updateDirtyState();
+  await Promise.all([refreshStatus(), loadRuntime()]);
+  updateAuthSummaryChip();
+}
+async function exportSettings() {
+  window.location.href = '/api/settings/export';
+  showFlash('ok', 'Export started');
+}
+function chooseImportFile() {
+  document.getElementById('import-settings-file').click();
+}
+async function importSettingsFile(file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  setSaveState('importing…');
+  const r = await fetch('/api/settings/import', { method:'POST', body: fd });
+  const j = await r.json();
+  if (!r.ok || !j.ok) throw new Error(j.message || j.error || ('HTTP ' + r.status));
+  showFlash('ok', j.message || 'Settings imported. Reloading…', 9000);
+  setTimeout(() => location.reload(), 800);
 }
 async function testChannel(channel) {
   const data = formToJSON(document.getElementById('settings-form'));
@@ -744,6 +861,21 @@ function syncPresetSliders() {
 }
 document.getElementById('settings-form').addEventListener('submit', e => { e.preventDefault(); saveSettings(false); });
 document.getElementById('apply-now').addEventListener('click', () => saveSettings(true));
+document.getElementById('save-tab').addEventListener('click', () => saveActiveTab(false));
+document.getElementById('reset-tab').addEventListener('click', resetActiveTab);
+document.getElementById('reset-tab-inline').addEventListener('click', resetActiveTab);
+document.getElementById('export-settings').addEventListener('click', exportSettings);
+document.getElementById('export-settings-inline').addEventListener('click', exportSettings);
+document.getElementById('import-settings-btn').addEventListener('click', chooseImportFile);
+document.getElementById('import-settings-inline').addEventListener('click', chooseImportFile);
+document.getElementById('import-settings-file').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  document.getElementById('import-file-name').textContent = file ? file.name : 'No import file selected.';
+  if (!file) return;
+  try { await importSettingsFile(file); }
+  catch (err) { setSaveState('ready'); showFlash('err', err.message || 'Import failed'); }
+  finally { e.target.value = ''; }
+});
 document.getElementById('restart-collector').addEventListener('click', async () => {
   if (!confirm('Restart the collector now? It will be down briefly.')) return;
   try { const j = await fetchJSON('/api/restart-collector', { method:'POST' }); showFlash('ok', j.message || 'collector restarting'); setTimeout(loadRuntime, 1500); }
@@ -762,14 +894,16 @@ document.getElementById('save-test-dc').addEventListener('click', () => saveThen
 document.getElementById('copy-tg-payload').addEventListener('click', () => copyPayload('telegram'));
 document.getElementById('copy-dc-payload').addEventListener('click', () => copyPayload('discord'));
 Array.from(document.querySelectorAll('#settings-form input, #settings-form select')).forEach(el => {
-  el.addEventListener('change', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); });
-  el.addEventListener('input', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); });
+  el.addEventListener('change', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); updateDirtyState(); });
+  el.addEventListener('input', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); updateDirtyState(); });
 });
 initSettingsTabs();
+captureInitialState();
 syncPresetSliders();
 loadAccess();
 loadRuntime();
 refreshStatus();
 updateAuthSummaryChip();
+updateDirtyState();
 </script>
 {% endblock %}

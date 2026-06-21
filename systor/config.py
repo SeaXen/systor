@@ -92,6 +92,10 @@ DEFAULT_CONFIG: dict = {
         "no_right_click": False,
         "max_scan_files": 20000,
     },
+    "public": {
+        "dashboard": True,
+        "alerts": False,
+    },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
         "host": "0.0.0.0",

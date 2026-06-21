@@ -27,6 +27,8 @@
       <a href="/alerts" class="page-tab {% if request.path == '/alerts' %}active{% endif %}" aria-label="Alerts" title="Alerts"><span class="tab-icon" aria-hidden="true">⚠</span><span class="tab-label">Alerts</span></a>
       <a href="/logs" class="page-tab {% if request.path == '/logs' %}active{% endif %}" aria-label="Logs" title="Logs"><span class="tab-icon" aria-hidden="true">≣</span><span class="tab-label">Logs</span></a>
       <a href="/settings" class="page-tab {% if request.path.startswith('/settings') %}active{% endif %}" aria-label="Settings" title="Settings"><span class="tab-icon" aria-hidden="true">⚙</span><span class="tab-label">Settings</span></a>
+      {% elif public_pages and public_pages.get('alerts') %}
+      <a href="/alerts" class="page-tab {% if request.path == '/alerts' %}active{% endif %}" aria-label="Alerts" title="Alerts"><span class="tab-icon" aria-hidden="true">⚠</span><span class="tab-label">Alerts</span></a>
       {% endif %}
     </nav>
     {% if client_private_raw and auth_enabled %}
