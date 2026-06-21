@@ -29,6 +29,13 @@
       <a href="/settings" class="page-tab {% if request.path.startswith('/settings') %}active{% endif %}" aria-label="Settings" title="Settings"><span class="tab-icon" aria-hidden="true">⚙</span><span class="tab-label">Settings</span></a>
       {% endif %}
     </nav>
+    {% if client_private_raw and auth_enabled %}
+      {% if auth_logged_in %}
+      <a href="/logout" class="btn secondary compact" title="Sign out">Logout</a>
+      {% else %}
+      <a href="/login{% if request.path != '/login' %}?next={{ request.full_path if request.query_string else request.path }}{% endif %}" class="btn secondary compact" title="Sign in">Login</a>
+      {% endif %}
+    {% endif %}
   </div>
 </div>
 <div class="container" id="main-content">

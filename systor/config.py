@@ -40,6 +40,13 @@ DEFAULT_CONFIG: dict = {
         "enabled": False,
         "webhook_url": "",            # or env SYSTOR_DISCORD_WEBHOOK
     },
+    "auth": {
+        "enabled": False,
+        "mode": "admin_only",
+        "username": "admin",
+        "password_hash": "",
+        "session_secret": "",
+    },
     "network": {
         "default_hours": 24,
         "default_granularity": "day",

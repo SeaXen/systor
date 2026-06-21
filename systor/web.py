@@ -26,6 +26,7 @@ import ipaddress
 import zipfile
 import tempfile
 import hashlib
+import secrets
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -33,7 +34,7 @@ from pathlib import Path
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from flask import Flask, jsonify, render_template, request, abort, Response, send_file, after_this_request
+from flask import Flask, jsonify, render_template, request, abort, Response, send_file, after_this_request, session, redirect, url_for
 
 from .config import load_config, save_config
 from .metrics import collect_snapshot, read_top_processes, read_total_memory_mb, read_network_interfaces
@@ -668,8 +669,63 @@ def _client_private() -> bool:
         return False
 
 
+def _auth_cfg() -> dict:
+    cfg = load_config().get("auth", {}) or {}
+    mode = str(cfg.get("mode") or "admin_only").strip().lower()
+    if mode not in ("admin_only", "full_app"):
+        mode = "admin_only"
+    username = str(cfg.get("username") or "admin").strip() or "admin"
+    return {
+        "enabled": bool(cfg.get("enabled", False)),
+        "mode": mode,
+        "username": username,
+        "password_hash": str(cfg.get("password_hash") or ""),
+        "session_secret": str(cfg.get("session_secret") or ""),
+    }
+
+
+def _auth_enabled() -> bool:
+    cfg = _auth_cfg()
+    return bool(cfg.get("enabled") and cfg.get("username") and cfg.get("password_hash"))
+
+
+def _auth_logged_in() -> bool:
+    cfg = _auth_cfg()
+    return bool(session.get("systor_auth") and session.get("systor_user") == cfg.get("username"))
+
+
+def _private_auth_exempt(path: str) -> bool:
+    if path.startswith("/static/"):
+        return True
+    return path in ("/login", "/logout", "/health", "/api/version")
+
+
+def _private_auth_protected(path: str) -> bool:
+    if _private_auth_exempt(path):
+        return False
+    mode = _auth_cfg().get("mode", "admin_only")
+    if mode == "full_app":
+        return True
+    admin_pages = ("/apps", "/network", "/speed", "/alerts", "/logs", "/settings", "/storage")
+    if path in admin_pages or any(path.startswith(p + "/") for p in admin_pages):
+        return True
+    if path.startswith("/api/"):
+        allow = {"/api/snapshot", "/api/series", "/api/network-series", "/api/public-dashboard", "/api/version"}
+        return path not in allow
+    return False
+
+
+def _effective_private_ui() -> bool:
+    private = _client_private()
+    if not private:
+        return False
+    if not _auth_enabled():
+        return True
+    return _auth_logged_in()
+
+
 def _storage_can_write() -> bool:
-    return _client_private()
+    return _client_private() and (not _auth_enabled() or _auth_logged_in())
 
 
 def _safe_roots() -> list[Path]:
@@ -943,6 +999,8 @@ def _scan_storage(path: Path, limit: int) -> dict:
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    auth_boot = _auth_cfg()
+    app.secret_key = auth_boot.get("session_secret") or os.environ.get("SYSTOR_SESSION_SECRET") or "systor-unsafe-dev-secret"
     app.config["JSON_SORT_KEYS"] = False
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
     app.static_folder = "static"
@@ -960,17 +1018,34 @@ def create_app() -> Flask:
     @app.context_processor
     def _ctx_access():
         private = _client_private()
-        return {"storage_private": private, "client_private": private}
+        effective_private = _effective_private_ui()
+        auth = _auth_cfg()
+        return {
+            "storage_private": effective_private,
+            "client_private": effective_private,
+            "client_private_raw": private,
+            "auth_enabled": _auth_enabled(),
+            "auth_mode": auth.get("mode", "admin_only"),
+            "auth_username": auth.get("username", "admin"),
+            "auth_logged_in": _auth_logged_in(),
+        }
 
     @app.before_request
     def _block_public_surfaces():
         path = request.path or ""
         private = _client_private()
         if private:
+            if _auth_enabled() and _private_auth_protected(path) and not _auth_logged_in():
+                if path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "login required"}), 401
+                next_url = request.full_path if request.query_string else request.path
+                if next_url.endswith("?"):
+                    next_url = next_url[:-1]
+                return redirect(url_for("page_login", next=next_url))
             return None
 
         # Public internet: dashboard only.
-        public_pages_blocked = ("/apps", "/network", "/speed", "/alerts", "/logs", "/settings", "/storage")
+        public_pages_blocked = ("/apps", "/network", "/speed", "/alerts", "/logs", "/settings", "/storage", "/login", "/logout")
         if path in public_pages_blocked or any(path.startswith(p + "/") for p in public_pages_blocked):
             abort(404)
 
@@ -1841,6 +1916,48 @@ def create_app() -> Flask:
         return jsonify({"name": __app_name__, "version": __version__})
 
     # ---------- HTML pages ----------
+    @app.route("/login", methods=["GET", "POST"])
+    def page_login():
+        if not _client_private():
+            abort(404)
+        if not _auth_enabled():
+            return redirect(url_for("page_dashboard"))
+        if _auth_logged_in():
+            nxt = str(request.values.get("next") or "/")
+            if not nxt.startswith("/") or nxt.startswith("//"):
+                nxt = "/"
+            return redirect(nxt)
+        error = ""
+        next_url = str(request.values.get("next") or "/")
+        if not next_url.startswith("/") or next_url.startswith("//"):
+            next_url = "/"
+        if request.method == "POST":
+            auth = _auth_cfg()
+            username = str(request.form.get("username") or "").strip()
+            password = str(request.form.get("password") or "")
+            if username == auth.get("username") and auth.get("password_hash"):
+                try:
+                    ok = check_password_hash(auth.get("password_hash", ""), password)
+                except Exception:
+                    ok = False
+                if ok:
+                    session["systor_auth"] = True
+                    session["systor_user"] = auth.get("username")
+                    return redirect(next_url or "/")
+            error = "Invalid username or password"
+            return render_template("login.html", error=error, next_url=next_url), 401
+        return render_template("login.html", error=error, next_url=next_url)
+
+    @app.route("/logout", methods=["GET", "POST"])
+    def page_logout():
+        if not _client_private():
+            abort(404)
+        session.pop("systor_auth", None)
+        session.pop("systor_user", None)
+        if _auth_enabled():
+            return redirect(url_for("page_login"))
+        return redirect(url_for("page_dashboard"))
+
     @app.route("/")
     def page_dashboard():
         cfg = load_config()
@@ -2017,6 +2134,29 @@ def create_app() -> Flask:
             if "web_port" in data and data["web_port"]:
                 try: cfg["web"]["port"] = int(data["web_port"])
                 except (ValueError, TypeError): pass
+            # Optional single-admin auth
+            cfg.setdefault("auth", {})
+            auth = cfg["auth"]
+            auth["enabled"] = _bool(data.get("auth_enabled")) if "auth_enabled" in data else bool(auth.get("enabled", False))
+            if "auth_mode" in data and str(data.get("auth_mode") or "").strip() in ("admin_only", "full_app"):
+                auth["mode"] = str(data.get("auth_mode") or "admin_only").strip()
+            if "auth_username" in data:
+                auth["username"] = str(data.get("auth_username") or "admin").strip() or "admin"
+            pw = str(data.get("auth_password") or "")
+            pw2 = str(data.get("auth_password_confirm") or "")
+            if pw or pw2:
+                if pw != pw2:
+                    return jsonify({"ok": False, "message": "Auth password confirmation does not match."}), 400
+                auth["password_hash"] = generate_password_hash(pw)
+            if auth.get("enabled"):
+                if not auth.get("username"):
+                    return jsonify({"ok": False, "message": "Auth username is required when login protection is enabled."}), 400
+                if not auth.get("password_hash"):
+                    return jsonify({"ok": False, "message": "Set an auth password before enabling login protection."}), 400
+                if not auth.get("session_secret"):
+                    auth["session_secret"] = secrets.token_hex(32)
+            if auth.get("session_secret"):
+                app.secret_key = auth.get("session_secret") or app.secret_key
             try:
                 path = save_config(cfg)
                 msg = f"Saved to {path}."
@@ -2073,6 +2213,11 @@ def create_app() -> Flask:
         if cfg.get("discord", {}).get("webhook_url"):
             url = cfg["discord"]["webhook_url"]
             cfg["discord"]["webhook_url"] = url[:40] + "…" if len(url) > 50 else "***"
+        if cfg.get("auth", {}).get("password_hash"):
+            cfg["auth"].pop("password_hash", None)
+            cfg["auth"]["has_password"] = True
+        if cfg.get("auth", {}).get("session_secret"):
+            cfg["auth"].pop("session_secret", None)
         return jsonify({"ok": True, "config": cfg})
 
     @app.route("/api/apply", methods=["POST"])
