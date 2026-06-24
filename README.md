@@ -13,6 +13,7 @@
   <a href="https://github.com/SeaXen/systor/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-3fb950"></a>
   <img alt="python" src="https://img.shields.io/badge/python-3.9%2B-58a6ff">
   <a href="https://systor.xuup.top/"><img alt="demo" src="https://img.shields.io/badge/demo-live_dashboard-8957e5"></a>
+  <a href="https://seaxen.github.io/systor/"><img alt="site" src="https://img.shields.io/badge/site-GitHub_Pages-21262d"></a>
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-8892a0">
 </p>
 
@@ -333,6 +334,16 @@ systemctl restart systor-web
 - prefer LAN / Tailscale for admin access
 - if using Cloudflare tunnel, expose the read-only dashboard surface only
 - limit Storage roots to the minimum you actually need
+
+---
+
+## GitHub Pages landing
+
+A static marketing page lives in [`docs/`](docs/) (`index.html` + `landing.css`). Enable it once in the repo:
+
+**Settings → Pages → Build from branch `main` → folder `/docs`**
+
+Public URL: **https://seaxen.github.io/systor/** (after GitHub finishes the first deploy).
 
 ---
 

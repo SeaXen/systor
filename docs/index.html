@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>systor — lightweight Linux system monitor</title>
+  <meta name="description" content="Self-hosted Linux monitoring: branded dashboard, sustained alerts, storage tools, speed tests, Telegram & Discord — without Prometheus or Grafana.">
+  <link rel="icon" type="image/png" href="systor-logo.png">
+  <link rel="stylesheet" href="landing.css">
+  <meta property="og:title" content="systor">
+  <meta property="og:description" content="Lightweight Linux system monitor with a fast web dashboard.">
+  <meta property="og:image" content="screen-dashboard.png">
+</head>
+<body>
+  <header class="site-nav">
+    <div class="wrap">
+      <a class="brand" href="#top">
+        <img src="systor-logo.png" alt="" width="32" height="32">
+        systor<span>.</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/SeaXen/systor" class="cta" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <img class="hero-logo" src="systor-logo.png" alt="systor logo" width="88" height="88">
+        <h1>systor<span>.</span></h1>
+        <p class="lead">
+          Lightweight Linux monitoring for DietPi, Raspberry Pi, home servers, and small VPS hosts.
+          One Flask app, one collector, SQLite — real dashboards and alerts without the Prometheus stack.
+        </p>
+        <div class="badges">
+          <span class="badge release">v0.1.0</span>
+          <span class="badge ok">MIT</span>
+          <span class="badge">Python 3.9+</span>
+          <span class="badge">~25 MB RAM</span>
+          <span class="badge">Port 6677</span>
+        </div>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="https://systor.xuup.top/" rel="noopener">Live demo dashboard</a>
+          <a class="btn btn-ghost" href="https://github.com/SeaXen/systor#quick-start" rel="noopener">Quick start</a>
+          <a class="btn btn-ghost" href="https://github.com/SeaXen/systor/releases/tag/v0.1.0" rel="noopener">Download release</a>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Why not Grafana?</h2>
+        <p class="sub">Built when you want observability on a box that cannot afford another 250 MB of Java and YAML.</p>
+        <table class="compare" aria-label="Tool comparison">
+          <thead>
+            <tr>
+              <th>Tool</th>
+              <th>Typical RAM</th>
+              <th>Setup</th>
+              <th>Notifications</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Prometheus + Grafana</td><td>250 MB+</td><td>Hours</td><td>Alertmanager</td></tr>
+            <tr><td>Netdata</td><td>200 MB+</td><td>One command</td><td>Email / webhook</td></tr>
+            <tr><td>Glances (web)</td><td>~30 MB</td><td>One command</td><td>Limited</td></tr>
+            <tr class="highlight"><td>systor</td><td><strong>~25 MB</strong></td><td><strong>install.sh</strong></td><td><strong>Telegram + Discord</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <h2>What you get</h2>
+        <p class="sub">Same GitHub-dark UI as the running app — no SPA, no Electron, no agent protocol.</p>
+        <div class="grid">
+          <article class="card"><div class="icon">⌂</div><h3>Live dashboard</h3><p>CPU, temp, RAM, swap, disk I/O, load, network charts, top processes, recent alerts.</p></article>
+          <article class="card"><div class="icon">◫</div><h3>Apps</h3><p>Host and Docker processes ranked by CPU, RAM, network, and disk.</p></article>
+          <article class="card"><div class="icon">⇄</div><h3>Network</h3><p>Per-interface traffic and daily / monthly / yearly usage tables.</p></article>
+          <article class="card"><div class="icon">⚡</div><h3>Speed</h3><p>Official Ookla CLI runs, scheduler, history, and threshold alerts.</p></article>
+          <article class="card"><div class="icon">▣</div><h3>Storage</h3><p>Allowed-root browser, uploads, trash/restore, duplicate scan, action password.</p></article>
+          <article class="card"><div class="icon">⚠</div><h3>Sustained alerts</h3><p>Threshold + duration so one spike does not wake you at 3 AM.</p></article>
+          <article class="card"><div class="icon">⚙</div><h3>Settings</h3><p>Telegram and Discord with test buttons, cooldowns, and live SIGHUP reload.</p></article>
+          <article class="card"><div class="icon">🔒</div><h3>Public vs private</h3><p>Read-only dashboard on the internet; full admin on LAN, localhost, or Tailscale.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="screenshots">
+      <div class="wrap">
+        <h2>Screenshots</h2>
+        <p class="sub">From a real install — not mockups.</p>
+        <div class="shots">
+          <figure class="shot">
+            <img src="screen-dashboard.png" alt="systor dashboard with KPI cards and charts" width="1200" height="675" loading="lazy">
+            <figcaption>Dashboard — KPI strip, six charts, processes, alerts</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="screen-speed.png" alt="systor speed test page" width="800" height="600" loading="lazy">
+            <figcaption>Speed — Ookla CLI with honest phase progress</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap split">
+        <div>
+          <h2>Install in one command</h2>
+          <p class="sub">Copies to <code>/opt/systor</code>, systemd units, config under <code>/etc/systor</code>.</p>
+          <div class="install">
+            <pre><code>git clone https://github.com/SeaXen/systor.git
+cd systor
+sudo ./install.sh</code></pre>
+            <p style="margin-top:12px;font-size:13px;color:var(--text-muted)">Open <a href="http://127.0.0.1:6677">http://127.0.0.1:6677</a> or <code>http://&lt;host-ip&gt;:6677</code> on your LAN.</p>
+          </div>
+        </div>
+        <div>
+          <h2>Stack</h2>
+          <p class="sub">Two long-lived processes — collector samples metrics; web serves the UI.</p>
+          <ul class="list-check">
+            <li>Flask + Waitress + SQLite</li>
+            <li>Custom canvas charts — no Chart.js bundle</li>
+            <li>systemd: <code>systor-collector</code> + <code>systor-web</code></li>
+            <li>No Docker required (standalone Linux)</li>
+            <li>MIT license — SeaXen / Dr. Sagar</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p>
+        <a href="https://github.com/SeaXen/systor">Source</a> ·
+        <a href="https://systor.xuup.top/">Demo</a> ·
+        <a href="https://github.com/SeaXen/systor/blob/main/README.md">README</a> ·
+        <a href="https://github.com/SeaXen/systor/blob/main/LICENSE">MIT</a>
+      </p>
+      <p style="margin-top:8px">GitHub Pages landing · project docs live in the repo README</p>
+    </div>
+  </footer>
+</body>
+</html>
