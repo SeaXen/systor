@@ -1,0 +1,53 @@
+services:
+  systor:
+    image: ghcr.io/seaxen/systor:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: systor
+    restart: unless-stopped
+
+    # Host PID namespace gives Systor direct access to host processes and /proc
+    pid: host
+
+    # Standard web dashboard port
+    ports:
+      - "${SYSTOR_PORT:-6677}:6677"
+
+    # Least-privilege volume mounts for metrics, SMART disk telemetry, and services
+    volumes:
+      # Persistent application data and configuration
+      - systor_config:/etc/systor
+      - systor_data:/var/lib/systor
+      - systor_log:/var/log/systor
+
+      # Host metrics and hardware sensors (read-only)
+      - /sys:/sys:ro
+      - /dev:/dev:ro
+
+      # Host systemd management via D-Bus and container inspect
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    environment:
+      - SYSTOR_WEB_HOST=0.0.0.0
+      - SYSTOR_WEB_PORT=6677
+      # Uncomment to pre-configure Telegram/Discord alerts via environment:
+      # - SYSTOR_TELEGRAM_BOT_TOKEN=
+      # - SYSTOR_TELEGRAM_CHAT_ID=
+      # - SYSTOR_DISCORD_WEBHOOK=
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6677/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  systor_config:
+    name: systor_config
+  systor_data:
+    name: systor_data
+  systor_log:
+    name: systor_log

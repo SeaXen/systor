@@ -9,11 +9,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SeaXen/systor/releases/tag/v0.1.0"><img alt="release" src="https://img.shields.io/github/v/release/SeaXen/systor?display_name=tag&sort=semver&color=1f6feb"></a>
+  <a href="https://github.com/SeaXen/systor/releases/tag/v1.0.0"><img alt="release" src="https://img.shields.io/github/v/release/SeaXen/systor?display_name=tag&sort=semver&color=1f6feb"></a>
   <a href="https://github.com/SeaXen/systor/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-3fb950"></a>
   <img alt="python" src="https://img.shields.io/badge/python-3.9%2B-58a6ff">
   <a href="https://systor.xuup.top/"><img alt="demo" src="https://img.shields.io/badge/demo-live_dashboard-8957e5"></a>
   <a href="https://seaxen.github.io/systor/"><img alt="site" src="https://img.shields.io/badge/site-GitHub_Pages-21262d"></a>
+  <img alt="docker" src="https://img.shields.io/badge/docker-multi--arch-2496ed">
   <img alt="platform" src="https://img.shields.io/badge/platform-Linux-8892a0">
 </p>
 
@@ -21,43 +22,33 @@
 
 ## What it is
 
-`systor` is a small self-hosted monitoring app for Linux boxes where Prometheus + Grafana is too heavy and terminal-only tools are too limited.
+`systor` is a small, high-performance self-hosted monitoring application for Linux servers where Prometheus + Grafana is too heavy and terminal-only tools are too limited.
 
 It is built for:
-- DietPi / Raspberry Pi / small home servers
-- low-RAM VPS machines
-- personal infrastructure where you want a **fast dashboard**, **real alerts**, and **simple operations**
+- DietPi / Raspberry Pi / small home lab servers
+- Low-RAM VPS machines
+- Personal infrastructure where you want a **fast dashboard**, **real alerts**, and **simple operations**
 
-It runs as two long-lived processes:
-- **collector** — samples system metrics and writes them to SQLite
-- **web** — serves the dashboard and admin UI on port `6677`
-
-No Docker required. No JS framework. No Prometheus. No Grafana. No external database.
-
----
-
-## Screenshots
-
-### Dashboard
-
-![Dashboard](docs/screen-dashboard.png)
-
-### Speed test
-
-![Speed page](docs/screen-speed.png)
+Available as both a **zero-overhead bare-metal systemd installation** (<30MB RAM) and an official **multi-arch Docker container** (`ghcr.io/seaxen/systor:latest`).
 
 ---
 
 ## Highlights
 
 - **Live dashboard** — CPU, temperature, memory, swap, disk I/O, CPU load, network DL/UL, chart history, top processes, recent alerts
+- **Drive Health & SMART Insights** — NVMe/SATA/SAS drive telemetry, wear percentage, reallocated sectors, and real-time disk health scoring
+- **Service Uptime & Blackbox Monitoring** — Probes external or internal HTTP, HTTPS, TCP, Ping, and DNS endpoints with latency history
+- **Systemd Service Manager & Audit Logging** — Inspect, restart, and monitor host system services with security audit logs
+- **SSL / TLS Certificate Tracker** — Live certificate chain validation, issuer verification, and expiration countdowns
+- **Security Updates & Kernel Reboot Indicators** — Instant alerts when APT/DNF pending security updates or `/var/run/reboot-required` are detected
+- **Prometheus Metric Exporter (`/metrics`)** — Native OpenMetrics format endpoint for optional external Prometheus/Grafana scraping
+- **One-Click Disaster Recovery** — Full JSON backup export and zero-downtime restore for configurations, uptime targets, and audit histories
 - **Apps page** — host + Docker processes ranked by CPU, RAM, network, and disk activity
 - **Network page** — live traffic + daily / monthly / yearly usage views with interface filtering
 - **Speed page** — official Ookla CLI runs, saved server selection, scheduler, run history, packet loss, and alert thresholds
 - **Storage page** — browser for allowed roots, uploads/downloads, chunk uploads, checksums, duplicate scan, trash/restore, action-password support
 - **Telegram + Discord notifications** — channel-specific test/send flows from the UI
-- **Systemd-managed** — `systor-web` and `systor-collector` install as boot services
-- **Lightweight** — simple Python app, SQLite storage, static assets only
+- **Dual Packaging** — 1-line bare-metal curl installer or 1-line Docker container
 
 ---
 
@@ -108,6 +99,46 @@ If you want a small, direct, all-in-one monitor for one machine or a few machine
 
 ## Quick start
 
+### Option A: Docker Compose (Recommended for Container Stacks)
+
+Run Systor with least-privilege host mounts and zero setup:
+
+```bash
+# 1. Download docker-compose.yml
+curl -sSL https://raw.githubusercontent.com/SeaXen/systor/main/docker-compose.yml -o docker-compose.yml
+
+# 2. Launch in background
+docker compose up -d
+```
+
+Or run via single-line `docker run`:
+```bash
+docker run -d \
+  --name systor \
+  --restart unless-stopped \
+  --pid host \
+  -p 6677:6677 \
+  -v systor_config:/etc/systor \
+  -v systor_data:/var/lib/systor \
+  -v systor_log:/var/log/systor \
+  -v /sys:/sys:ro \
+  -v /dev:/dev:ro \
+  -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  ghcr.io/seaxen/systor:latest
+```
+
+---
+
+### Option B: Bare-Metal Installation (Sub-30MB RAM Native)
+
+Run the automated one-line curl bootstrapper:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/SeaXen/systor/main/install.sh | sudo bash
+```
+
+Or clone and install manually:
 ```bash
 git clone https://github.com/SeaXen/systor.git
 cd systor
@@ -115,7 +146,7 @@ sudo ./install.sh
 ```
 
 Then open:
-- local: <http://127.0.0.1:6677>
+- Local: <http://127.0.0.1:6677>
 - LAN: `http://<host-ip>:6677`
 
 Default bind:

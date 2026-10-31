@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on Keep a Changelog.
 
+## [1.0.0] - 2026-10-31
+
+### Added
+- **Drive Health & SMART Insights**: Real-time NVMe/SATA/SAS telemetry, wear levels, reallocated sectors, and disk health indicators.
+- **Service Uptime & Blackbox Monitoring**: Configurable background probes for HTTP, HTTPS, TCP, Ping, and DNS endpoints with latency tracking and history.
+- **Systemd Service Manager & Audit Logging**: Host system service controls (start/stop/restart) with security audit history.
+- **SSL / TLS Certificate Tracker**: Live certificate chain validation, issuer verification, and expiration countdowns.
+- **Security Updates & Kernel Reboot Indicators**: Notification and dashboard banner for pending APT/DNF security packages and `/var/run/reboot-required`.
+- **Prometheus Metric Exporter (`/metrics`)**: OpenMetrics scraping endpoint for external Prometheus/Grafana collectors.
+- **One-Click Disaster Recovery**: Complete JSON configuration export and zero-downtime database restore.
+- **Official Multi-Architecture Docker Container**: Automated `linux/amd64` and `linux/arm64` builds on GitHub Container Registry (`ghcr.io/seaxen/systor:latest`).
+- **Least-Privilege Docker Compose Setup**: Host PID namespace with read-only `/sys`, `/dev`, D-Bus, and Docker sockets without `--privileged`.
+- **Automated 1-Line Remote Installer**: Headless `curl -sSL ... | sudo bash` auto-bootstrapping installer alongside local git support.
+- **Unified Process Supervision**: Built-in `systor serve all` coordinating background metrics collection and Waitress web serving with `tini` signal handling.
+
+### Changed
+- Bumped project version to `1.0.0` production release.
+- Upgraded installer with automatic dependency detection for `smartmontools`, `python3-venv`, and `curl`.
+
+---
+
 ## [0.1.0] - 2026-06-21
 
 ### Added

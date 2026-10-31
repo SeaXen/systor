@@ -108,16 +108,41 @@ def cmd_test(args):
         print("No notification channels enabled. Use `systor setup telegram` or `systor setup discord`.")
 
 
+def _serve_all():
+    """Run both collector daemon and web server concurrently in one process."""
+    import threading
+    import signal
+    from . import collector, web
+
+    def _sig_handler(signum, _frame):
+        collector._running = False
+        web._running = False
+        raise SystemExit(0)
+
+    try:
+        signal.signal(signal.SIGTERM, _sig_handler)
+        signal.signal(signal.SIGINT, _sig_handler)
+    except Exception:
+        pass
+
+    col_thread = threading.Thread(target=collector.run, name="systor-collector", daemon=True)
+    col_thread.start()
+    web.run()
+
+
 def cmd_serve(args):
-    """Run the collector or web in foreground (for debugging)."""
-    if args.component == "collector":
+    """Run the collector, web, or both in foreground."""
+    comp = getattr(args, "component", "all") or "all"
+    if comp == "collector":
         from .collector import run
         run()
-    elif args.component == "web":
+    elif comp == "web":
         from .web import run
         run()
+    elif comp == "all":
+        _serve_all()
     else:
-        print(f"Unknown component: {args.component}")
+        print(f"Unknown component: {comp}")
         sys.exit(1)
 
 
@@ -154,8 +179,8 @@ def main():
     t.add_argument("--message", default="🧪 systor test message", help="message body")
     t.set_defaults(func=cmd_test)
 
-    sv = sub.add_parser("serve", help="run a component in foreground (use systemd normally)")
-    sv.add_argument("component", choices=["collector", "web"])
+    sv = sub.add_parser("serve", help="run a component in foreground (collector, web, or all)")
+    sv.add_argument("component", choices=["collector", "web", "all"], nargs="?", default="all", help="component to run (default: all)")
     sv.set_defaults(func=cmd_serve)
 
     cs = sub.add_parser("config", help="config utilities")
