@@ -14,7 +14,7 @@ from .blueprints import register_blueprints
 from .blueprints.common import (
     client_private, auth_cfg, auth_enabled, auth_logged_in,
     auth_session_expired, auth_logout_session, auth_touch_session,
-    private_auth_protected, public_cfg, _login_rate_state
+    private_auth_protected, public_cfg, effective_private_ui, _login_rate_state
 )
 
 log = logging.getLogger("systor.web")
@@ -47,7 +47,24 @@ def create_app(start_worker: bool = True) -> Flask:
     app.config["JSON_SORT_KEYS"] = False
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
 
+    @app.context_processor
+    def _ctx_access():
+        private = client_private()
+        effective_private = effective_private_ui()
+        auth = auth_cfg()
+        return {
+            "storage_private": effective_private,
+            "client_private": effective_private,
+            "client_private_raw": private,
+            "auth_enabled": auth_enabled(),
+            "auth_mode": auth.get("mode", "admin_only"),
+            "auth_username": auth.get("username", "admin"),
+            "auth_logged_in": auth_logged_in(),
+            "public_pages": public_cfg(),
+        }
+
     @app.after_request
+
     def _add_security_headers(resp):
         path = request.path or ""
         if path.startswith("/static/"):
