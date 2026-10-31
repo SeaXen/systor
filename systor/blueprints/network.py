@@ -79,11 +79,11 @@ def api_uptime_create():
 
     body = request.get_json(silent=True) or {}
     name = str(body.get("name") or "").strip()
-    url = str(body.get("url") or "").strip()
+    url = str(body.get("url") or body.get("target") or "").strip()
     if not name or not url:
         return jsonify({"ok": False, "error": "Target name and URL are required"}), 400
 
-    method = str(body.get("method") or "GET").upper()
+    method = str(body.get("method") or body.get("check_type") or "GET").upper()
     try:
         expected = int(body.get("expected_status") or 200)
         interval = max(10, int(body.get("interval_sec") or 60))
@@ -102,8 +102,9 @@ def api_uptime_create():
     return jsonify({"ok": True, "id": target_id, "message": f"Uptime target '{name}' created"})
 
 
+@network_bp.route("/api/uptime/targets", methods=["DELETE"])
 @network_bp.route("/api/uptime/targets/<int:tid>", methods=["PUT", "DELETE"])
-def api_uptime_modify(tid: int):
+def api_uptime_modify(tid: int | None = None):
     from .common import client_private, auth_enabled, auth_logged_in
     if not client_private():
         return jsonify({"ok": False, "error": "Uptime configuration is private LAN only"}), 403
@@ -111,17 +112,26 @@ def api_uptime_modify(tid: int):
         return jsonify({"ok": False, "error": "Admin login required"}), 401
 
     storage = get_storage()
+    if tid is None:
+        try:
+            tid = int(request.args.get("id", (request.get_json(silent=True) or {}).get("id", 0)))
+        except (ValueError, TypeError):
+            tid = 0
+
+    if not tid:
+        return jsonify({"ok": False, "error": "Target ID is required"}), 400
+
     if request.method == "DELETE":
         ok = storage.delete_uptime_target(tid)
         return jsonify({"ok": ok, "message": "Target deleted" if ok else "Target not found"})
 
     body = request.get_json(silent=True) or {}
     name = str(body.get("name") or "").strip()
-    url = str(body.get("url") or "").strip()
+    url = str(body.get("url") or body.get("target") or "").strip()
     if not name or not url:
         return jsonify({"ok": False, "error": "Name and URL are required"}), 400
 
-    method = str(body.get("method") or "GET").upper()
+    method = str(body.get("method") or body.get("check_type") or "GET").upper()
     try:
         expected = int(body.get("expected_status") or 200)
         interval = max(10, int(body.get("interval_sec") or 60))
@@ -160,6 +170,6 @@ def api_ssl_certs():
 
     from ..services.ssl_service import get_ssl_certificates
     certs = get_ssl_certificates(custom_targets=custom_targets)
-    return jsonify({"ok": True, "certificates": certs, "count": len(certs)})
+    return jsonify({"ok": True, "certs": certs, "certificates": certs, "count": len(certs)})
 
 
