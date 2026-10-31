@@ -17,20 +17,20 @@
   </div>
 
   <div class="storage-pathbar">
-    <input id="storage-path" class="storage-path-input mono" placeholder="/mnt/tb" autocomplete="off">
+    <input id="storage-path" class="storage-path-input mono" placeholder="/mnt/tb" autocomplete="off" aria-label="Storage directory path">
     <button class="btn compact" id="storage-go">Open</button>
   </div>
   <div id="storage-breadcrumbs" class="storage-breadcrumbs"></div>
 
-  <div class="storage-tabs" role="tablist">
-    <button class="storage-tab active" data-tab="overview">Overview</button>
-    <button class="storage-tab" data-tab="analysis">Disk Analysis</button>
-    <button class="storage-tab" data-tab="files">File Manager</button>
-    <button class="storage-tab" data-tab="settings">Settings</button>
-    <button class="storage-tab" data-tab="ops">Ops Log</button>
+  <div class="storage-tabs" role="tablist" aria-label="Storage sections">
+    <button class="storage-tab active" data-tab="overview" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
+    <button class="storage-tab" data-tab="analysis" role="tab" id="tab-analysis" aria-controls="panel-analysis" aria-selected="false">Disk Analysis</button>
+    <button class="storage-tab" data-tab="files" role="tab" id="tab-files" aria-controls="panel-files" aria-selected="false">File Manager</button>
+    <button class="storage-tab" data-tab="settings" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false">Settings</button>
+    <button class="storage-tab" data-tab="ops" role="tab" id="tab-ops" aria-controls="panel-ops" aria-selected="false">Ops Log</button>
   </div>
 
-  <section class="storage-panel active" data-panel="overview">
+  <section class="storage-panel active" id="panel-overview" data-panel="overview" role="tabpanel" aria-labelledby="tab-overview">
     <div class="stat-grid storage-kpis">
       <div class="stat-card cyan"><div class="label">Mount used</div><div class="value" id="st-used">—</div><div class="sub" id="st-mount">—</div></div>
       <div class="stat-card yellow"><div class="label">Free</div><div class="value" id="st-free">—</div><div class="sub">available on selected mount</div></div>
@@ -38,27 +38,27 @@
       <div class="stat-card green"><div class="label">Access</div><div class="value" id="st-mode">—</div><div class="sub">public safe by default</div></div>
     </div>
     <div class="storage-grid-3 storage-overview-grid">
-      <div class="table-card compact-table"><div class="apps-card-head"><h3>Root / SSD disks</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Disk</th><th class="text-right">Used</th><th class="text-right">Free</th></tr></thead><tbody id="storage-mounts-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
-      <div class="table-card compact-table"><div class="apps-card-head"><h3>Largest here</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Name</th><th>Type</th><th class="text-right">Size</th></tr></thead><tbody id="storage-largest-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
-      <div class="table-card compact-table"><div class="apps-card-head"><h3>Type usage</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Type</th><th class="text-right">Files</th><th class="text-right">Size</th></tr></thead><tbody id="storage-types-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Root / SSD Disks</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Disk</th><th class="text-right">Used</th><th class="text-right">Free</th></tr></thead><tbody id="storage-mounts-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Largest Here</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Name</th><th>Type</th><th class="text-right">Size</th></tr></thead><tbody id="storage-largest-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Type Usage</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Type</th><th class="text-right">Files</th><th class="text-right">Size</th></tr></thead><tbody id="storage-types-body"><tr><td colspan="3" class="empty-cell">Loading…</td></tr></tbody></table></div>
     </div>
   </section>
 
-  <section class="storage-panel" data-panel="analysis">
+  <section class="storage-panel" id="panel-analysis" data-panel="analysis" role="tabpanel" aria-labelledby="tab-analysis">
     <div class="dash-toolbar storage-subbar">
       <div class="dash-status"><strong>Disk Analysis</strong><span>largest folders/files · old large files · duplicate candidates</span></div>
-      <div class="dash-controls storage-analysis-actions"><label>limit <select id="analysis-limit" class="control-select"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label><button class="btn secondary compact" id="analysis-run">Quick</button><button class="btn secondary compact" id="analysis-deep">Deep bg</button><button class="btn secondary compact" id="analysis-checksum">Checksum dupes</button></div>
+      <div class="dash-controls storage-analysis-actions"><label for="analysis-limit">limit</label><select id="analysis-limit" class="control-select"><option>10</option><option selected>25</option><option>50</option><option>100</option></select><button class="btn secondary compact" id="analysis-run">Quick</button><button class="btn secondary compact" id="analysis-deep">Deep bg</button><button class="btn secondary compact" id="analysis-checksum">Checksum dupes</button></div>
     </div>
     <div class="storage-analysis-summary" id="analysis-summary">Run analysis to scan the selected root. Manual only, so it stays lightweight.</div>
     <div class="storage-grid-4 storage-analysis-grid" id="analysis-grid" hidden>
-      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Largest folders</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Folder</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-folders"><tr><td colspan="2" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
-      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Largest files</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>File</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-files"><tr><td colspan="2" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
-      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Old large files</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>File</th><th>Age</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-old"><tr><td colspan="3" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
-      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Duplicate candidates</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Name</th><th>Count</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-dupes"><tr><td colspan="3" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Largest Folders</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Folder</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-folders"><tr><td colspan="2" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Largest Files</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>File</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-files"><tr><td colspan="2" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Old Large Files</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>File</th><th>Age</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-old"><tr><td colspan="3" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
+      <div class="table-card compact-table storage-analysis-card"><div class="apps-card-head"><h3>Duplicate Candidates</h3></div><table class="apps-table compact-apps-table"><thead><tr><th>Name</th><th>Count</th><th class="text-right">Size</th></tr></thead><tbody id="analysis-dupes"><tr><td colspan="3" class="empty-cell">Run analysis…</td></tr></tbody></table></div>
     </div>
   </section>
 
-  <section class="storage-panel" data-panel="files">
+  <section class="storage-panel" id="panel-files" data-panel="files" role="tabpanel" aria-labelledby="tab-files">
     <div class="dash-toolbar storage-subbar">
       <div class="dash-status"><strong>File Manager</strong><span id="file-mode-note"></span></div>
       <div class="dash-controls storage-action-row">
@@ -69,7 +69,7 @@
         <button class="btn secondary compact" data-action="move">Move</button>
         <button class="btn secondary compact" data-action="rename">Rename</button>
         <button class="btn danger compact" data-action="delete">Trash</button>
-        <input id="storage-upload-input" type="file" multiple hidden>
+        <input id="storage-upload-input" type="file" multiple hidden aria-label="Upload files">
       </div>
       <div class="dash-controls storage-file-nav-row">
         <button class="btn secondary compact" data-jump="up">Up</button>
@@ -78,8 +78,9 @@
       </div>
     </div>
     <div class="storage-file-tools">
-      <input id="storage-search" class="storage-path-input" placeholder="Search/filter files…">
-      <label>per page <select id="storage-page-size" class="control-select"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
+      <input id="storage-search" class="storage-path-input" placeholder="Search/filter files…" aria-label="Search or filter files">
+      <label for="storage-page-size">per page</label>
+      <select id="storage-page-size" class="control-select"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
       <span id="storage-page-info" class="storage-page-info">—</span>
       <button class="btn secondary compact" id="storage-prev-page">Prev</button>
       <button class="btn secondary compact" id="storage-next-page">Next</button>
@@ -87,38 +88,38 @@
     <div id="storage-preview" class="storage-preview" hidden></div>
     <div class="table-card compact-table storage-file-card">
       <table class="apps-table compact-apps-table storage-table">
-        <thead><tr><th><input type="checkbox" id="storage-check-all"></th><th>Name</th><th>Type</th><th class="text-right">Size</th><th>Modified</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="storage-check-all" aria-label="Select all files"></th><th>Name</th><th>Type</th><th class="text-right">Size</th><th>Modified</th></tr></thead>
         <tbody id="storage-files-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
 
-  <section class="storage-panel" data-panel="settings">
+  <section class="storage-panel" id="panel-settings" data-panel="settings" role="tabpanel" aria-labelledby="tab-settings">
     <div class="settings-grid storage-settings-grid">
       <div class="settings-card">
-        <h3>Allowed roots</h3>
-        <textarea id="storage-allowed-roots" class="storage-textarea mono" rows="5"></textarea>
+        <h3>Allowed Roots</h3>
+        <textarea id="storage-allowed-roots" class="storage-textarea mono" rows="5" aria-label="Allowed roots list"></textarea>
         <p class="muted-small">One path per line. Actions never escape these roots. Public Cloudflare access stays read-only.</p>
       </div>
       <div class="settings-card">
         <h3>Safety</h3>
         <label class="toggle-row"><input type="checkbox" id="storage-action-password-required"> Require password for major actions</label>
-        <label class="field-row">Action password <input id="storage-action-password" class="control-input" type="password" placeholder="set/change"></label>
+        <label class="field-row" for="storage-action-password">Action password <input id="storage-action-password" class="control-input" type="password" placeholder="set/change"></label>
         <p class="muted-small" id="storage-password-state">Password not set</p>
         <label class="toggle-row"><input type="checkbox" id="storage-public-readonly" checked> Public/tunnel read-only</label>
         <label class="toggle-row"><input type="checkbox" id="storage-trash-enabled" checked> Delete to trash first</label>
         <label class="toggle-row"><input type="checkbox" id="storage-no-right-click"> Disable right-click on Storage page</label>
-        <label class="field-row">Analysis max files <input id="storage-max-scan" class="control-input" type="number" min="100" max="200000" step="100" value="20000"></label>
-        <button class="btn compact" id="storage-save-settings">Save Storage settings</button>
+        <label class="field-row" for="storage-max-scan">Analysis max files <input id="storage-max-scan" class="control-input" type="number" min="100" max="200000" step="100" value="20000"></label>
+        <button class="btn compact" id="storage-save-settings">Save Storage Settings</button>
         <div id="storage-save-result" class="save-result"></div>
       </div>
     </div>
   </section>
 
-  <section class="storage-panel" data-panel="ops">
+  <section class="storage-panel" id="panel-ops" data-panel="ops" role="tabpanel" aria-labelledby="tab-ops">
     <div class="storage-grid-2">
       <div class="table-card compact-table"><div class="apps-card-head"><h3>Trash / Restore</h3><button class="btn secondary compact" id="trash-refresh">Refresh</button></div><table class="apps-table compact-apps-table"><thead><tr><th>Name</th><th>Type</th><th class="text-right">Size</th><th></th></tr></thead><tbody id="storage-trash-body"><tr><td colspan="4" class="empty-cell">No trash data</td></tr></tbody></table></div>
-      <div class="table-card compact-table"><div class="apps-card-head"><h3>Recent file operations</h3><div class="dash-controls"><button class="btn secondary compact" id="ops-export">Export</button><button class="btn danger compact" id="ops-clear">Clear</button><button class="btn secondary compact" id="ops-refresh">Refresh</button></div></div><table class="apps-table compact-apps-table"><thead><tr><th>Time</th><th>Action</th><th>Path</th><th>Result</th></tr></thead><tbody id="storage-ops-body"><tr><td colspan="4" class="empty-cell">No operations yet</td></tr></tbody></table></div>
+      <div class="table-card compact-table"><div class="apps-card-head"><h3>Recent File Operations</h3><div class="dash-controls"><button class="btn secondary compact" id="ops-export">Export</button><button class="btn danger compact" id="ops-clear">Clear</button><button class="btn secondary compact" id="ops-refresh">Refresh</button></div></div><table class="apps-table compact-apps-table"><thead><tr><th>Time</th><th>Action</th><th>Path</th><th>Result</th></tr></thead><tbody id="storage-ops-body"><tr><td colspan="4" class="empty-cell">No operations yet</td></tr></tbody></table></div>
     </div>
   </section>
   <div id="storage-context-menu" class="storage-context-menu" hidden>
@@ -141,7 +142,7 @@ function fmtBytes(n){if(n===null||n===undefined||n==='') return '—'; n=Number(
 function short(p){p=String(p||''); return p.length>54?'…'+p.slice(-53):p;}
 function renderBreadcrumbs(){const box=$('#storage-breadcrumbs'); if(!box)return; const p=String(st.path||'/'); const parts=p.split('/').filter(Boolean); let acc=''; const chips=[`<button data-crumb="/">/</button>`]; parts.forEach(part=>{acc+='/'+part; chips.push(`<button data-crumb="${esc(acc)}">${esc(part)}</button>`)}); box.innerHTML=chips.join('<span>/</span>');}
 async function api(url,opt){const r=await fetch(url,Object.assign({cache:'no-store'},opt||{})); const j=await r.json().catch(()=>({ok:false,error:'bad json'})); if(!r.ok||j.ok===false) throw new Error(j.error||('HTTP '+r.status)); return j;}
-function setTab(t){st.tab=t; $$('.storage-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t)); $$('.storage-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===t)); if(t==='ops'){loadOps(); loadTrash();}}
+function setTab(t){st.tab=t; $$('.storage-tab').forEach(b=>{const act=b.dataset.tab===t; b.classList.toggle('active',act); b.setAttribute('aria-selected', act?'true':'false');}); $$('.storage-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===t)); if(t==='ops'){loadOps(); loadTrash();}}
 function selected(){return $$('.storage-row-check:checked').map(x=>x.value);}
 function fileTone(r){if(r.type==='dir')return 'dir'; const ext=String(r.name||'').split('.').pop().toLowerCase(); if(['mp4','mkv','webm','avi','mov'].includes(ext))return 'video'; if(['jpg','jpeg','png','webp','gif','svg'].includes(ext))return 'image'; if(['pdf','doc','docx','md','txt'].includes(ext))return 'doc'; if(['zip','rar','7z','tar','gz'].includes(ext))return 'archive'; return 'file';}
 function rowName(r){const tone=fileTone(r); const icon=r.type==='dir'?'📁':r.type==='symlink'?'🔗':tone==='video'?'🎞️':tone==='image'?'🖼️':tone==='doc'?'📘':tone==='archive'?'🗜️':'📄'; return `<button class="storage-name-btn storage-tone-${tone}" data-open="${esc(r.path)}" data-type="${esc(r.type)}">${icon} <span>${esc(r.name)}</span></button>`;}

@@ -16,11 +16,11 @@
         </select></div>
       <div class="speed-inline-field"><select id="speed-poll-select" class="control-select" aria-label="Poll interval">
           <option value="0">off</option>
-          <option value="15">15s</option>
-          <option value="30">30s</option>
-          <option value="60">60s</option>
-        </select></div>
-      <button class="btn secondary compact" id="speed-run-btn">Run speedtest</button>
+        <option value="15">15s</option>
+        <option value="30">30s</option>
+        <option value="60">60s</option>
+      </select></div>
+      <button class="btn secondary compact" id="speed-run-btn">Run Speedtest</button>
       <button class="btn secondary compact" id="speed-refresh-btn">Refresh</button>
     </div>
   </div>
@@ -35,10 +35,10 @@
           </div>
           <div class="speed-go-stack">
             <button class="speed-go-btn speed-go-panel" id="speed-go-btn" type="button" aria-label="Run speedtest">
-              <span class="speed-go-label-top">SERVER</span>
+              <span class="speed-go-label-top" id="speed-go-label-top">SERVER</span>
               <span class="speed-go-server" id="speed-live-target">MS Online · Dhaka, Bangladesh</span>
               <span class="speed-live-core" id="speed-live-core">GO</span>
-              <span class="speed-go-sub" id="speed-go-label-top">MS Online</span>
+              <span class="speed-go-sub" id="speed-go-sub">MS Online</span>
             </button>
             <button class="btn secondary compact speed-stop-btn" id="speed-stop-btn" type="button">Stop</button>
           </div>
@@ -89,37 +89,31 @@
       <div class="speed-schedule-form">
         <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-enabled-input"> <span>Enable scheduled speedtest</span></label>
         <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-notify-input"> <span>Notify on bad result</span></label>
-        <label>run every (min)
-          <input type="number" id="auto-interval-input" min="5" step="5">
-        </label>
-        <label>minimum DL
-          <input type="number" id="auto-min-dl-input" min="0" step="0.1">
-        </label>
-        <label>minimum UL
-          <input type="number" id="auto-min-ul-input" min="0" step="0.1">
-        </label>
-        <label>saved server id
-          <input type="text" id="ookla-server-id-input" placeholder="auto">
-        </label>
-        <label>status poll
-          <select id="speed-page-refresh-input" class="control-select">
-            <option value="0">off</option>
-            <option value="15">15s</option>
-            <option value="30">30s</option>
-            <option value="60">60s</option>
-          </select>
-        </label>
-        <label>history rows/page
-          <select id="history-page-size-input" class="control-select">
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
+        <label for="auto-interval-input">run every (min)</label>
+        <input type="number" id="auto-interval-input" min="5" step="5">
+        <label for="auto-min-dl-input">minimum DL</label>
+        <input type="number" id="auto-min-dl-input" min="0" step="0.1">
+        <label for="auto-min-ul-input">minimum UL</label>
+        <input type="number" id="auto-min-ul-input" min="0" step="0.1">
+        <label for="ookla-server-id-input">saved server id</label>
+        <input type="text" id="ookla-server-id-input" placeholder="auto">
+        <label for="speed-page-refresh-input">status poll</label>
+        <select id="speed-page-refresh-input" class="control-select">
+          <option value="0">off</option>
+          <option value="15">15s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
+        </select>
+        <label for="history-page-size-input">history rows/page</label>
+        <select id="history-page-size-input" class="control-select">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
       </div>
       <div class="speed-schedule-actions">
-        <button class="btn compact" id="speed-save-settings">Save + apply</button>
+        <button class="btn compact" id="speed-save-settings">Save & Apply</button>
         <span class="inline-help" id="speed-save-result">—</span>
       </div>
       <div class="speed-schedule-current" id="speed-schedule-current"></div>
@@ -129,32 +123,30 @@
 
   <div class="chart-card">
     <div class="chart-head">
-      <h3><strong>History chart</strong></h3>
+      <h3><strong>History Chart</strong></h3>
       <div class="chart-meta" id="speed-chart-meta"><span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span></div>
     </div>
-    <canvas id="speed-history-chart"></canvas>
+    <canvas id="speed-history-chart" role="img" aria-label="Speedtest history over time chart"></canvas>
   </div>
 
   <div class="table-card compact-table speed-history-card">
     <div class="speed-history-head">
       <h3><span>History</span><span class="network-mini" id="speed-history-meta">loading…</span></h3>
       <div class="dash-controls speed-history-controls">
-        <label>provider
-          <select id="speed-history-provider" class="control-select">
-            <option value="all">all</option>
-            <option value="ookla">ookla</option>
-            <option value="speedtest">legacy speedtest</option>
-          </select>
-        </label>
-        <label>type
-          <select id="speed-history-type" class="control-select">
-            <option value="all">all</option>
-            <option value="manual">manual</option>
-            <option value="auto">autorun</option>
-          </select>
-        </label>
-        <button class="btn secondary compact" id="speed-history-prev">‹</button>
-        <button class="btn secondary compact" id="speed-history-next">›</button>
+        <label for="speed-history-provider">provider</label>
+        <select id="speed-history-provider" class="control-select">
+          <option value="all">all</option>
+          <option value="ookla">ookla</option>
+          <option value="speedtest">legacy speedtest</option>
+        </select>
+        <label for="speed-history-type">type</label>
+        <select id="speed-history-type" class="control-select">
+          <option value="all">all</option>
+          <option value="manual">manual</option>
+          <option value="auto">autorun</option>
+        </select>
+        <button class="btn secondary compact" id="speed-history-prev" aria-label="Previous history page">‹</button>
+        <button class="btn secondary compact" id="speed-history-next" aria-label="Next history page">›</button>
       </div>
     </div>
     <table class="apps-table aligned-table compact-apps-table speed-history-table">
@@ -315,8 +307,10 @@ function ensureServerOption(id, label){
 function updateSelectedTargetDisplay(){
   const sel = document.getElementById('ookla-server-select');
   const txt = sel?.selectedOptions?.[0]?.textContent?.trim() || 'auto';
-  document.getElementById('speed-live-target').textContent = txt;
-  document.getElementById('speed-go-label-top').textContent = txt.split('·')[0].trim() || txt;
+  const targetEl = document.getElementById('speed-live-target');
+  if (targetEl) targetEl.textContent = txt;
+  const labelTopEl = document.getElementById('speed-go-label-top');
+  if (labelTopEl) labelTopEl.textContent = txt.split('·')[0].trim() || txt;
 }
 function renderScheduleSummary(sc){
   const box = document.getElementById('speed-schedule-current');
@@ -386,9 +380,12 @@ function applyLiveState(live){
   document.getElementById('speed-stop-btn').disabled = !live.running;
   document.getElementById('speed-run-btn').textContent = live.running ? 'Running…' : 'Run speedtest';
   if (live.target) {
-    document.getElementById('speed-live-target').textContent = live.target;
-    document.getElementById('speed-go-label-top').textContent = String(live.target).split('·')[0].trim();
-    document.getElementById('cur-server').textContent = live.target;
+    const targetEl = document.getElementById('speed-live-target');
+    if (targetEl) targetEl.textContent = live.target;
+    const labelTopEl = document.getElementById('speed-go-label-top');
+    if (labelTopEl) labelTopEl.textContent = String(live.target).split('·')[0].trim();
+    const curServer = document.getElementById('cur-server');
+    if (curServer) curServer.textContent = live.target;
   }
   if (live.ping_ms !== null && live.ping_ms !== undefined) document.getElementById('cur-ping').textContent = fmtMs(live.ping_ms);
   if (live.jitter_ms !== null && live.jitter_ms !== undefined) document.getElementById('cur-jitter').textContent = fmtMs(live.jitter_ms);
@@ -533,8 +530,10 @@ function applyServerPreset(id, label){
   document.getElementById('ookla-server-select').value = String(id);
   document.getElementById('ookla-server-id-input').value = String(id);
   document.querySelectorAll('.speed-preset-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.serverId === String(id)));
-  document.getElementById('speed-live-target').textContent = label || ('server ' + id);
-  document.getElementById('speed-go-label-top').textContent = String(label || ('server ' + id)).split('·')[0].trim();
+  const targetEl = document.getElementById('speed-live-target');
+  if (targetEl) targetEl.textContent = label || ('server ' + id);
+  const labelTopEl = document.getElementById('speed-go-label-top');
+  if (labelTopEl) labelTopEl.textContent = String(label || ('server ' + id)).split('·')[0].trim();
 }
 async function runOokla(){
   if (speedRunning) return;

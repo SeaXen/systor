@@ -24,10 +24,10 @@
 .auth-mini-grid{display:grid;grid-template-columns:128px minmax(0,1fr);gap:7px 10px;align-items:center}
 .auth-mini-grid .full{grid-column:1 / -1}
 .auth-stat-row{display:flex;gap:7px;flex-wrap:wrap}
-.settings-meta-chip{font-size:10px;padding:3px 8px;gap:4px;border-color:rgba(88,166,255,.28);background:rgba(23,32,45,.92)}
+.settings-meta-chip{font-size:11px;padding:3px 8px;gap:4px;border-color:rgba(88,166,255,.28);background:rgba(23,32,45,.92)}
 .settings-meta-chip .ico{font-size:11px;line-height:1}
 .settings-card .card-subtle{margin-top:-2px}
-.status-chip.mini-chip{padding:3px 8px;font-size:10px}
+.status-chip.mini-chip{padding:3px 8px;font-size:11px}
 #dirty-summary.ok{color:#9ae6b4;border-color:rgba(52,211,153,.32);background:rgba(10,44,33,.75)}
 #dirty-summary.warn{color:#ffd27d;border-color:rgba(245,158,11,.36);background:rgba(52,34,10,.78)}
 #dirty-summary.err{color:#ff9b9b;border-color:rgba(239,68,68,.36);background:rgba(52,18,18,.78)}
@@ -38,8 +38,9 @@
 .settings-inline-file input[type=file]{max-width:230px}
 .import-modal-backdrop{position:fixed;inset:0;background:rgba(5,8,13,.72);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
 .import-modal-backdrop.open{display:flex}
-.import-modal{width:min(520px,100%);background:linear-gradient(180deg,rgba(18,24,34,.98),rgba(10,14,21,.99));border:1px solid rgba(88,166,255,.28);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.45);padding:18px}
-.import-modal h3{margin:0 0 8px}
+.import-modal{width:min(520px,100%);background:#121822;color:var(--text-bright);border:1px solid rgba(88,166,255,.28);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.45);padding:18px}
+.import-modal h3{margin:0 0 8px;color:var(--text-bright)}
+.settings-page{color:var(--text)}
 .import-modal .modal-file{display:inline-flex;max-width:100%;padding:6px 10px;border-radius:999px;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.24);font-size:12px;color:var(--text-bright)}
 .import-modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
 @media (max-width:1100px){
@@ -57,9 +58,9 @@
 }
 @media (max-width:700px){
   .settings-tabs{gap:6px;overflow-x:auto;flex-wrap:nowrap}
-  .settings-tab-btn{padding:7px 9px;font-size:10px}
+  .settings-tab-btn{padding:7px 9px;font-size:11px}
   .auth-mini-grid{grid-template-columns:1fr}
-  .settings-meta-chip{font-size:9px;padding:3px 6px}
+  .settings-meta-chip{font-size:11px;padding:3px 6px}
   .settings-action-group{padding-left:0;border-left:0}
 }
 </style>
@@ -386,10 +387,10 @@
             <div class="notif-field-grid">
               <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
               <div class="inline-help">Leave token blank to keep the saved one. If the saved token was a masked placeholder, Telegram cannot work until you paste the full real bot token.</div>
-              <label>Bot token</label>
-              <input type="password" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF...{% endif %}" autocomplete="off">
-              <label>Chat ID</label>
-              <input type="text" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
+              <label for="tg-bot-token">Bot token</label>
+              <input type="password" id="tg-bot-token" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF…{% endif %}" autocomplete="off">
+              <label for="tg-chat-id">Chat ID</label>
+              <input type="text" id="tg-chat-id" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
             </div>
             <div class="kv-mini-grid">
               <div><span>Last error</span><code id="tg-last-error">—</code></div>
@@ -402,7 +403,7 @@
             </div>
           </div>
           <div class="settings-card">
-            <h3>Discord webhook</h3>
+            <h3>Discord Webhook</h3>
             <div class="status-row">
               <span class="status-chip {% if cfg.discord.enabled %}ok{% endif %}" id="dc-enabled-chip">{% if cfg.discord.enabled %}enabled{% else %}disabled{% endif %}</span>
               <span class="status-chip {% if cfg.discord.webhook_url %}ok{% else %}warn{% endif %}">{% if cfg.discord.webhook_url %}webhook saved{% else %}webhook missing{% endif %}</span>
@@ -411,8 +412,8 @@
             <div class="notif-field-grid">
               <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}> Enabled</label>
               <div class="inline-help">Leave webhook blank to keep the saved one.</div>
-              <label>Webhook URL</label>
-              <input type="password" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/...{% endif %}" autocomplete="off">
+              <label for="dc-webhook-url">Webhook URL</label>
+              <input type="password" id="dc-webhook-url" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/…{% endif %}" autocomplete="off">
             </div>
             <div class="kv-mini-grid">
               <div><span>Last error</span><code id="dc-last-error">—</code></div>
@@ -427,7 +428,7 @@
         </div>
         <div class="settings-panel-col">
           <div class="settings-card">
-            <h3>Notification history</h3>
+            <h3>Notification History</h3>
             <div class="card-subtle">Latest delivery results from both channels.</div>
             <div class="history-list" id="notify-history">
               <div class="history-item"><span class="text-muted">loading…</span></div>

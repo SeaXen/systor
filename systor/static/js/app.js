@@ -22,9 +22,9 @@ function bytes(n) {
   return n.toFixed(1) + ' ' + u[i];
 }
 
+const _timeFmt = new Intl.DateTimeFormat(undefined, {hour:'2-digit', minute:'2-digit', second:'2-digit'});
 function timeShort(ts) {
-  const d = new Date(ts * 1000);
-  return d.toLocaleTimeString();
+  return _timeFmt.format(new Date(ts * 1000));
 }
 
 function timeAgo(ts) {

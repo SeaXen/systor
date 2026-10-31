@@ -100,6 +100,7 @@ DEFAULT_CONFIG: dict = {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
         "host": "0.0.0.0",
         "port": 6677,
+        "trusted_proxies": "127.0.0.1, ::1",
     },
     "logging": {
         "level": "INFO",

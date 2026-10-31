@@ -41,6 +41,7 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+tests/screenshots/
 
 # OS files
 Thumbs.db

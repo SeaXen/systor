@@ -11,52 +11,46 @@
       <span id="net-coverage">usage history</span>
     </div>
     <div class="dash-controls">
-      <label>rate view
-        <select id="net-hours" class="control-select">
-          <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
-          <option value="0.5" {% if cfg.network.default_hours == 0.5 %}selected{% endif %}>30m</option>
-          <option value="1" {% if cfg.network.default_hours == 1 %}selected{% endif %}>1h</option>
-          <option value="6" {% if cfg.network.default_hours == 6 %}selected{% endif %}>6h</option>
-          <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
-          <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
-          <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
-          <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
-          <option value="2160" {% if cfg.network.default_hours == 2160 %}selected{% endif %}>90d</option>
-          <option value="8760" {% if cfg.network.default_hours == 8760 %}selected{% endif %}>1y</option>
-          <option value="87600" {% if cfg.network.default_hours == 87600 %}selected{% endif %}>all</option>
-        </select>
-      </label>
-      <label>usage view
-        <select id="net-granularity" class="control-select">
-          <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
-          <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
-          <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
-        </select>
-      </label>
-      <label>bar days
-        <select id="net-bar-days" class="control-select">
-          <option value="30">30d</option><option value="60">60d</option><option value="90">90d</option><option value="180">180d</option><option value="365">365d</option><option value="all">all</option>
-        </select>
-      </label>
-      <label>table days
-        <select id="net-table-days" class="control-select">
-          <option value="30">30d</option><option value="60">60d</option><option value="90">90d</option><option value="180">180d</option><option value="365">365d</option><option value="all">all</option>
-        </select>
-      </label>
-      <label>iface
-        <select id="net-iface-filter" class="control-select"><option value="all">all</option></select>
-      </label>
-      <label>refresh
-        <select id="net-refresh-sec" class="control-select">
-          <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
-          <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
-          <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
-          <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
-          <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
-          <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
-          <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
-        </select>
-      </label>
+      <label for="net-hours">rate view</label>
+      <select id="net-hours" class="control-select">
+        <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
+        <option value="0.5" {% if cfg.network.default_hours == 0.5 %}selected{% endif %}>30m</option>
+        <option value="1" {% if cfg.network.default_hours == 1 %}selected{% endif %}>1h</option>
+        <option value="6" {% if cfg.network.default_hours == 6 %}selected{% endif %}>6h</option>
+        <option value="24" {% if cfg.network.default_hours == 24 %}selected{% endif %}>24h</option>
+        <option value="72" {% if cfg.network.default_hours == 72 %}selected{% endif %}>3d</option>
+        <option value="168" {% if cfg.network.default_hours == 168 %}selected{% endif %}>7d</option>
+        <option value="720" {% if cfg.network.default_hours == 720 %}selected{% endif %}>30d</option>
+        <option value="2160" {% if cfg.network.default_hours == 2160 %}selected{% endif %}>90d</option>
+        <option value="8760" {% if cfg.network.default_hours == 8760 %}selected{% endif %}>1y</option>
+        <option value="87600" {% if cfg.network.default_hours == 87600 %}selected{% endif %}>all</option>
+      </select>
+      <label for="net-granularity">usage view</label>
+      <select id="net-granularity" class="control-select">
+        <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
+        <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
+        <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
+      </select>
+      <label for="net-bar-days">bar days</label>
+      <select id="net-bar-days" class="control-select">
+        <option value="30">30d</option><option value="60">60d</option><option value="90">90d</option><option value="180">180d</option><option value="365">365d</option><option value="all">all</option>
+      </select>
+      <label for="net-table-days">table days</label>
+      <select id="net-table-days" class="control-select">
+        <option value="30">30d</option><option value="60">60d</option><option value="90">90d</option><option value="180">180d</option><option value="365">365d</option><option value="all">all</option>
+      </select>
+      <label for="net-iface-filter">iface</label>
+      <select id="net-iface-filter" class="control-select"><option value="all">all</option></select>
+      <label for="net-refresh-sec">refresh</label>
+      <select id="net-refresh-sec" class="control-select">
+        <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
+        <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
+        <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
+        <option value="10" {% if cfg.network.auto_refresh_sec == 10 %}selected{% endif %}>10s</option>
+        <option value="15" {% if cfg.network.auto_refresh_sec == 15 %}selected{% endif %}>15s</option>
+        <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
+        <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
+      </select>
       <label class="toggle-inline"><input type="checkbox" id="hide-virtual-toggle" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide docker/bridge/veth</label>
       <button class="btn secondary compact" id="net-refresh">Refresh</button>
     </div>
@@ -72,18 +66,18 @@
   </div>
 
   <div class="chart-card">
-    <div class="chart-head"><h3><strong>Usage totals by period</strong></h3><div class="chart-meta" id="meta-usage-bars"><span class="rx-text"><strong>DL —</strong></span> · <span class="tx-text"><strong>UL —</strong></span> · avg — · total —</div></div>
-    <canvas id="net-usage-chart"></canvas>
+    <div class="chart-head"><h3><strong>Usage Totals by Period</strong></h3><div class="chart-meta" id="meta-usage-bars"><span class="rx-text"><strong>DL —</strong></span> · <span class="tx-text"><strong>UL —</strong></span> · avg — · total —</div></div>
+    <canvas id="net-usage-chart" role="img" aria-label="Network usage totals by period chart"></canvas>
   </div>
 
   <div class="chart-grid">
-    <div class="chart-card"><div class="chart-head"><h3><strong>Download rate</strong></h3><div class="chart-meta" id="meta-rx-line"><span class="rx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-rx-chart"></canvas></div>
-    <div class="chart-card"><div class="chart-head"><h3><strong>Upload rate</strong></h3><div class="chart-meta" id="meta-tx-line"><span class="tx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-tx-chart"></canvas></div>
+    <div class="chart-card"><div class="chart-head"><h3><strong>Download Rate</strong></h3><div class="chart-meta" id="meta-rx-line"><span class="rx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-rx-chart" role="img" aria-label="Network download rate over time chart"></canvas></div>
+    <div class="chart-card"><div class="chart-head"><h3><strong>Upload Rate</strong></h3><div class="chart-meta" id="meta-tx-line"><span class="tx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-tx-chart" role="img" aria-label="Network upload rate over time chart"></canvas></div>
   </div>
 
   <div class="table-grid">
     <div class="table-card compact-table">
-      <h3><span>Per-interface breakdown</span><span class="network-mini" id="iface-title-meta">0 interfaces total</span></h3>
+      <h3><span>Per-Interface Breakdown</span><span class="network-mini" id="iface-title-meta">0 interfaces total</span></h3>
       <table class="network-table aligned-table">
         <thead>
           <tr><th>Interface <span class="text-muted" id="iface-period-note"></span></th><th class="text-right rx-text">DL total</th><th class="text-right tx-text">UL total</th><th class="text-right rx-text">Avg DL MB/s</th><th class="text-right tx-text">Avg UL MB/s</th></tr>
@@ -108,7 +102,7 @@
   <div class="table-grid">
     <div class="table-card compact-table">
       <div class="usage-table-head">
-        <h3><span>Monthly usage</span><span class="network-mini" id="monthly-title-meta">loading monthly</span></h3>
+        <h3><span>Monthly Usage</span><span class="network-mini" id="monthly-title-meta">loading monthly</span></h3>
         <div class="apps-pager" id="monthly-pager"></div>
       </div>
       <table class="network-table aligned-table">
@@ -120,7 +114,7 @@
     </div>
     <div class="table-card compact-table">
       <div class="usage-table-head">
-        <h3><span>Yearly usage</span><span class="network-mini" id="yearly-title-meta">loading yearly</span></h3>
+        <h3><span>Yearly Usage</span><span class="network-mini" id="yearly-title-meta">loading yearly</span></h3>
         <div class="apps-pager" id="yearly-pager"></div>
       </div>
       <table class="network-table aligned-table">
@@ -133,7 +127,7 @@
   </div>
 
   <div class="table-card compact-table">
-    <h3><span>Per-app network usage</span><span class="network-mini" id="app-net-meta">best for docker/live counters</span></h3>
+    <h3><span>Per-App Network Usage</span><span class="network-mini" id="app-net-meta">best for docker/live counters</span></h3>
     <table class="apps-table aligned-table compact-apps-table network-apps-table">
       <thead><tr><th>App</th><th>Kind</th><th class="text-right">Network</th><th class="text-right dl-text">DL</th><th class="text-right ul-text">UL</th></tr></thead>
       <tbody id="app-net-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>

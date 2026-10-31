@@ -14,47 +14,44 @@
     <span id="load-state">idle</span>
   </div>
   <div class="dash-controls">
-    <label>refresh
-      <select id="refresh-sec" class="control-select">
-        <option value="1000">1s</option>
-        <option value="3000">3s</option>
-        <option value="5000">5s</option>
-        <option value="10000">10s</option>
-        <option value="15000">15s</option>
-        <option value="30000">30s</option>
-        <option value="60000">1m</option>
-      </select>
-    </label>
-    <label>charts
-      <select id="chart-sec" class="control-select">
-        <option value="1000">1s</option>
-        <option value="3000">3s</option>
-        <option value="5000">5s</option>
-        <option value="10000">10s</option>
-        <option value="15000">15s</option>
-        <option value="30000">30s</option>
-        <option value="60000">1m</option>
-      </select>
-    </label>
-    <label>view
-      <select id="range-hours" class="control-select">
-        <option value="0.25">15m</option>
-        <option value="0.5">30m</option>
-        <option value="1">1h</option>
-        <option value="6">6h</option>
-        <option value="24">24h</option>
-        <option value="72">3d</option>
-        <option value="168">7d</option>
-        <option value="720">30d</option>
-        <option value="2160">90d</option>
-        <option value="8760">1y</option>
-        <option value="87600">all</option>
-      </select>
-    </label>
+    <label for="refresh-sec">refresh</label>
+    <select id="refresh-sec" class="control-select">
+      <option value="1000">1s</option>
+      <option value="3000">3s</option>
+      <option value="5000">5s</option>
+      <option value="10000">10s</option>
+      <option value="15000">15s</option>
+      <option value="30000">30s</option>
+      <option value="60000">1m</option>
+    </select>
+    <label for="chart-sec">charts</label>
+    <select id="chart-sec" class="control-select">
+      <option value="1000">1s</option>
+      <option value="3000">3s</option>
+      <option value="5000">5s</option>
+      <option value="10000">10s</option>
+      <option value="15000">15s</option>
+      <option value="30000">30s</option>
+      <option value="60000">1m</option>
+    </select>
+    <label for="range-hours">view</label>
+    <select id="range-hours" class="control-select">
+      <option value="0.25">15m</option>
+      <option value="0.5">30m</option>
+      <option value="1">1h</option>
+      <option value="6">6h</option>
+      <option value="24">24h</option>
+      <option value="72">3d</option>
+      <option value="168">7d</option>
+      <option value="720">30d</option>
+      <option value="2160">90d</option>
+      <option value="8760">1y</option>
+      <option value="87600">all</option>
+    </select>
     <button class="btn secondary compact" id="manual-refresh-btn">Refresh</button>
     {% if client_private %}
-    <button class="btn secondary compact" id="restart-collector-btn">Restart collector</button>
-    <button class="btn secondary compact" id="restart-web-btn">Restart web</button>
+    <button class="btn secondary compact" id="restart-collector-btn">Restart Collector</button>
+    <button class="btn secondary compact" id="restart-web-btn">Restart Web</button>
     {% endif %}
     <button class="btn secondary compact" id="pause-btn">Pause</button>
   </div>
@@ -103,27 +100,27 @@
 <div class="chart-grid chart-grid-6">
   <div class="chart-card">
     <div class="chart-head"><h3><strong>CPU usage</strong></h3><div class="chart-meta" id="meta-cpu-pct">latest — · peak —</div></div>
-    <canvas id="chart-cpu-pct"></canvas>
+    <canvas id="chart-cpu-pct" role="img" aria-label="CPU usage over time"></canvas>
   </div>
   <div class="chart-card">
     <div class="chart-head"><h3><strong>Temperature</strong></h3><div class="chart-meta" id="meta-temp">latest — · peak —</div></div>
-    <canvas id="chart-temp"></canvas>
+    <canvas id="chart-temp" role="img" aria-label="CPU temperature over time"></canvas>
   </div>
   <div class="chart-card">
     <div class="chart-head"><h3><strong>Memory used</strong></h3><div class="chart-meta" id="meta-mem">latest — · peak —</div></div>
-    <canvas id="chart-mem"></canvas>
+    <canvas id="chart-mem" role="img" aria-label="Memory usage over time"></canvas>
   </div>
   <div class="chart-card">
     <div class="chart-head"><h3><strong>Disk I/O</strong></h3><div class="chart-meta" id="meta-disk-io"><span class="rx-text"><strong>read —</strong></span> · <span class="tx-text"><strong>write —</strong></span></div></div>
-    <canvas id="chart-disk-io"></canvas>
+    <canvas id="chart-disk-io" role="img" aria-label="Disk read and write throughput over time"></canvas>
   </div>
   <div class="chart-card load-chart-card">
     <div class="chart-head"><h3><strong>CPU load</strong></h3><div class="chart-meta" id="meta-load">1m — · 5m — · 15m —</div></div>
-    <canvas id="chart-load"></canvas>
+    <canvas id="chart-load" role="img" aria-label="CPU load averages over time"></canvas>
   </div>
   <div class="chart-card">
     <div class="chart-head"><h3><strong>Network</strong></h3><div class="chart-meta" id="meta-net-chart"><span class="dl-text"><strong>DL —</strong></span> · <span class="ul-text"><strong>UL —</strong></span></div></div>
-    <canvas id="chart-net"></canvas>
+    <canvas id="chart-net" role="img" aria-label="Network download and upload rates over time"></canvas>
   </div>
 </div>
 

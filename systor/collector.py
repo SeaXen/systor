@@ -41,9 +41,21 @@ def _handle_hup(signum, _frame):
     _reload_requested = True
 
 
-signal.signal(signal.SIGTERM, _handle_term)
-signal.signal(signal.SIGINT, _handle_term)
-signal.signal(signal.SIGHUP, _handle_hup)
+if hasattr(signal, "SIGTERM"):
+    try:
+        signal.signal(signal.SIGTERM, _handle_term)
+    except Exception:
+        pass
+if hasattr(signal, "SIGINT"):
+    try:
+        signal.signal(signal.SIGINT, _handle_term)
+    except Exception:
+        pass
+if hasattr(signal, "SIGHUP"):
+    try:
+        signal.signal(signal.SIGHUP, _handle_hup)
+    except Exception:
+        pass
 
 
 # Per-metric state: how many consecutive samples above/below threshold, last alert time, in_alert flag
@@ -177,12 +189,24 @@ def run():
     except PermissionError:
         log.warning("cannot write to %s, logging to stdout only", log_file)
 
-    # Write a pidfile so the web UI can SIGHUP/SIGTERM us
-    try:
-        Path("/tmp/systor-collector.pid").write_text(str(os.getpid()))
-        log.info("collector: pidfile at /tmp/systor-collector.pid (pid %d)", os.getpid())
-    except OSError as e:
-        log.warning("could not write pidfile: %s", e)
+    # Write a pidfile so the web UI or system can manage us
+    pidfile_candidates = [
+        Path("/var/lib/systor/collector.pid"),
+        Path("/run/systor/collector.pid"),
+        Path("/tmp/systor-collector.pid"),
+    ]
+    active_pidfile = None
+    for p in pidfile_candidates:
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(str(os.getpid()))
+            active_pidfile = p
+            log.info("collector: pidfile at %s (pid %d)", p, os.getpid())
+            break
+        except OSError:
+            continue
+    if not active_pidfile:
+        log.warning("could not write pidfile to any candidate location")
 
     # Pre-warm process CPU% baseline so the first /api/top-processes call
     # has data (otherwise the first call always returns 0% for everything).
@@ -197,6 +221,14 @@ def run():
     last_retention_check = 0.0
     last_speedtest_check = 0.0
 
+    # Instantiate storage and notifier once outside the polling loop
+    storage = Storage(
+        db_path=DEFAULT_DB_PATH,
+        retention_days=cfg["collector"]["retention_days"],
+        rollup_retention_days=cfg["collector"]["rollup_retention_days"],
+    )
+    notifier = Notifier(cfg)
+
     log.info("collector: starting (poll=%ds)", cfg["collector"]["poll_interval_sec"])
     while _running:
         t0 = time.time()
@@ -210,6 +242,15 @@ def run():
                     if new_cfg != cfg:
                         # Reset sustained counters so old violations don't bleed
                         _metric_state.clear()
+                        # Re-create storage and notifier if settings changed
+                        if (new_cfg["collector"]["retention_days"] != cfg["collector"]["retention_days"]
+                                or new_cfg["collector"]["rollup_retention_days"] != cfg["collector"]["rollup_retention_days"]):
+                            storage = Storage(
+                                db_path=DEFAULT_DB_PATH,
+                                retention_days=new_cfg["collector"]["retention_days"],
+                                rollup_retention_days=new_cfg["collector"]["rollup_retention_days"],
+                            )
+                        notifier = Notifier(new_cfg)
                         log.info("collector: config reloaded from disk")
                     cfg = new_cfg
                     _reload_requested = False
@@ -219,12 +260,6 @@ def run():
 
             poll = cfg["collector"]["poll_interval_sec"]
             th = cfg["thresholds"]
-            storage = Storage(
-                db_path=DEFAULT_DB_PATH,
-                retention_days=cfg["collector"]["retention_days"],
-                rollup_retention_days=cfg["collector"]["rollup_retention_days"],
-            )
-            notifier = Notifier(cfg)
 
             snap = collect_snapshot()
             storage.insert_sample(snap)
@@ -312,10 +347,16 @@ def run():
             time.sleep(1)
 
     # Cleanup pidfile
-    try:
-        Path("/tmp/systor-collector.pid").unlink(missing_ok=True)
-    except OSError:
-        pass
+    if active_pidfile:
+        try:
+            active_pidfile.unlink(missing_ok=True)
+        except OSError:
+            pass
+    for p in pidfile_candidates:
+        try:
+            p.unlink(missing_ok=True)
+        except OSError:
+            pass
     log.info("collector: exiting")
 
 

@@ -6,7 +6,7 @@
   <div class="dash-status">
     <span class="dot green" id="alert-dot"></span>
     <strong>Alerts</strong>
-    <span id="alert-status">loading</span>
+    <span id="alert-status">Loading…</span>
   </div>
   <div class="dash-controls">
     <button class="btn secondary compact" id="refresh-alerts">Refresh</button>
@@ -17,7 +17,7 @@
   </div>
 </div>
 
-<div id="alert-flash"></div>
+<div id="alert-flash" role="alert" aria-live="polite"></div>
 
 <div class="table-card compact-table">
   <h3><span>Alert History</span><span class="text-muted">latest 200</span></h3>
@@ -40,7 +40,8 @@
 {% block scripts %}
 <script>
 const IS_PRIVATE = {{ 'true' if client_private else 'false' }};
-function timeShort(ts) { return new Date(ts * 1000).toLocaleTimeString(); }
+const _timeFmt = new Intl.DateTimeFormat(undefined, {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+function timeShort(ts) { return _timeFmt.format(new Date(ts * 1000)); }
 function timeAgo(ts) {
   const s = Math.floor(Date.now() / 1000 - ts);
   if (s < 60) return s + 's ago';

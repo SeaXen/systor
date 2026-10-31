@@ -3,21 +3,21 @@
 {% block content %}
 <style>
 .login-wrap{max-width:520px;margin:14px auto 0;}
-.login-shell{background:radial-gradient(circle at top right,rgba(88,166,255,.18),transparent 34%),linear-gradient(180deg,rgba(22,27,34,.92),rgba(13,17,23,.92));border:1px solid #2d3640;border-radius:16px;padding:18px 18px 16px;box-shadow:0 18px 48px rgba(0,0,0,.28)}
+.login-shell{background:#161b22;color:#c9d1d9;border:1px solid #2d3640;border-radius:16px;padding:18px 18px 16px;box-shadow:0 18px 48px rgba(0,0,0,.45)}
 .login-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
-.login-kicker{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid rgba(63,185,80,.28);background:rgba(63,185,80,.08);color:#8ae79d;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.login-kicker{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid rgba(63,185,80,.35);background:rgba(63,185,80,.12);color:#8ae79d;font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
 .login-shell h3{margin:8px 0 4px;font-size:22px;line-height:1.1;text-transform:none;letter-spacing:0;color:#f0f6fc}
-.login-sub{color:#97a6b5;font-size:13px;line-height:1.5;max-width:42ch}
+.login-sub{color:#c9d1d9;font-size:13px;line-height:1.5;max-width:42ch}
 .login-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:14px}
-.login-grid label{font-size:11px;font-weight:700;letter-spacing:.45px;text-transform:uppercase;color:#9fb0c1}
+.login-grid label{font-size:12px;font-weight:700;letter-spacing:.45px;text-transform:uppercase;color:#c9d1d9}
 .login-grid input{width:100%;background:#0b0f14;color:#f0f6fc;border:1px solid #2f3943;border-radius:12px;padding:11px 12px;font-size:14px}
-.login-grid input:focus{outline:none;border-color:rgba(88,166,255,.82);box-shadow:0 0 0 3px rgba(88,166,255,.16)}
+.login-grid input:focus-visible{outline:2px solid var(--blue);outline-offset:1px;border-color:rgba(88,166,255,.9);box-shadow:0 0 0 3px rgba(88,166,255,.16)}
 .login-error,.login-wait{margin-top:12px;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.45}
-.login-error{border:1px solid rgba(248,81,73,.35);background:rgba(248,81,73,.08);color:#ffb4bf}
-.login-wait{border:1px solid rgba(210,153,34,.35);background:rgba(210,153,34,.08);color:#ffd38c}
+.login-error{border:1px solid rgba(248,81,73,.35);background:rgba(248,81,73,.14);color:#ffb4bf}
+.login-wait{border:1px solid rgba(210,153,34,.35);background:rgba(210,153,34,.14);color:#ffd38c}
 .login-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:14px}
 .login-actions .btn{min-width:112px}
-.login-note{margin-top:10px;color:#7f8c99;font-size:11px}
+.login-note{margin-top:10px;color:#8b949e;font-size:12px}
 @media (max-width:700px){.login-wrap{margin-top:8px}.login-shell{padding:14px 12px 12px;border-radius:14px}.login-shell h3{font-size:19px}.login-actions{display:grid;grid-template-columns:1fr 1fr}.login-actions .btn{min-width:0;width:100%}}
 </style>
 <div class="login-wrap">
@@ -25,23 +25,23 @@
     <div class="login-top">
       <div>
         <div class="login-kicker">🔒 auth enabled</div>
-        <h3>Admin login</h3>
+        <h3>Admin Login</h3>
         <div class="login-sub">Single-admin access for private Systor pages. Public read-only dashboard rules stay separate.</div>
       </div>
       <span class="status-chip ok">1 user</span>
     </div>
     {% if error %}
-    <div class="login-error">{{ error }}</div>
+    <div class="login-error" role="alert" aria-live="polite">{{ error }}</div>
     {% endif %}
     {% if wait_sec and wait_sec > 0 %}
-    <div class="login-wait">Cooldown active. Try again in {{ wait_sec }}s.</div>
+    <div class="login-wait" role="alert" aria-live="polite">Cooldown active. Try again in {{ wait_sec }}s.</div>
     {% endif %}
     <form method="post" class="login-grid">
       <input type="hidden" name="next" value="{{ next_url or '/' }}">
-      <label>Username</label>
-      <input type="text" name="username" value="{{ auth_username or 'admin' }}" autocomplete="username" required>
-      <label>Password</label>
-      <input type="password" name="password" value="" autocomplete="current-password" required>
+      <label for="login-username">Username</label>
+      <input type="text" id="login-username" name="username" value="{{ auth_username or 'admin' }}" autocomplete="username" spellcheck="false" required>
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" name="password" value="" autocomplete="current-password" required>
       <div class="login-actions">
         <button type="submit" class="btn compact">Login</button>
         <a href="/" class="btn secondary compact">Back</a>

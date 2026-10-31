@@ -7,7 +7,7 @@ StartLimitIntervalSec=120
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -m systor serve collector
+ExecStart=/opt/systor/venv/bin/python3 -m systor serve collector
 WorkingDirectory=/opt/systor
 Restart=always
 RestartSec=10

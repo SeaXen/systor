@@ -7,7 +7,7 @@ StartLimitIntervalSec=120
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -m systor serve web
+ExecStart=/opt/systor/venv/bin/python3 -m systor serve web
 WorkingDirectory=/opt/systor
 Restart=always
 RestartSec=10

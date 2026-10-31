@@ -81,7 +81,15 @@ Private access keeps the full surface:
 - notification configuration
 - admin APIs
 
-That makes it reasonable to publish a public dashboard through a Cloudflare tunnel while keeping admin operations local.
+### Strict Reverse Proxy Security (`trusted_proxies`)
+To prevent public clients from forging `X-Forwarded-For` headers to gain unauthorized admin access, `systor` enforces a `trusted_proxies` configuration (default: `127.0.0.1, ::1`). Headers from unverified public connections are rejected, and only requests passing through explicitly trusted reverse proxies (e.g. local Nginx, Caddy, or Cloudflare Tunnel) are evaluated for upstream client IP.
+
+```yaml
+web:
+  host: "0.0.0.0"
+  port: 6677
+  trusted_proxies: "127.0.0.1, ::1"  # Subnets supported, e.g. "10.0.0.0/8, 172.16.0.0/12"
+```
 
 ---
 
@@ -116,9 +124,10 @@ Default bind:
 
 The installer:
 - copies the app to `/opt/systor`
-- writes config to `/etc/systor/config.yaml`
+- creates an isolated virtualenv in `/opt/systor/venv` (zero system Python pollution, PEP 668 compliant)
+- symlinks `/opt/systor/venv/bin/systor` to `/usr/local/bin/systor` for CLI availability
+- writes default config to `/etc/systor/config.yaml`
 - writes secrets env file to `/etc/systor/systor.env`
-- installs Python dependencies from `requirements.txt`
 - installs and enables `systor-web.service` and `systor-collector.service`
 - creates `/var/log/systor/` and `/var/lib/systor/`
 
@@ -127,9 +136,8 @@ The installer:
 ## Requirements
 
 - Linux
-- Python `3.9+`
+- Python `3.9+` (with `python3-venv`)
 - `systemd`
-- `pip3`
 
 Optional but useful:
 - `speedtest` (official Ookla CLI) for WAN tests
@@ -139,14 +147,24 @@ Optional but useful:
 
 ---
 
-## Services
+## Services & CLI Control
 
+`systor` provides both an interactive command line interface and systemd background services.
+
+### CLI Commands (`systor`)
+```bash
+systor status       # View live service statuses, PID, and port
+systor snapshot     # Take and display an instantaneous metric snapshot
+systor config       # Inspect active configuration
+systor serve web    # Run web dashboard in foreground
+systor serve collector # Run metric collector in foreground
+```
+
+### System Services
 | Service | Purpose | Default |
 |---|---|---|
 | `systor-collector` | metric sampling + alert evaluation | enabled on boot |
 | `systor-web` | dashboard and admin UI | enabled on boot |
-
-Useful commands:
 
 ```bash
 systemctl status systor-web

@@ -360,7 +360,12 @@ def read_top_processes(n: int = 10, by: str = "cpu") -> list[dict]:
     Cost: O(num_procs) syscalls. For 250 procs ~5ms.
     """
     global _prev_proc, _last_proc_scan_ts
-    clk_tck = os.sysconf("SC_CLK_TCK") or 100
+    clk_tck = 100
+    if hasattr(os, "sysconf"):
+        try:
+            clk_tck = os.sysconf("SC_CLK_TCK") or 100
+        except Exception:
+            clk_tck = 100
     now = time.time()
     elapsed = now - _last_proc_scan_ts if _last_proc_scan_ts else None
     _last_proc_scan_ts = now
