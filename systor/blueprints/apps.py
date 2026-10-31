@@ -95,3 +95,46 @@ def api_apps():
             "docker_count": len(docker_rows),
         }
     })
+
+
+# --- Systemd Service Management Endpoints ---
+@apps_bp.route("/api/apps/systemd", methods=["GET"])
+def api_systemd_list():
+    from ..services.systemd_service import list_systemd_services
+    data = list_systemd_services()
+    return jsonify({"ok": True, **data})
+
+
+@apps_bp.route("/api/apps/systemd/<path:unit>/restart", methods=["POST"])
+def api_systemd_restart(unit: str):
+    from .common import client_private, auth_enabled, auth_logged_in, get_storage
+    from ..security import get_client_ip, parse_trusted_proxies
+    from ..config import load_config
+    if not client_private():
+        return jsonify({"ok": False, "error": "Systemd service control is private LAN only"}), 403
+    if auth_enabled() and not auth_logged_in():
+        return jsonify({"ok": False, "error": "Admin login required to control services"}), 401
+
+    cfg = load_config()
+    trusted = parse_trusted_proxies(cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1"))
+    client_ip = get_client_ip(request, trusted)
+    from flask import session
+    user = session.get("systor_user", "admin")
+
+    from ..services.systemd_service import restart_systemd_service
+    storage = get_storage()
+    ok, msg = restart_systemd_service(unit, user, client_ip, storage)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": msg, "unit": unit}), status
+
+
+@apps_bp.route("/api/apps/systemd/audit", methods=["GET"])
+def api_systemd_audit():
+    from .common import get_storage
+    try:
+        limit = max(1, min(200, int(request.args.get("limit", 50))))
+    except (ValueError, TypeError):
+        limit = 50
+    rows = get_storage().recent_systemd_actions(limit=limit)
+    return jsonify({"ok": True, "actions": rows, "count": len(rows)})
+

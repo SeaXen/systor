@@ -573,6 +573,26 @@
               <span class="inline-help" id="import-file-name">No import file selected.</span>
             </div>
           </div>
+
+          <div class="settings-card">
+            <h3>Disaster recovery &amp; full backup</h3>
+            <div class="card-subtle">Atomic snapshot of your SQLite history, configuration files, and system settings bundled into an integrity-checked .tar.gz archive.</div>
+            <div class="settings-tool-row" style="margin-top:0.75rem;">
+              <a href="/api/backup/export" class="btn compact" download style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                <span>💾</span><span>Export full system archive (.tar.gz)</span>
+              </a>
+            </div>
+            <div class="card-subtle" style="margin-top:1rem;">Restore from archive:</div>
+            <div class="settings-tool-row">
+              <label for="restore-archive-file" class="btn secondary compact" style="cursor:pointer;">Choose archive…</label>
+              <input type="file" id="restore-archive-file" accept=".tar.gz,.tgz" style="display:none;">
+              <span class="inline-help" id="restore-file-name">No archive selected.</span>
+              <button type="button" class="btn compact" id="restore-archive-btn" style="display:none;background:#b91c1c;border-color:#ef4444;">Restore archive</button>
+            </div>
+            <div class="card-subtle" style="font-size:0.78rem;margin-top:0.4rem;color:var(--text-dim);">
+              Restores automatically perform a pre-flight integrity check and create a safe rollback backup before applying.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1071,6 +1091,48 @@ Array.from(document.querySelectorAll('#settings-form input, #settings-form selec
   el.addEventListener('change', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); updateDirtyState(); });
   el.addEventListener('input', () => { setSaveState('unsaved', 'warn'); updateAuthSummaryChip(); updateDirtyState(); });
 });
+
+// Disaster recovery full archive restore handler
+const restoreFileEl = document.getElementById('restore-archive-file');
+const restoreNameEl = document.getElementById('restore-file-name');
+const restoreBtnEl = document.getElementById('restore-archive-btn');
+if (restoreFileEl && restoreBtnEl) {
+  restoreFileEl.addEventListener('change', () => {
+    const f = restoreFileEl.files && restoreFileEl.files[0];
+    if (f) {
+      restoreNameEl.textContent = `${f.name} (${(f.size / 1024).toFixed(1)} KB)`;
+      restoreBtnEl.style.display = 'inline-flex';
+    } else {
+      restoreNameEl.textContent = 'No archive selected.';
+      restoreBtnEl.style.display = 'none';
+    }
+  });
+
+  restoreBtnEl.addEventListener('click', async () => {
+    const f = restoreFileEl.files && restoreFileEl.files[0];
+    if (!f) return;
+    if (!confirm(`Restore system from archive "${f.name}"?\n\nThis will restore your SQLite database and configuration settings. A safe pre-restore rollback snapshot will be taken first.`)) return;
+    restoreBtnEl.disabled = true;
+    restoreBtnEl.textContent = 'Restoring…';
+    try {
+      const fd = new FormData();
+      fd.append('backup', f);
+      const res = await fetch('/api/backup/restore', {
+        method: 'POST',
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Restore failed');
+      showFlash('ok', data.message || 'System restored successfully! Reloading in 2s...', 10000);
+      setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+      showFlash('err', 'Restore failed: ' + e.message);
+      restoreBtnEl.disabled = false;
+      restoreBtnEl.textContent = 'Restore archive';
+    }
+  });
+}
+
 initSettingsTabs();
 captureInitialState();
 syncPresetSliders();

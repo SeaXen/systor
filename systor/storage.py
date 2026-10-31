@@ -90,14 +90,50 @@ CREATE TABLE IF NOT EXISTS speedtests (
 );
 CREATE INDEX IF NOT EXISTS idx_speedtests_ts ON speedtests(ts);
 CREATE INDEX IF NOT EXISTS idx_speedtests_provider_ts ON speedtests(provider, ts);
+
+CREATE TABLE IF NOT EXISTS uptime_targets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    method TEXT NOT NULL DEFAULT 'GET',
+    expected_status INTEGER NOT NULL DEFAULT 200,
+    interval_sec INTEGER NOT NULL DEFAULT 60,
+    timeout_sec REAL NOT NULL DEFAULT 5.0,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS uptime_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_id INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    status_code INTEGER,
+    latency_ms REAL,
+    ok INTEGER NOT NULL,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_uptime_checks_target_ts ON uptime_checks(target_id, ts);
+
+CREATE TABLE IF NOT EXISTS systemd_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts INTEGER NOT NULL,
+    unit TEXT NOT NULL,
+    action TEXT NOT NULL,
+    user TEXT,
+    ip TEXT,
+    success INTEGER NOT NULL,
+    message TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_systemd_audit_ts ON systemd_audit_log(ts);
 """
+
 
 
 class Storage:
     """Thread-safe SQLite wrapper. Auto-creates schema and applies retention."""
 
-    def __init__(self, db_path: Path = DEFAULT_DB_PATH, retention_days: int = 7, rollup_retention_days: int = 90):
-        self.db_path = db_path
+    def __init__(self, db_path: Path | str = DEFAULT_DB_PATH, retention_days: int = 7, rollup_retention_days: int = 90):
+        self.db_path = Path(db_path)
         self.retention_days = retention_days
         self.rollup_retention_days = rollup_retention_days
         self._lock = threading.Lock()
@@ -364,18 +400,134 @@ class Storage:
             r3 = c.execute("DELETE FROM alerts WHERE ts < ?", (raw_cutoff,)).rowcount
             r4 = c.execute("DELETE FROM notification_log WHERE ts < ?", (raw_cutoff,)).rowcount
             r5 = c.execute("DELETE FROM speedtests WHERE ts < ?", (raw_cutoff,)).rowcount
+            r6 = c.execute("DELETE FROM uptime_checks WHERE ts < ?", (raw_cutoff,)).rowcount
+            r7 = c.execute("DELETE FROM systemd_audit_log WHERE ts < ?", (raw_cutoff,)).rowcount
             c.execute("VACUUM")
-        return r1 + r3 + r4 + r5, r2
+        return r1 + r3 + r4 + r5 + r6 + r7, r2
 
     def stats(self) -> dict:
         with self._lock, self._conn() as c:
             return {
-                "samples":       c.execute("SELECT COUNT(*) FROM samples").fetchone()[0],
-                "rollups":       c.execute("SELECT COUNT(*) FROM rollups_5m").fetchone()[0],
-                "alerts":        c.execute("SELECT COUNT(*) FROM alerts").fetchone()[0],
-                "notifications": c.execute("SELECT COUNT(*) FROM notification_log").fetchone()[0],
-                "speedtests":    c.execute("SELECT COUNT(*) FROM speedtests").fetchone()[0],
+                "samples":          c.execute("SELECT COUNT(*) FROM samples").fetchone()[0],
+                "rollups":          c.execute("SELECT COUNT(*) FROM rollups_5m").fetchone()[0],
+                "alerts":           c.execute("SELECT COUNT(*) FROM alerts").fetchone()[0],
+                "notifications":    c.execute("SELECT COUNT(*) FROM notification_log").fetchone()[0],
+                "speedtests":       c.execute("SELECT COUNT(*) FROM speedtests").fetchone()[0],
+                "uptime_targets":   c.execute("SELECT COUNT(*) FROM uptime_targets").fetchone()[0],
+                "uptime_checks":    c.execute("SELECT COUNT(*) FROM uptime_checks").fetchone()[0],
                 "oldest_sample_ts": c.execute("SELECT MIN(ts) FROM samples").fetchone()[0],
                 "newest_sample_ts": c.execute("SELECT MAX(ts) FROM samples").fetchone()[0],
-                "db_size_bytes": self.db_path.stat().st_size if self.db_path.exists() else 0,
+                "db_size_bytes":    self.db_path.stat().st_size if self.db_path.exists() else 0,
             }
+
+    # --- Uptime Target & Check Management ---
+    def list_uptime_targets(self, enabled_only: bool = False) -> list[dict]:
+        with self._lock, self._conn() as c:
+            clause = " WHERE enabled = 1" if enabled_only else ""
+            rows = c.execute(f"SELECT * FROM uptime_targets{clause} ORDER BY name COLLATE NOCASE").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_uptime_target(self, target_id: int) -> dict | None:
+        with self._lock, self._conn() as c:
+            row = c.execute("SELECT * FROM uptime_targets WHERE id = ?", (target_id,)).fetchone()
+        return dict(row) if row else None
+
+    def add_uptime_target(self, name: str, url: str, method: str = "GET", expected_status: int = 200,
+                          interval_sec: int = 60, timeout_sec: float = 5.0) -> int:
+        with self._lock, self._conn() as c:
+            cur = c.execute(
+                """INSERT INTO uptime_targets (name, url, method, expected_status, interval_sec, timeout_sec, enabled, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, 1, ?)""",
+                (name.strip(), url.strip(), method.strip().upper(), expected_status, max(10, interval_sec), max(1.0, timeout_sec), int(time.time())),
+            )
+            return int(cur.lastrowid)
+
+    def update_uptime_target(self, target_id: int, name: str, url: str, method: str = "GET",
+                             expected_status: int = 200, interval_sec: int = 60, timeout_sec: float = 5.0,
+                             enabled: bool = True) -> bool:
+        with self._lock, self._conn() as c:
+            cur = c.execute(
+                """UPDATE uptime_targets
+                   SET name = ?, url = ?, method = ?, expected_status = ?, interval_sec = ?, timeout_sec = ?, enabled = ?
+                   WHERE id = ?""",
+                (name.strip(), url.strip(), method.strip().upper(), expected_status, max(10, interval_sec), max(1.0, timeout_sec), 1 if enabled else 0, target_id),
+            )
+            return cur.rowcount > 0
+
+    def delete_uptime_target(self, target_id: int) -> bool:
+        with self._lock, self._conn() as c:
+            c.execute("DELETE FROM uptime_checks WHERE target_id = ?", (target_id,))
+            cur = c.execute("DELETE FROM uptime_targets WHERE id = ?", (target_id,))
+            return cur.rowcount > 0
+
+    def record_uptime_check(self, target_id: int, status_code: int | None, latency_ms: float | None, ok: bool, error: str | None = None) -> None:
+        with self._lock, self._conn() as c:
+            c.execute(
+                """INSERT INTO uptime_checks (target_id, ts, status_code, latency_ms, ok, error)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (target_id, int(time.time()), status_code, latency_ms, 1 if ok else 0, error or ""),
+            )
+
+    def get_uptime_summary(self, hours: int = 24) -> list[dict]:
+        """Return targets combined with their latest check, 24h uptime %, and avg latency."""
+        cutoff = int(time.time()) - hours * 3600
+        targets = self.list_uptime_targets()
+        out: list[dict] = []
+        with self._lock, self._conn() as c:
+            for t in targets:
+                tid = t["id"]
+                last_check = c.execute(
+                    "SELECT * FROM uptime_checks WHERE target_id = ? ORDER BY ts DESC LIMIT 1",
+                    (tid,),
+                ).fetchone()
+                stats = c.execute(
+                    """SELECT COUNT(*) as total, SUM(ok) as ok_cnt, AVG(latency_ms) as avg_lat
+                       FROM uptime_checks WHERE target_id = ? AND ts >= ?""",
+                    (tid, cutoff),
+                ).fetchone()
+                total = stats["total"] or 0
+                ok_cnt = stats["ok_cnt"] or 0
+                uptime_pct = round(100.0 * ok_cnt / total, 1) if total > 0 else 100.0
+                avg_lat = round(stats["avg_lat"] or 0.0, 1)
+                
+                recent_points = c.execute(
+                    "SELECT ts, ok, latency_ms FROM uptime_checks WHERE target_id = ? ORDER BY ts DESC LIMIT 30",
+                    (tid,)
+                ).fetchall()
+                spark = [{"ts": r["ts"], "ok": bool(r["ok"]), "lat": r["latency_ms"]} for r in reversed(recent_points)]
+
+                item = dict(t)
+                item["uptime_pct"] = uptime_pct
+                item["avg_latency_ms"] = avg_lat
+                item["total_checks"] = total
+                item["sparkline"] = spark
+                if last_check:
+                    item["last_check"] = {
+                        "ts": last_check["ts"],
+                        "status_code": last_check["status_code"],
+                        "latency_ms": last_check["latency_ms"],
+                        "ok": bool(last_check["ok"]),
+                        "error": last_check["error"],
+                    }
+                else:
+                    item["last_check"] = None
+                out.append(item)
+        return out
+
+    # --- Systemd Audit Logging ---
+    def log_systemd_action(self, unit: str, action: str, user: str, ip: str, success: bool, message: str) -> None:
+        with self._lock, self._conn() as c:
+            c.execute(
+                """INSERT INTO systemd_audit_log (ts, unit, action, user, ip, success, message)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (int(time.time()), unit, action, user, ip, 1 if success else 0, message),
+            )
+
+    def recent_systemd_actions(self, limit: int = 50) -> list[dict]:
+        with self._lock, self._conn() as c:
+            rows = c.execute(
+                "SELECT * FROM systemd_audit_log ORDER BY ts DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+

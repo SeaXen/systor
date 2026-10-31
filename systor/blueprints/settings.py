@@ -662,3 +662,43 @@ def logs_download():
         mimetype="text/plain",
         headers={"Content-Disposition": f'attachment; filename="{p.name}"'},
     )
+
+
+# --- Disaster Recovery & Backup Endpoints ---
+@settings_bp.route("/api/backup/export", methods=["GET"])
+def api_backup_export():
+    from .common import client_private, auth_enabled, auth_logged_in, get_storage
+    if not client_private():
+        return jsonify({"ok": False, "error": "Backup export is private LAN only"}), 403
+    if auth_enabled() and not auth_logged_in():
+        return jsonify({"ok": False, "error": "Admin login required for backup export"}), 401
+
+    from ..services.backup_service import create_backup_archive
+    storage = get_storage()
+    archive_bytes, filename = create_backup_archive(storage, custom_note=request.args.get("note", ""))
+    return Response(
+        archive_bytes,
+        mimetype="application/gzip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@settings_bp.route("/api/backup/restore", methods=["POST"])
+def api_backup_restore():
+    from .common import client_private, auth_enabled, auth_logged_in, get_storage
+    if not client_private():
+        return jsonify({"ok": False, "error": "Backup restore is private LAN only"}), 403
+    if auth_enabled() and not auth_logged_in():
+        return jsonify({"ok": False, "error": "Admin login required for backup restore"}), 401
+
+    file = request.files.get("backup_file")
+    if not file:
+        return jsonify({"ok": False, "error": "No backup archive file provided"}), 400
+
+    archive_bytes = file.read()
+    from ..services.backup_service import restore_backup_archive
+    storage = get_storage()
+    ok, msg = restore_backup_archive(archive_bytes, storage)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": msg}), status
+

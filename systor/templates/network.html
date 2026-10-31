@@ -131,10 +131,69 @@
     <table class="apps-table aligned-table compact-apps-table network-apps-table">
       <thead><tr><th>App</th><th>Kind</th><th class="text-right">Network</th><th class="text-right dl-text">DL</th><th class="text-right ul-text">UL</th></tr></thead>
       <tbody id="app-net-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
+  </div>
+
+  <div class="table-card compact-table" style="margin-top: 1rem;" id="uptime-wrap">
+    <div class="apps-card-head">
+      <h3><span>Service Uptime & Blackbox Health</span><span class="network-mini" id="uptime-meta">internal services & URLs</span></h3>
+      <div class="dash-controls">
+        <button class="btn secondary compact" id="uptime-check-btn">Check All Now</button>
+        <button class="btn compact" id="uptime-add-btn">+ Add Target</button>
+      </div>
+    </div>
+    <div id="uptime-add-form" class="uptime-form" style="display:none; padding: 0.75rem; background: var(--bg-panel-subtle, #141822); border-bottom: 1px solid var(--border, #222938); margin-bottom: 0.5rem;">
+      <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+        <input type="text" id="up-name" class="control-input" placeholder="Service Name (e.g. Plex)" style="width:180px;">
+        <input type="text" id="up-url" class="control-input" placeholder="http://192.168.1.50:32400" style="flex:1; min-width:220px;">
+        <input type="number" id="up-expected" class="control-input" placeholder="200" value="200" style="width:70px;">
+        <input type="number" id="up-interval" class="control-input" placeholder="60s" value="60" style="width:70px;">
+        <button class="btn ok compact" id="up-save-btn">Save</button>
+        <button class="btn secondary compact" id="up-cancel-btn">Cancel</button>
+      </div>
+    </div>
+    <table class="network-table aligned-table compact-apps-table">
+      <thead>
+        <tr>
+          <th>Service Name</th>
+          <th>URL / Host</th>
+          <th>Status</th>
+          <th>Latency</th>
+          <th class="text-right">24h Uptime</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody id="uptime-targets-body">
+        <tr><td colspan="6" class="empty-cell">Loading monitored services…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-card compact-table" style="margin-top: 1rem;" id="ssl-wrap">
+    <div class="apps-card-head">
+      <h3><span>SSL / TLS Certificate Expiry Tracker</span><span class="network-mini" id="ssl-meta">certificates & Let's Encrypt</span></h3>
+      <div class="dash-controls">
+        <input type="text" id="ssl-host-input" class="control-input compact" placeholder="Check domain (e.g. mydomain.com)" style="width:200px;">
+        <button class="btn secondary compact" id="ssl-check-btn">Check Cert</button>
+      </div>
+    </div>
+    <table class="network-table aligned-table compact-apps-table">
+      <thead>
+        <tr>
+          <th>Domain / Host</th>
+          <th>Issuer</th>
+          <th>Valid Until</th>
+          <th>Days Remaining</th>
+          <th class="text-right">Status</th>
+        </tr>
+      </thead>
+      <tbody id="ssl-certs-body">
+        <tr><td colspan="5" class="empty-cell">Scanning certificates…</td></tr>
+      </tbody>
     </table>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 const NCOL = { rx: '#22d3ee', tx: '#ff6b8a', grid: '#30363d', dim: '#8b949e', fillRx:'rgba(34,211,238,.18)', fillTx:'rgba(255,107,138,.18)' };
@@ -219,6 +278,180 @@ document.addEventListener('click', ev=>{ const btn=ev.target.closest('[data-usag
 document.getElementById('hide-virtual-toggle').addEventListener('change', ()=>{ localStorage.setItem('systor.network.hideVirtual', document.getElementById('hide-virtual-toggle').checked ? '1' : '0'); renderInterfaces(lastIfaceRows); });
 const storedHide=localStorage.getItem('systor.network.hideVirtual'); if(storedHide!==null) document.getElementById('hide-virtual-toggle').checked = storedHide==='1'; else document.getElementById('hide-virtual-toggle').checked = NET_DEFAULT_HIDE;
 document.getElementById('net-bar-days').value = String(DEFAULT_BAR_DAYS); document.getElementById('net-table-days').value = String(DEFAULT_TABLE_DAYS);
-document.getElementById('net-refresh').addEventListener('click', refreshAll); document.getElementById('net-hours').addEventListener('change', refreshAll); document.getElementById('net-granularity').addEventListener('change', refreshAll); document.getElementById('net-bar-days').addEventListener('change', refreshAll); document.getElementById('net-table-days').addEventListener('change', ()=>{ usageState.daily.page=1; usageState.monthly.page=1; usageState.yearly.page=1; refreshAll(); }); document.getElementById('net-iface-filter').addEventListener('change', ()=>{ usageState.daily.page=1; usageState.monthly.page=1; usageState.yearly.page=1; refreshAll(); }); document.getElementById('net-refresh-sec').addEventListener('change', resetRefreshTimer); refreshAll(); resetRefreshTimer(); window.addEventListener('resize', ()=>{ clearTimeout(window.__netResize); window.__netResize=setTimeout(()=>{ const nextDefault = window.innerWidth <= 760 ? '30' : '90'; if(['30','60','90','180','365','all'].includes(document.getElementById('net-bar-days').value) === false) document.getElementById('net-bar-days').value=nextDefault; },150); });
+document.getElementById('net-refresh').addEventListener('click', refreshAll); document.getElementById('net-hours').addEventListener('change', refreshAll); document.getElementById('net-granularity').addEventListener('change', refreshAll); document.getElementById('net-bar-days').addEventListener('change', refreshAll); document.getElementById('net-table-days').addEventListener('change', ()=>{ usageState.daily.page=1; usageState.monthly.page=1; usageState.yearly.page=1; refreshAll(); }); document.getElementById('net-iface-filter').addEventListener('change', ()=>{ usageState.daily.page=1; usageState.monthly.page=1; usageState.yearly.page=1; refreshAll(); }); document.getElementById('net-refresh-sec').addEventListener('change', resetRefreshTimer);
+
+// --- Feature 2: Service Uptime & Blackbox Health ---
+async function loadUptimeTargets(){
+  try {
+    const j = await fetchJSON('/api/uptime');
+    const targets = j.targets || [];
+    const meta = document.getElementById('uptime-meta');
+    if(meta) meta.textContent = `${targets.filter(t=>t.last_status==='up').length}/${targets.length} online`;
+    const body = document.getElementById('uptime-targets-body');
+    if(!body) return;
+    if(!targets.length){
+      body.innerHTML = '<tr><td colspan="6" class="empty-cell">No uptime targets configured yet. Click "Add Target" above.</td></tr>';
+      return;
+    }
+    body.innerHTML = targets.map(t => {
+      const stBadge = t.last_status === 'up'
+        ? '<span class="kind-pill docker" style="background:#052e16;color:#4ade80;">UP</span>'
+        : (t.last_status === 'down' ? '<span class="kind-pill alert" style="background:#450a0a;color:#f87171;">DOWN</span>' : '<span class="kind-pill host" style="background:#3b2d04;color:#fde047;">CHECKING</span>');
+      const latency = t.last_latency_ms != null ? Number(t.last_latency_ms).toFixed(1) + ' ms' : '—';
+      const up24 = t.uptime_24h != null ? Number(t.uptime_24h).toFixed(1) + '%' : '100.0%';
+      return `<tr>
+        <td><strong>${esc(t.name)}</strong></td>
+        <td class="mono" style="font-size:0.82rem;">${esc(t.target)}</td>
+        <td>${stBadge}</td>
+        <td class="mono">${latency}</td>
+        <td class="text-right mono"><strong>${up24}</strong></td>
+        <td class="text-right">
+          <button class="btn secondary compact" style="color:#ef4444;" onclick="deleteUptimeTarget(${t.id})">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    const body = document.getElementById('uptime-targets-body');
+    if(body) body.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:#ef4444;">Error loading uptime targets: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+window.deleteUptimeTarget = async function(id){
+  if(!confirm('Delete this monitored target?')) return;
+  try {
+    const r = await fetch(`/api/uptime/targets?id=${id}`, { method: 'DELETE' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    await loadUptimeTargets();
+  } catch(e){
+    alert('Failed to delete target: ' + e.message);
+  }
+};
+
+const upAddBtn = document.getElementById('uptime-add-btn');
+const upCard = document.getElementById('uptime-add-card');
+if(upAddBtn && upCard){
+  upAddBtn.addEventListener('click', () => {
+    upCard.style.display = upCard.style.display === 'none' ? 'block' : 'none';
+  });
+}
+const upCancelBtn = document.getElementById('up-cancel-btn');
+if(upCancelBtn && upCard){
+  upCancelBtn.addEventListener('click', () => { upCard.style.display = 'none'; });
+}
+const upSaveBtn = document.getElementById('up-save-btn');
+if(upSaveBtn){
+  upSaveBtn.addEventListener('click', async () => {
+    const name = document.getElementById('up-name').value.trim();
+    const target = document.getElementById('up-target').value.trim();
+    const check_type = document.getElementById('up-type').value;
+    const interval_sec = Number(document.getElementById('up-interval').value || 60);
+    const expected_status = Number(document.getElementById('up-status').value || 200);
+    if(!name || !target){
+      alert('Please provide both name and target URL/host');
+      return;
+    }
+    upSaveBtn.disabled = true;
+    try {
+      const res = await fetch('/api/uptime/targets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, target, check_type, interval_sec, expected_status })
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || 'Failed to add target');
+      document.getElementById('up-name').value = '';
+      document.getElementById('up-target').value = '';
+      if(upCard) upCard.style.display = 'none';
+      await loadUptimeTargets();
+    } catch(e){
+      alert(e.message);
+    } finally {
+      upSaveBtn.disabled = false;
+    }
+  });
+}
+
+const upCheckBtn = document.getElementById('uptime-check-btn');
+if(upCheckBtn){
+  upCheckBtn.addEventListener('click', async () => {
+    upCheckBtn.disabled = true;
+    upCheckBtn.textContent = 'Checking…';
+    try {
+      await fetch('/api/uptime/check-now', { method: 'POST' });
+      await loadUptimeTargets();
+    } catch(e){
+      console.error(e);
+    } finally {
+      upCheckBtn.disabled = false;
+      upCheckBtn.textContent = 'Check All Now';
+    }
+  });
+}
+
+// --- Feature 4: SSL / TLS Expiry Tracker ---
+async function loadSslCerts(extraHost){
+  try {
+    let url = '/api/ssl/certs';
+    if(extraHost) url += '?host=' + encodeURIComponent(extraHost);
+    const j = await fetchJSON(url);
+    const certs = j.certs || [];
+    const meta = document.getElementById('ssl-meta');
+    if(meta) meta.textContent = `${certs.length} certificates monitored`;
+    const body = document.getElementById('ssl-certs-body');
+    if(!body) return;
+    if(!certs.length){
+      body.innerHTML = '<tr><td colspan="5" class="empty-cell">No SSL/TLS certificates discovered yet. Enter a domain above to probe.</td></tr>';
+      return;
+    }
+    body.innerHTML = certs.map(c => {
+      let stBadge = '<span class="kind-pill docker" style="background:#052e16;color:#4ade80;">VALID</span>';
+      if(c.error){
+        stBadge = `<span class="kind-pill alert" style="background:#450a0a;color:#f87171;" title="${esc(c.error)}">ERROR</span>`;
+      } else if(c.is_expired){
+        stBadge = '<span class="kind-pill alert" style="background:#450a0a;color:#f87171;">EXPIRED</span>';
+      } else if(c.is_warning){
+        stBadge = '<span class="kind-pill host" style="background:#3b2d04;color:#fde047;">EXPIRING SOON</span>';
+      }
+      const days = c.days_remaining != null ? `${c.days_remaining} d` : '—';
+      const validUntil = c.valid_until ? new Date(c.valid_until).toLocaleDateString() : '—';
+      return `<tr>
+        <td><strong>${esc(c.domain)}</strong></td>
+        <td style="font-size:0.82rem;color:var(--text-dim);">${esc(c.issuer || 'Local / Auto')}</td>
+        <td class="mono">${validUntil}</td>
+        <td class="mono"><strong>${days}</strong></td>
+        <td class="text-right">${stBadge}</td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    const body = document.getElementById('ssl-certs-body');
+    if(body) body.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:#ef4444;">Error checking SSL certificates: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+const sslBtn = document.getElementById('ssl-check-btn');
+if(sslBtn){
+  sslBtn.addEventListener('click', async () => {
+    const input = document.getElementById('ssl-host-input');
+    const host = input ? input.value.trim() : '';
+    if(!host){
+      alert('Please enter a host or domain name to check');
+      return;
+    }
+    sslBtn.disabled = true;
+    sslBtn.textContent = 'Checking…';
+    try {
+      await loadSslCerts(host);
+    } finally {
+      sslBtn.disabled = false;
+      sslBtn.textContent = 'Check Cert';
+    }
+  });
+}
+
+refreshAll();
+loadUptimeTargets();
+loadSslCerts();
+resetRefreshTimer();
+window.addEventListener('resize', ()=>{ const nextDefault = window.innerWidth <= 760 ? '30' : '90'; if(['30','60','90','180','365','all'].includes(document.getElementById('net-bar-days').value) === false) document.getElementById('net-bar-days').value=nextDefault; });
 </script>
 {% endblock %}

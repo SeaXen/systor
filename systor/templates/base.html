@@ -64,12 +64,23 @@
       const runtime = IS_PRIVATE ? await getJSON('/api/runtime') : null;
       const cpu=snap.cpu||{}, mem=snap.memory||{}, web=(runtime&&runtime.web)||{}, collector=(runtime&&runtime.collector)||{}, st=(runtime&&runtime.storage)||{};
       const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null;
+      const upd = snap.system_updates || {};
+      let updChips = '';
+      if (upd.reboot_required) {
+        updChips += ` <span class="header-chip" style="border-color:var(--rose,#ff4772);color:var(--rose,#ff4772);"><span class="chip-k" style="background:var(--rose,#ff4772);color:#fff;">Reboot</span><strong>Required</strong></span>`;
+      }
+      if (upd.updates_security > 0) {
+        updChips += ` <span class="header-chip" style="border-color:var(--amber,#ffb84d);color:var(--amber,#ffb84d);"><span class="chip-k" style="background:var(--amber,#ffb84d);color:#000;">Security</span><strong>${upd.updates_security}</strong></span>`;
+      } else if (upd.updates_total > 0) {
+        updChips += ` <span class="header-chip"><span class="chip-k">Updates</span><strong>${upd.updates_total}</strong></span>`;
+      }
       if(!IS_PRIVATE){
-        el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span>`;
+        el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span>${updChips}`;
         return;
       }
-      el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(st.total_mb,'MB')}</strong></span>`;
+      el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(st.total_mb,'MB')}</strong></span>${updChips}`;
     } catch(e) { /* keep fallback text */ }
+
   }
   update(); setInterval(update, 15000);
 })();

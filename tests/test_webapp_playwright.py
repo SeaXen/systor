@@ -196,6 +196,15 @@ def run_webapp_tests() -> int:
             panel_files = page.locator("#panel-files")
             record("Switching to File Manager Tab", panel_files.count() == 1)
 
+            # Switch tab to Drive Health (SMART)
+            tab_smart = page.locator("#tab-smart")
+            record("Storage Tab SMART Health Exists", tab_smart.count() == 1)
+            tab_smart.click()
+            page.wait_for_timeout(300)
+            panel_smart = page.locator("#panel-smart")
+            record("Switching to SMART Health Tab", panel_smart.is_visible())
+            page.screenshot(path=str(SCREENSHOT_DIR / "03b_storage_smart_desktop.png"), full_page=True)
+
             page.screenshot(path=str(SCREENSHOT_DIR / "03_storage_desktop.png"), full_page=True)
 
             # -------------------------------------------------------------
@@ -283,6 +292,16 @@ def run_webapp_tests() -> int:
             auth_panel = page.locator("section[data-settings-panel='auth']")
             is_active = auth_panel.get_attribute("class") or ""
             record("Settings Tab Switching to Auth", "active" in is_active)
+
+            # Switch to Access tab (Disaster Recovery & Full Backup)
+            access_tab_btn = page.locator("button[data-settings-tab='access']")
+            record("Settings Tab Access Present", access_tab_btn.count() == 1)
+            access_tab_btn.click()
+            page.wait_for_timeout(300)
+            access_panel = page.locator("section[data-settings-panel='access']")
+            is_active = access_panel.get_attribute("class") or ""
+            record("Settings Tab Switching to Access", "active" in is_active)
+            page.screenshot(path=str(SCREENSHOT_DIR / "08b_settings_access_desktop.png"), full_page=True)
 
             # Switch back to General tab
             general_tab_btn.click()

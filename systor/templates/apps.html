@@ -111,8 +111,39 @@
       <tbody id="apps-all-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
     </table>
   </details>
+
+  <div class="table-card compact-table" style="margin-top: 1rem;" id="systemd-wrap">
+    <div class="apps-card-head">
+      <h3><span>Host System Services (systemd)</span><span class="network-mini" id="systemd-meta">loading units…</span></h3>
+      <div class="dash-controls">
+        <input type="text" id="systemd-search" class="control-input compact" placeholder="Filter services…" style="width:140px;">
+        <select id="systemd-state-filter" class="control-select">
+          <option value="all">all states</option>
+          <option value="active" selected>active</option>
+          <option value="failed">failed</option>
+          <option value="inactive">inactive</option>
+        </select>
+        <button class="btn secondary compact" id="systemd-refresh-btn">Refresh Services</button>
+      </div>
+    </div>
+    <table class="apps-table aligned-table compact-apps-table">
+      <thead>
+        <tr>
+          <th>Unit Name</th>
+          <th>State</th>
+          <th>Sub-State</th>
+          <th>Description</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody id="systemd-units-body">
+        <tr><td colspan="5" class="empty-cell">Loading system services…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
 let appsTimer=null, appsLoading=false;
@@ -227,5 +258,66 @@ document.getElementById('apps-limit').addEventListener('change', ()=>{ state.pag
 document.getElementById('apps-all-limit').addEventListener('change', ()=>{ state.pages.all=1; repaintFromRows(document.getElementById('apps-scope').value, state.summary || {}); });
 document.getElementById('apps-refresh-sec').addEventListener('change', resetAppsTimer);
 refreshApps(); resetAppsTimer();
+
+let systemdUnits = [];
+async function loadSystemdServices(){
+  const body = document.getElementById('systemd-units-body');
+  if(!body) return;
+  body.innerHTML = '<tr><td colspan="5" class="empty-cell">Loading system services…</td></tr>';
+  try {
+    const j = await fetchJSON('/api/apps/systemd');
+    if(!j.available) {
+      body.innerHTML = `<tr><td colspan="5" class="empty-cell">${esc(j.error || 'systemd unavailable')}</td></tr>`;
+      document.getElementById('systemd-meta').textContent = 'systemd not active';
+      return;
+    }
+    systemdUnits = j.services || [];
+    renderSystemdRows();
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="5" class="empty-cell">${esc(e.message)}</td></tr>`;
+  }
+}
+function renderSystemdRows(){
+  const body = document.getElementById('systemd-units-body');
+  const q = (document.getElementById('systemd-search')?.value || '').trim().toLowerCase();
+  const filterState = document.getElementById('systemd-state-filter')?.value || 'active';
+  let rows = systemdUnits;
+  if(filterState !== 'all') {
+    rows = rows.filter(r => (r.active || '').toLowerCase() === filterState);
+  }
+  if(q) {
+    rows = rows.filter(r => (r.unit || '').toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q));
+  }
+  document.getElementById('systemd-meta').textContent = `${rows.length}/${systemdUnits.length} units`;
+  if(!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" class="empty-cell">No matching system services found</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.slice(0, 50).map(u => {
+    const stateBadge = u.active === 'active' ? '<span class="status-chip ok">active</span>' : (u.active === 'failed' ? '<span class="status-chip critical">failed</span>' : `<span class="badge default">${esc(u.active)}</span>`);
+    return `<tr>
+      <td class="mono"><strong>${esc(u.unit)}</strong></td>
+      <td>${stateBadge}</td>
+      <td class="mono">${esc(u.sub || '—')}</td>
+      <td class="network-mini">${esc(u.description || '—')}</td>
+      <td class="text-right"><button class="btn secondary compact" onclick="restartService('${esc(u.unit)}')">Restart</button></td>
+    </tr>`;
+  }).join('');
+}
+async function restartService(unit){
+  if(!confirm(`Are you sure you want to safely restart '${unit}'?`)) return;
+  try {
+    const j = await fetchJSON(`/api/apps/systemd/${encodeURIComponent(unit)}/restart`, {method: 'POST'});
+    alert(j.message || 'Service restarted');
+    await loadSystemdServices();
+  } catch(e) {
+    alert('Failed to restart: ' + e.message);
+  }
+}
+document.getElementById('systemd-refresh-btn')?.addEventListener('click', loadSystemdServices);
+document.getElementById('systemd-search')?.addEventListener('input', renderSystemdRows);
+document.getElementById('systemd-state-filter')?.addEventListener('change', renderSystemdRows);
+loadSystemdServices();
 </script>
 {% endblock %}
+

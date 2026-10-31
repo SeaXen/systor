@@ -175,3 +175,120 @@ def api_access():
         "cloudflare": cloudflare,
         "note": "0.0.0.0 means one listener serves localhost, LAN, and Tailscale. Cloudflare Tunnel works if its route targets this port.",
     })
+
+
+@dashboard_bp.route("/metrics")
+def prometheus_metrics():
+    """Prometheus OpenMetrics exposition format."""
+    from .common import client_private
+    # Private client or valid bearer token
+    cfg = load_config()
+    prom_token = cfg.get("metrics", {}).get("token", "")
+    auth_header = request.headers.get("Authorization", "")
+    if prom_token and auth_header == f"Bearer {prom_token}":
+        pass
+    elif not client_private():
+        return Response("Forbidden", status=403, mimetype="text/plain")
+
+    snap = collect_snapshot()
+    cpu = snap.get("cpu", {})
+    mem = snap.get("memory", {})
+    net = snap.get("network", {})
+    disk_io = snap.get("disk_io", {})
+
+    lines: list[str] = [
+        "# HELP systor_uptime_seconds System uptime in seconds",
+        "# TYPE systor_uptime_seconds counter",
+        f"systor_uptime_seconds {snap.get('uptime_sec') or 0}",
+    ]
+
+    # CPU
+    if cpu.get("percent") is not None:
+        lines.extend([
+            "# HELP systor_cpu_percent Current overall CPU usage percentage",
+            "# TYPE systor_cpu_percent gauge",
+            f"systor_cpu_percent {cpu['percent']}",
+        ])
+    if cpu.get("load_1m") is not None:
+        lines.extend([
+            "# HELP systor_cpu_load System load average",
+            "# TYPE systor_cpu_load gauge",
+            f'systor_cpu_load{{period="1m"}} {cpu["load_1m"]}',
+            f'systor_cpu_load{{period="5m"}} {cpu.get("load_5m") or 0.0}',
+            f'systor_cpu_load{{period="15m"}} {cpu.get("load_15m") or 0.0}',
+        ])
+    if cpu.get("temp_c") is not None:
+        lines.extend([
+            "# HELP systor_cpu_temperature_celsius Maximum CPU thermal sensor temperature",
+            "# TYPE systor_cpu_temperature_celsius gauge",
+            f"systor_cpu_temperature_celsius {cpu['temp_c']}",
+        ])
+
+    # Memory
+    if mem.get("total_mb"):
+        lines.extend([
+            "# HELP systor_memory_bytes Host memory statistics in bytes",
+            "# TYPE systor_memory_bytes gauge",
+            f'systor_memory_bytes{{state="total"}} {mem["total_mb"] * 1024 * 1024}',
+            f'systor_memory_bytes{{state="used"}} {mem.get("used_mb", 0) * 1024 * 1024}',
+            f'systor_memory_bytes{{state="free"}} {mem.get("free_mb", 0) * 1024 * 1024}',
+            f'systor_memory_bytes{{state="available"}} {mem.get("available_mb", 0) * 1024 * 1024}',
+        ])
+    if mem.get("swap_total_mb"):
+        lines.extend([
+            "# HELP systor_swap_bytes Host swap statistics in bytes",
+            "# TYPE systor_swap_bytes gauge",
+            f'systor_swap_bytes{{state="total"}} {mem["swap_total_mb"] * 1024 * 1024}',
+            f'systor_swap_bytes{{state="used"}} {mem.get("swap_used_mb", 0) * 1024 * 1024}',
+        ])
+
+    # Disks
+    disks = snap.get("disks") or []
+    if disks:
+        lines.extend([
+            "# HELP systor_disk_used_percent Percentage of disk capacity used",
+            "# TYPE systor_disk_used_percent gauge",
+        ])
+        for d in disks:
+            mount = d.get("mount", "/")
+            pct = d.get("used_pct", 0)
+            lines.append(f'systor_disk_used_percent{{mount="{mount}"}} {pct}')
+
+    # Disk IO
+    lines.extend([
+        "# HELP systor_disk_io_rate_mbps Real-time disk throughput in MB/s",
+        "# TYPE systor_disk_io_rate_mbps gauge",
+        f'systor_disk_io_rate_mbps{{direction="read"}} {disk_io.get("read_mbps", 0.0)}',
+        f'systor_disk_io_rate_mbps{{direction="write"}} {disk_io.get("write_mbps", 0.0)}',
+    ])
+
+    # Network Interfaces
+    ifaces = snap.get("network_interfaces") or []
+    if ifaces:
+        lines.extend([
+            "# HELP systor_network_traffic_bytes_total Cumulative network bytes transferred",
+            "# TYPE systor_network_traffic_bytes_total counter",
+        ])
+        for iface in ifaces:
+            iname = iface.get("iface", "unknown")
+            rx = iface.get("rx_bytes", 0)
+            tx = iface.get("tx_bytes", 0)
+            lines.append(f'systor_network_traffic_bytes_total{{iface="{iname}",direction="rx"}} {rx}')
+            lines.append(f'systor_network_traffic_bytes_total{{iface="{iname}",direction="tx"}} {tx}')
+
+    # Service Uptime Targets
+    uptime_summary = get_storage().get_uptime_summary()
+    if uptime_summary:
+        lines.extend([
+            "# HELP systor_service_uptime_up Status of monitored services (1=up, 0=down)",
+            "# TYPE systor_service_uptime_up gauge",
+        ])
+        for t in uptime_summary:
+            tname = t.get("name", "target").replace('"', '\\"')
+            turl = t.get("url", "").replace('"', '\\"')
+            is_up = 1 if (t.get("last_check") and t["last_check"].get("ok")) else 0
+            lines.append(f'systor_service_uptime_up{{name="{tname}",url="{turl}"}} {is_up}')
+
+    body = "\n".join(lines) + "\n"
+    return Response(body, mimetype="text/plain; version=0.0.4; charset=utf-8")
+

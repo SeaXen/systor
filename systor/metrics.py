@@ -419,6 +419,35 @@ def read_total_memory_mb() -> int:
     return 0
 
 
+def read_system_updates() -> dict[str, Any]:
+    """Check for pending system updates and reboot requirement on Linux."""
+    reboot_required = Path("/var/run/reboot-required").exists()
+    updates_total = 0
+    updates_security = 0
+
+    # Debian/Ubuntu update-notifier
+    updates_file = Path("/var/lib/update-notifier/updates-available")
+    if updates_file.exists():
+        try:
+            for line in updates_file.read_text().splitlines():
+                if "packages can be updated" in line:
+                    parts = line.split()
+                    if parts:
+                        updates_total = int(parts[0])
+                if "updates are security updates" in line or "updates are to fix security issues" in line:
+                    parts = line.split()
+                    if parts:
+                        updates_security = int(parts[0])
+        except Exception:
+            pass
+
+    return {
+        "reboot_required": reboot_required,
+        "updates_total": updates_total,
+        "updates_security": updates_security,
+    }
+
+
 def collect_snapshot() -> dict[str, Any]:
     """One-time snapshot of all metrics. Returned as a single dict."""
     load = read_loadavg()
@@ -429,6 +458,7 @@ def collect_snapshot() -> dict[str, Any]:
     net = read_network_stats() or {}
     net_ifaces = read_network_interfaces()
     disk_io = read_disk_io_mbps()
+    updates = read_system_updates()
     return {
         "ts": int(time.time()),
         "hostname": read_hostname(),
@@ -445,6 +475,7 @@ def collect_snapshot() -> dict[str, Any]:
         "disk_io": disk_io,
         "network_interfaces": net_ifaces,
         "network": net,
+        "system_updates": updates,
     }
 
 
@@ -454,4 +485,5 @@ def _safe_loadavg(idx: int) -> float | None:
         return float(parts[idx])
     except Exception:
         return None
+
 

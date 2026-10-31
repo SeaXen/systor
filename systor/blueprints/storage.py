@@ -26,9 +26,11 @@ from ..services.storage_service import (
     _storage_deep_state, _storage_deep_lock, _DENY_NAME_RE, is_under,
     format_ts
 )
+from ..services.smart_service import get_drive_health
 
 storage_bp = Blueprint("storage", __name__)
 log = logging.getLogger("systor.blueprints.storage")
+
 
 
 def _get_action_pw(body: dict | None = None) -> str:
@@ -127,7 +129,15 @@ def api_storage_mounts():
     return jsonify({"ok": True, "mounts": rows})
 
 
+@storage_bp.route("/api/storage/smart")
+def api_storage_smart():
+    force = request.args.get("refresh") == "1"
+    drives = get_drive_health(force_refresh=force)
+    return jsonify({"ok": True, "drives": drives, "count": len(drives)})
+
+
 @storage_bp.route("/api/storage/browse")
+
 def api_storage_browse():
     raw_path = (request.args.get("path") or "").strip()
     if raw_path == "/":

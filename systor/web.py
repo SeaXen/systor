@@ -102,6 +102,9 @@ def create_app(start_worker: bool = True) -> Flask:
                 auth_touch_session()
             return None
 
+        if path == "/metrics":
+            return None
+
         # Public internet: allow only explicitly enabled read-only pages.
         public_pages = public_cfg()
         public_page_map = {
@@ -118,6 +121,7 @@ def create_app(start_worker: bool = True) -> Flask:
         public_api_allow = {
             "/health",
             "/api/version",
+            "/metrics",
         }
         if public_page_map.get("/"):
             public_api_allow.update({
@@ -141,8 +145,11 @@ def create_app(start_worker: bool = True) -> Flask:
     # Start background cache worker when not running under unit tests
     if start_worker and not app.config.get("TESTING"):
         start_apps_cache_worker()
+        from .services.uptime_service import start_uptime_worker
+        start_uptime_worker()
 
     return app
+
 
 
 # Backwards compatibility helpers
