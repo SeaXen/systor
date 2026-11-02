@@ -146,7 +146,6 @@ def api_uptime_modify(tid: int | None = None):
 
 @network_bp.route("/api/uptime/check-now", methods=["POST"])
 def api_uptime_check_now():
-    from ..services.uptime_service import run_single_audit_cycle
     storage = get_storage()
     # Force check for all enabled targets
     targets = storage.list_uptime_targets(enabled_only=True)

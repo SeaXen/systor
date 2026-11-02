@@ -1,5 +1,4 @@
 """Tests for CLI serve commands, versioning, and container packaging assets."""
-import os
 import argparse
 import unittest
 from unittest.mock import patch, MagicMock

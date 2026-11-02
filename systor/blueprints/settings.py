@@ -390,7 +390,13 @@ def page_settings():
         return jsonify({"ok": True, "message": msg, "saved_at": _config_saved_at(path)})
 
     cfg = load_config()
-    return render_template("settings.html", cfg=cfg, cfg_defaults=DEFAULT_CONFIG, settings_saved_at=_config_saved_at())
+    safe_cfg = json.loads(json.dumps(cfg))
+    for section in ("telegram", "discord", "auth", "storage_page"):
+        if section in safe_cfg and isinstance(safe_cfg[section], dict):
+            for secret_key in ("bot_token", "webhook_url", "password_hash", "session_secret", "action_password_hash"):
+                if safe_cfg[section].get(secret_key):
+                    safe_cfg[section][secret_key] = "********"
+    return render_template("settings.html", cfg=safe_cfg, cfg_defaults=DEFAULT_CONFIG, settings_saved_at=_config_saved_at())
 
 
 @settings_bp.route("/api/config", methods=["GET"])
@@ -541,6 +547,11 @@ def api_restart_collector():
         if cur is None:
             break
 
+    # If running in Docker container, do not spawn a second unmanaged collector process
+    is_docker = bool(os.environ.get("SYSTOR_DOCKER") == "1") or Path("/.dockerenv").exists()
+    if is_docker:
+        return jsonify({"ok": True, "message": "Docker container detected; collector process managed by container entrypoint."})
+
     # If running under systemd, systemd will restart it if enabled
     is_systemd = bool(os.environ.get("INVOCATION_ID")) or Path("/run/systemd/system").exists()
     if is_systemd:
@@ -643,8 +654,13 @@ def api_logs_clear():
     cfg = load_config()
     log_file = cfg.get("logging", {}).get("file", "/var/log/systor/systor.log")
     try:
-        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
-        Path(log_file).write_text("")
+        p = Path(log_file)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if p.exists():
+            with open(p, "r+", encoding="utf-8") as f:
+                f.truncate(0)
+        else:
+            p.touch()
         return jsonify({"ok": True, "message": f"Cleared {log_file}"})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -667,7 +683,7 @@ def logs_download():
 # --- Disaster Recovery & Backup Endpoints ---
 @settings_bp.route("/api/backup/export", methods=["GET"])
 def api_backup_export():
-    from .common import client_private, auth_enabled, auth_logged_in, get_storage
+    from .common import get_storage
     if not client_private():
         return jsonify({"ok": False, "error": "Backup export is private LAN only"}), 403
     if auth_enabled() and not auth_logged_in():
@@ -685,7 +701,7 @@ def api_backup_export():
 
 @settings_bp.route("/api/backup/restore", methods=["POST"])
 def api_backup_restore():
-    from .common import client_private, auth_enabled, auth_logged_in, get_storage
+    from .common import get_storage
     if not client_private():
         return jsonify({"ok": False, "error": "Backup restore is private LAN only"}), 403
     if auth_enabled() and not auth_logged_in():

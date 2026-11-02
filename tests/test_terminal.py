@@ -1,7 +1,5 @@
 """Unit tests for the secure Web Terminal engine."""
-import time
 from werkzeug.security import generate_password_hash
-import pytest
 
 from systor.terminal import (
     authenticate_terminal_session,
@@ -48,3 +46,15 @@ def test_terminal_command_invalid_token():
     res = execute_console_command("invalid_token", "127.0.0.1", "echo fail")
     assert res["ok"] is False
     assert "Invalid or expired" in res["error"]
+
+
+def test_terminal_refuses_without_configured_hash():
+    ok, msg, token = authenticate_terminal_session("admin", "127.0.0.1", "")
+    assert ok is False
+    assert token is None
+    assert "Set auth.password_hash" in msg
+
+    ok, msg, token = authenticate_terminal_session("systor", "127.0.0.1", "")
+    assert ok is False
+    assert token is None
+

@@ -3,18 +3,18 @@ from __future__ import annotations
 import logging
 import os
 import signal
-import time
+import time  # noqa: F401
 from pathlib import Path
-from flask import Flask, jsonify, request, abort, redirect, url_for
+from flask import Flask, jsonify, request, abort, redirect, url_for, session
 
 from .config import load_config
-from .security import is_request_private
 from .services.runtime_service import start_apps_cache_worker
 from .blueprints import register_blueprints
 from .blueprints.common import (
     client_private, auth_cfg, auth_enabled, auth_logged_in,
     auth_session_expired, auth_logout_session, auth_touch_session,
-    private_auth_protected, public_cfg, effective_private_ui, _login_rate_state
+    private_auth_protected, public_cfg, effective_private_ui,
+    _login_rate_state,  # noqa: F401
 )
 
 log = logging.getLogger("systor.web")
@@ -46,6 +46,30 @@ def create_app(start_worker: bool = True) -> Flask:
     app.secret_key = auth_boot.get("session_secret") or os.environ.get("SYSTOR_SESSION_SECRET") or "systor-secret-key-32b-secure-fallback"
     app.config["JSON_SORT_KEYS"] = False
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+    @app.before_request
+    def _csrf_protection():
+        import secrets
+        if "systor_csrf" not in session:
+            session["systor_csrf"] = secrets.token_hex(16)
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            if app.config.get("TESTING") and not app.config.get("CSRF_CHECK_IN_TESTS"):
+                return None
+            expected_session = session.get("systor_csrf")
+            expected_cookie = request.cookies.get("systor_csrf")
+            token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+            valid = False
+            if token:
+                if expected_cookie and secrets.compare_digest(token, expected_cookie):
+                    valid = True
+                elif expected_session and secrets.compare_digest(token, expected_session):
+                    valid = True
+            if not valid:
+                if request.path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "Invalid or missing CSRF token"}), 403
+                abort(403)
 
     @app.context_processor
     def _ctx_access():
@@ -75,6 +99,8 @@ def create_app(start_worker: bool = True) -> Flask:
         resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         resp.headers.setdefault("Content-Security-Policy", "default-src 'self' 'unsafe-inline'; img-src 'self' data:;")
+        if "systor_csrf" in session and "systor_csrf" not in request.cookies:
+            resp.set_cookie("systor_csrf", session["systor_csrf"], samesite="Lax")
         return resp
 
     @app.before_request
@@ -172,9 +198,21 @@ def _auth_logged_in() -> bool:
 def run():
     cfg = load_config()
     log_cfg = cfg.get("logging", {})
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    log_file = log_cfg.get("file")
+    if log_file:
+        try:
+            p = Path(log_file).expanduser().resolve()
+            p.parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(logging.FileHandler(str(p), encoding="utf-8"))
+        except Exception as e:
+            log.warning("web: could not open log file %s: %s", log_file, e)
+
     logging.basicConfig(
-        level=getattr(logging, log_cfg.get("level", "INFO")),
+        level=getattr(logging, log_cfg.get("level", "INFO").upper(), logging.INFO),
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        handlers=handlers,
+        force=True,
     )
 
     web_cfg = cfg.get("web", {})
@@ -186,8 +224,8 @@ def run():
 
     try:
         from waitress import serve
-        log.info("web: using waitress")
-        serve(app, host=host, port=port, threads=2, ident="systor")
+        log.info("web: using waitress with threads=16")
+        serve(app, host=host, port=port, threads=16, ident="systor")
     except ImportError:
         log.info("web: waitress not installed, falling back to flask dev server")
         app.run(host=host, port=port, debug=False, threaded=True, use_reloader=False)

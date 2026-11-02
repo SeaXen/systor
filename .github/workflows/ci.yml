@@ -7,6 +7,33 @@ on:
     branches: [ "main" ]
 
 jobs:
+  lint:
+    name: Code Quality & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run Ruff Linter
+        run: |
+          ruff check .
+
+      - name: Validate shell script syntax
+        run: |
+          bash -n install.sh
+          bash -n uninstall.sh
+
   test:
     name: Unit & Integration Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -32,11 +59,34 @@ jobs:
           pip install pytest pytest-cov
           pip install -e .
 
-      - name: Validate shell script syntax
+      - name: Run test suite with pytest & coverage
         run: |
-          bash -n install.sh
-          bash -n uninstall.sh
+          pytest -v --cov=systor --cov-report=term-missing tests/ --ignore=tests/test_webapp_playwright.py
 
-      - name: Run test suite with pytest
+  e2e:
+    name: Playwright E2E & Design Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies & browsers
         run: |
-          pytest -v tests/
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -e .
+          playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        run: |
+          python tests/test_webapp_playwright.py
+
+      - name: Run Design & WCAG Audit
+        run: |
+          python tools/design_audit.py

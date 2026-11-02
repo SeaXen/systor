@@ -1,13 +1,10 @@
 """Unit tests for the two-way interactive Telegram Bot."""
 from unittest.mock import MagicMock, patch
-import json
-import pytest
 
 from systor.bot import (
     handle_bot_command,
     send_telegram_message,
     start_bot_daemon,
-    stop_bot_daemon,
 )
 
 

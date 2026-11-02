@@ -56,6 +56,7 @@
     </div>
   </div>
 
+  <h2 class="sr-only">Network Activity Overview</h2>
   <div class="network-grid network-kpis network-kpis-6">
     <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">DL total</div><div class="value rx-text" id="cur-rx">—</div></div>
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">UL total</div><div class="value tx-text" id="cur-tx">—</div></div>
@@ -65,6 +66,7 @@
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">This month use</div><div class="value" id="month-use">—</div></div>
   </div>
 
+  <h2 class="sr-only">Network Usage and Rate Charts</h2>
   <div class="chart-card">
     <div class="chart-head"><h3><strong>Usage Totals by Period</strong></h3><div class="chart-meta" id="meta-usage-bars"><span class="rx-text"><strong>DL —</strong></span> · <span class="tx-text"><strong>UL —</strong></span> · avg — · total —</div></div>
     <canvas id="net-usage-chart" role="img" aria-label="Network usage totals by period chart"></canvas>
@@ -75,6 +77,7 @@
     <div class="chart-card"><div class="chart-head"><h3><strong>Upload Rate</strong></h3><div class="chart-meta" id="meta-tx-line"><span class="tx-text"><strong>latest —</strong></span> · avg — · peak —</div></div><canvas id="net-tx-chart" role="img" aria-label="Network upload rate over time chart"></canvas></div>
   </div>
 
+  <h2 class="sr-only">Network Interfaces and Historical Breakdown</h2>
   <div class="table-grid">
     <div class="table-card compact-table">
       <h3><span>Per-Interface Breakdown</span><span class="network-mini" id="iface-title-meta">0 interfaces total</span></h3>
@@ -133,12 +136,13 @@
       <tbody id="app-net-body"><tr><td colspan="5" class="empty-cell">Loading…</td></tr></tbody>
   </div>
 
+  <h2 class="sr-only">Service Uptime and Blackbox Health</h2>
   <div class="table-card compact-table" style="margin-top: 1rem;" id="uptime-wrap">
     <div class="apps-card-head">
       <h3><span>Service Uptime & Blackbox Health</span><span class="network-mini" id="uptime-meta">internal services & URLs</span></h3>
       <div class="dash-controls">
         <button class="btn secondary compact" id="uptime-check-btn">Check All Now</button>
-        <button class="btn compact" id="uptime-add-btn">+ Add Target</button>
+        <button class="btn secondary compact" id="uptime-add-btn">+ Add Target</button>
       </div>
     </div>
     <div id="uptime-add-form" class="uptime-form" style="display:none; padding: 0.75rem; background: var(--bg-panel-subtle, #141822); border-bottom: 1px solid var(--border, #222938); margin-bottom: 0.5rem;">
@@ -221,7 +225,14 @@
 
 {% block scripts %}
 <script>
-const NCOL = { rx: '#22d3ee', tx: '#ff6b8a', grid: '#30363d', dim: '#8b949e', fillRx:'rgba(34,211,238,.18)', fillTx:'rgba(255,107,138,.18)' };
+const NCOL = {
+  get rx() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-cpu').trim() || '#22d3ee'; },
+  get tx() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-ram').trim() || '#ff6b8a'; },
+  get grid() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || '#30363d'; },
+  get dim() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-label').trim() || '#8b949e'; },
+  get fillRx() { return 'rgba(34,211,238,.18)'; },
+  get fillTx() { return 'rgba(255,107,138,.18)'; }
+};
 const netTip = document.createElement('div'); netTip.className = 'canvas-tooltip hidden'; document.body.appendChild(netTip);
 const NET_DEFAULT_HIDE = {{ 'true' if cfg.network.hide_virtual_default else 'false' }};
 const DEFAULT_BAR_DAYS = {{ (cfg.network.default_bar_days or 90)|tojson }};
@@ -320,8 +331,8 @@ async function loadUptimeTargets(){
     }
     body.innerHTML = targets.map(t => {
       const stBadge = t.last_status === 'up'
-        ? '<span class="kind-pill docker" style="background:#052e16;color:#4ade80;">UP</span>'
-        : (t.last_status === 'down' ? '<span class="kind-pill alert" style="background:#450a0a;color:#f87171;">DOWN</span>' : '<span class="kind-pill host" style="background:#3b2d04;color:#fde047;">CHECKING</span>');
+        ? '<span class="kind-pill docker" style="background:var(--pill-up-bg);color:var(--pill-up-fg);">UP</span>'
+        : (t.last_status === 'down' ? '<span class="kind-pill alert" style="background:var(--pill-down-bg);color:var(--pill-down-fg);">DOWN</span>' : '<span class="kind-pill host" style="background:var(--pill-warn-bg);color:var(--pill-warn-fg);">CHECKING</span>');
       const latency = t.last_latency_ms != null ? Number(t.last_latency_ms).toFixed(1) + ' ms' : '—';
       const up24 = t.uptime_24h != null ? Number(t.uptime_24h).toFixed(1) + '%' : '100.0%';
       return `<tr>
@@ -331,13 +342,13 @@ async function loadUptimeTargets(){
         <td class="mono">${latency}</td>
         <td class="text-right mono"><strong>${up24}</strong></td>
         <td class="text-right">
-          <button class="btn secondary compact" style="color:#ef4444;" onclick="deleteUptimeTarget(${t.id})">Delete</button>
+          <button class="btn secondary compact" style="color:var(--text-danger);" onclick="deleteUptimeTarget(${t.id})">Delete</button>
         </td>
       </tr>`;
     }).join('');
   } catch(e){
     const body = document.getElementById('uptime-targets-body');
-    if(body) body.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:#ef4444;">Error loading uptime targets: ${esc(e.message)}</td></tr>`;
+    if(body) body.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:var(--text-danger);">Error loading uptime targets: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -429,13 +440,13 @@ async function loadSslCerts(extraHost){
       return;
     }
     body.innerHTML = certs.map(c => {
-      let stBadge = '<span class="kind-pill docker" style="background:#052e16;color:#4ade80;">VALID</span>';
+      let stBadge = '<span class="kind-pill docker" style="background:var(--pill-up-bg);color:var(--pill-up-fg);">VALID</span>';
       if(c.error){
-        stBadge = `<span class="kind-pill alert" style="background:#450a0a;color:#f87171;" title="${esc(c.error)}">ERROR</span>`;
+        stBadge = `<span class="kind-pill alert" style="background:var(--pill-down-bg);color:var(--pill-down-fg);" title="${esc(c.error)}">ERROR</span>`;
       } else if(c.is_expired){
-        stBadge = '<span class="kind-pill alert" style="background:#450a0a;color:#f87171;">EXPIRED</span>';
+        stBadge = '<span class="kind-pill alert" style="background:var(--pill-down-bg);color:var(--pill-down-fg);">EXPIRED</span>';
       } else if(c.is_warning){
-        stBadge = '<span class="kind-pill host" style="background:#3b2d04;color:#fde047;">EXPIRING SOON</span>';
+        stBadge = '<span class="kind-pill host" style="background:var(--pill-warn-bg);color:var(--pill-warn-fg);">EXPIRING SOON</span>';
       }
       const days = c.days_remaining != null ? `${c.days_remaining} d` : '—';
       const validUntil = c.valid_until ? new Date(c.valid_until).toLocaleDateString() : '—';
@@ -449,7 +460,7 @@ async function loadSslCerts(extraHost){
     }).join('');
   } catch(e){
     const body = document.getElementById('ssl-certs-body');
-    if(body) body.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:#ef4444;">Error checking SSL certificates: ${esc(e.message)}</td></tr>`;
+    if(body) body.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:var(--text-danger);">Error checking SSL certificates: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -522,7 +533,7 @@ async function loadSecurityAudit(force){
     if(meta) meta.textContent = `${ports.length} open ports detected`;
   } catch(e){
     const body = document.getElementById('sec-ports-body');
-    if(body) body.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:#ef4444;">Audit failed: ${esc(e.message)}</td></tr>`;
+    if(body) body.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:var(--text-danger);">Audit failed: ${esc(e.message)}</td></tr>`;
   }
 }
 

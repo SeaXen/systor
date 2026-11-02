@@ -19,5 +19,12 @@ StandardError=append:/var/log/systor/collector.log
 # Load all SYSTOR_* env vars
 EnvironmentFile=-/etc/systor/systor.env
 
+# Sandboxing & least privilege
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/systor /var/log/systor /etc/systor
+
 [Install]
 WantedBy=default.target

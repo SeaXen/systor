@@ -1,7 +1,5 @@
 """Tests for collector sustained-threshold alert logic, cooldowns, and recovery notifications."""
 import time
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 from systor import collector
 

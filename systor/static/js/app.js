@@ -1,36 +1,31 @@
 /* systor dashboard JS — vanilla, no frameworks */
 const COLORS = {
-  green: '#1d9e75', yellow: '#db9300', red: '#ec7e7e',
-  blue: '#1d9e75', purple: '#a78bfa', dim: '#898781', grid: 'rgba(255, 255, 255, 0.08)'
+  get green() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-net').trim() || '#1d9e75'; },
+  get yellow() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-disk').trim() || '#db9300'; },
+  get red() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-warn').trim() || '#ec7e7e'; },
+  get blue() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-load').trim() || '#1d9e75'; },
+  get purple() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-alt').trim() || '#a78bfa'; },
+  get cyan() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-cpu').trim() || '#22d3ee'; },
+  get cpu() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-cpu').trim() || '#22d3ee'; },
+  get ram() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-ram').trim() || '#ff6b8a'; },
+  get disk() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-disk').trim() || '#f6c453'; },
+  get disk2() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-disk2').trim() || '#ffb347'; },
+  get tx() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-ram').trim() || '#ff6b8a'; },
+  get dim() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-label').trim() || '#898781'; },
+  get grid() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(255, 255, 255, 0.08)'; },
+  get text() { return getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#c9d1d9'; }
 };
-
-function updateChartColors() {
-  const theme = document.documentElement.getAttribute('data-theme') || 'warm-dark';
-  if (theme === 'light') {
-    COLORS.dim = '#898781';
-    COLORS.grid = 'rgba(11, 11, 11, 0.08)';
-    COLORS.blue = '#1d9e75';
-    COLORS.green = '#006300';
-    COLORS.yellow = '#734500';
-    COLORS.red = '#8e2626';
-  } else if (theme === 'classic-dark') {
-    COLORS.dim = '#8b949e';
-    COLORS.grid = 'rgba(48, 54, 61, 0.6)';
-    COLORS.blue = '#58a6ff';
-    COLORS.green = '#3fb950';
-    COLORS.yellow = '#d29922';
-    COLORS.red = '#f85149';
-  } else {
-    COLORS.dim = '#898781';
-    COLORS.grid = 'rgba(255, 255, 255, 0.08)';
-    COLORS.blue = '#1d9e75';
-    COLORS.green = '#0ca30c';
-    COLORS.yellow = '#db9300';
-    COLORS.red = '#ec7e7e';
-  }
+window.COLORS = COLORS;
+function updateChartColors(theme) {
+  // Refreshes colors when theme changes
 }
-updateChartColors();
-window.addEventListener('systor:theme-change', updateChartColors);
+window.updateChartColors = updateChartColors;
+
+window.addEventListener('systor:theme-change', function(e) {
+  if (typeof updateChartColors === 'function') {
+    updateChartColors(e && e.detail ? e.detail.theme : undefined);
+  }
+});
 
 function fmt(n, unit) {
   if (n === null || n === undefined) return '—';

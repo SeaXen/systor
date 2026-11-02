@@ -2,6 +2,7 @@
 Description=systor web — dashboard on port 6677
 After=network-online.target systor-collector.service
 Wants=network-online.target
+Requires=systor-collector.service
 StartLimitBurst=5
 StartLimitIntervalSec=120
 
@@ -16,6 +17,13 @@ KillMode=control-group
 StandardOutput=append:/var/log/systor/web.log
 StandardError=append:/var/log/systor/web.log
 EnvironmentFile=-/etc/systor/systor.env
+
+# Sandboxing & least privilege
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/systor /var/log/systor /etc/systor
 
 [Install]
 WantedBy=default.target

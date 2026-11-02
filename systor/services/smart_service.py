@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 import subprocess
 import threading
@@ -92,7 +91,7 @@ def _parse_smartctl_record(dev_name: str, d: dict[str, Any]) -> dict[str, Any]:
     capacity_gb = round(capacity_bytes / (1024 ** 3), 1) if capacity_bytes else None
 
     smart_status = d.get("smart_status", {})
-    passed = smart_status.get("passed", True)
+    passed = smart_status.get("passed")
 
     protocol = device_info.get("protocol", "ATA")
     temp_obj = d.get("temperature", {})
@@ -184,13 +183,13 @@ def _probe_with_sysfs() -> list[dict[str, Any]]:
                 "serial": "N/A",
                 "firmware": "N/A",
                 "capacity_gb": capacity_gb,
-                "passed": True,
+                "passed": None,
                 "temperature_c": None,
                 "power_on_hours": None,
                 "nvme_wear_pct": None,
                 "nvme_tbw": None,
-                "reallocated_sectors": 0,
-                "pending_sectors": 0,
+                "reallocated_sectors": None,
+                "pending_sectors": None,
                 "smart_available": False,
                 "note": "smartctl not installed. Install smartmontools for full SMART data.",
             })

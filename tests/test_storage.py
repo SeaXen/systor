@@ -1,6 +1,5 @@
 """Tests for Storage SQLite database: schemas, queries, retention purging, and rollups."""
 import time
-from pathlib import Path
 import pytest
 
 from systor.storage import Storage

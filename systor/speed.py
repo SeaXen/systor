@@ -4,9 +4,11 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 import urllib.request
-from urllib.parse import urlparse
+
+_SUBPROCESS_SEMAPHORE = threading.BoundedSemaphore(2)
 
 
 def _cmd_exists(name: str) -> bool:
@@ -19,7 +21,8 @@ def _run(cmd: list[str], timeout: int = 180) -> subprocess.CompletedProcess:
     env.setdefault('LANG', 'C.UTF-8')
     env.setdefault('LC_ALL', 'C.UTF-8')
     env.setdefault('HOME', '/root')
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+    with _SUBPROCESS_SEMAPHORE:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
 
 
 def _safe_float(v):

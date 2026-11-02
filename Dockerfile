@@ -35,7 +35,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source tree and install package
-COPY setup.py README.md ./
+COPY pyproject.toml setup.py README.md ./
 COPY systor/ ./systor/
 RUN pip install --no-cache-dir .
 

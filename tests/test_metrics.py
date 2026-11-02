@@ -1,5 +1,4 @@
 """Tests for Linux /proc, /sys metric readers and delta computations."""
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

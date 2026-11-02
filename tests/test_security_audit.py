@@ -1,6 +1,5 @@
 """Unit tests for the security audit service (ports, firewall, fail2ban)."""
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import patch
 
 from systor.services.security_audit_service import (
     parse_listening_ports_output,

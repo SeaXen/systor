@@ -1,5 +1,6 @@
 """Apps monitoring blueprint for Systor: Host and Docker workloads."""
 from __future__ import annotations
+import threading
 import time
 from flask import Blueprint, render_template, request, jsonify
 
@@ -162,6 +163,11 @@ def api_apps_compose_restart(project: str):
 
 
 # --- Live Service & Container Log Streamer (SSE) ---
+_SSE_CONCURRENT = 0
+_SSE_LOCK = threading.Lock()
+_MAX_SSE_CONCURRENT = 2
+
+
 @apps_bp.route("/api/apps/logs/stream")
 def api_apps_logs_stream():
     import json
@@ -173,6 +179,12 @@ def api_apps_logs_stream():
     if not client_private():
         return jsonify({"ok": False, "error": "Log streaming is private LAN only"}), 403
 
+    global _SSE_CONCURRENT
+    with _SSE_LOCK:
+        if _SSE_CONCURRENT >= _MAX_SSE_CONCURRENT:
+            return jsonify({"ok": False, "error": "Too many concurrent log streams (limit 2)"}), 429
+        _SSE_CONCURRENT += 1
+
     unit = request.args.get("unit", "").strip()
     container_id = request.args.get("container", "").strip()
     try:
@@ -182,10 +194,14 @@ def api_apps_logs_stream():
 
     if unit:
         if not re.match(r"^[a-zA-Z0-9_\-\.@]+(\.service)?$", unit):
+            with _SSE_LOCK:
+                _SSE_CONCURRENT = max(0, _SSE_CONCURRENT - 1)
             return jsonify({"ok": False, "error": "Invalid service unit name"}), 400
         cmd = ["journalctl", "-u", unit, "-f", f"-n{lines}", "--no-pager"]
     elif container_id:
         if not re.match(r"^[a-zA-Z0-9_\-\.]+$", container_id):
+            with _SSE_LOCK:
+                _SSE_CONCURRENT = max(0, _SSE_CONCURRENT - 1)
             return jsonify({"ok": False, "error": "Invalid container ID"}), 400
         cmd = ["docker", "logs", "-f", f"--tail={lines}", container_id]
     else:
@@ -214,6 +230,9 @@ def api_apps_logs_stream():
                     proc.wait(timeout=1)
                 except Exception:
                     pass
+            global _SSE_CONCURRENT
+            with _SSE_LOCK:
+                _SSE_CONCURRENT = max(0, _SSE_CONCURRENT - 1)
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream", headers={
         "Cache-Control": "no-cache",
@@ -225,23 +244,33 @@ def api_apps_logs_stream():
 # --- Secure Web Terminal Endpoints ---
 @apps_bp.route("/api/terminal/auth", methods=["POST"])
 def api_terminal_auth():
-    from .common import client_private
+    from .common import client_private, login_rate_status, login_rate_fail, login_rate_success
     if not client_private():
         return jsonify({"ok": False, "error": "Terminal console is private LAN / Tailscale only"}), 403
 
-    body = request.get_json(silent=True) or {}
-    password = str(body.get("password") or "").strip()
     from ..config import load_config
     from ..security import parse_trusted_proxies, get_client_ip
     cfg = load_config()
     trusted = parse_trusted_proxies(cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1"))
     client_ip = get_client_ip(request, trusted)
+
+    rate_blocked, rate_wait = login_rate_status(client_ip)
+    if rate_blocked:
+        return jsonify({"ok": False, "error": f"Too many failed login attempts. Try again in {rate_wait}s."}), 429
+
+    body = request.get_json(silent=True) or {}
+    password = str(body.get("password") or "").strip()
     stored_hash = cfg.get("auth", {}).get("password_hash", "")
 
     from ..terminal import authenticate_terminal_session
     ok, msg, token = authenticate_terminal_session(password, client_ip, stored_hash)
     if not ok:
+        blocked, wait_sec = login_rate_fail(client_ip)
+        if blocked:
+            return jsonify({"ok": False, "error": f"Too many failed login attempts. Locked out for {wait_sec}s."}), 429
         return jsonify({"ok": False, "error": msg}), 401
+
+    login_rate_success(client_ip)
     return jsonify({"ok": True, "token": token, "message": "Console unlocked"})
 
 

@@ -66,6 +66,7 @@
 </style>
 
 <div class="settings-page">
+  <h2 class="sr-only">Configuration Settings</h2>
   <div id="flash"></div>
   <div class="import-modal-backdrop" id="import-modal-backdrop" aria-hidden="true">
     <div class="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
@@ -189,8 +190,8 @@
             <h3>Dashboard defaults</h3>
             <div class="card-subtle">Saved defaults used on page load. Dashboard page controls are temporary live overrides and do not silently overwrite Settings.</div>
             <div class="notif-field-grid compact-top network-settings-grid">
-              <label>Default time view</label>
-              <select name="dashboard_default_hours">
+              <label for="dashboard-default-hours">Default time view</label>
+              <select id="dashboard-default-hours" name="dashboard_default_hours">
                 <option value="0.25" {% if cfg.dashboard.default_hours == 0.25 %}selected{% endif %}>15m</option>
                 <option value="0.5" {% if cfg.dashboard.default_hours == 0.5 %}selected{% endif %}>30m</option>
                 <option value="1" {% if cfg.dashboard.default_hours == 1 %}selected{% endif %}>1h</option>
@@ -203,8 +204,8 @@
                 <option value="8760" {% if cfg.dashboard.default_hours == 8760 %}selected{% endif %}>1y</option>
                 <option value="87600" {% if cfg.dashboard.default_hours == 87600 %}selected{% endif %}>all</option>
               </select>
-              <label>Refresh</label>
-              <select name="dashboard_refresh_sec">
+              <label for="dashboard-refresh-sec">Refresh</label>
+              <select id="dashboard-refresh-sec" name="dashboard_refresh_sec">
                 <option value="1" {% if cfg.dashboard.refresh_sec == 1 %}selected{% endif %}>1s</option>
                 <option value="3" {% if cfg.dashboard.refresh_sec == 3 %}selected{% endif %}>3s</option>
                 <option value="5" {% if cfg.dashboard.refresh_sec == 5 %}selected{% endif %}>5s</option>
@@ -213,8 +214,8 @@
                 <option value="30" {% if cfg.dashboard.refresh_sec == 30 %}selected{% endif %}>30s</option>
                 <option value="60" {% if cfg.dashboard.refresh_sec == 60 %}selected{% endif %}>1m</option>
               </select>
-              <label>Sample interval</label>
-              <select name="poll_interval_sec">
+              <label for="poll-interval-sec">Sample interval</label>
+              <select id="poll-interval-sec" name="poll_interval_sec">
                 <option value="1" {% if cfg.collector.poll_interval_sec == 1 %}selected{% endif %}>1s</option>
                 <option value="5" {% if cfg.collector.poll_interval_sec == 5 %}selected{% endif %}>5s</option>
                 <option value="10" {% if cfg.collector.poll_interval_sec == 10 %}selected{% endif %}>10s</option>
@@ -222,8 +223,8 @@
                 <option value="30" {% if cfg.collector.poll_interval_sec == 30 %}selected{% endif %}>30s</option>
                 <option value="60" {% if cfg.collector.poll_interval_sec == 60 %}selected{% endif %}>1m</option>
               </select>
-              <label>Chart refresh</label>
-              <select name="dashboard_chart_refresh_sec">
+              <label for="dashboard-chart-refresh-sec">Chart refresh</label>
+              <select id="dashboard-chart-refresh-sec" name="dashboard_chart_refresh_sec">
                 <option value="1" {% if cfg.dashboard.chart_refresh_sec == 1 %}selected{% endif %}>1s</option>
                 <option value="3" {% if cfg.dashboard.chart_refresh_sec == 3 %}selected{% endif %}>3s</option>
                 <option value="5" {% if cfg.dashboard.chart_refresh_sec == 5 %}selected{% endif %}>5s</option>
@@ -239,21 +240,21 @@
             <h3>Apps page defaults</h3>
             <div class="card-subtle">Default scope, sort order, and refresh for the apps/process view.</div>
             <div class="notif-field-grid compact-top network-settings-grid">
-              <label>Scope</label>
-              <select name="apps_default_scope">
+              <label for="apps-default-scope">Scope</label>
+              <select id="apps-default-scope" name="apps_default_scope">
                 <option value="all" {% if cfg.apps.default_scope == 'all' %}selected{% endif %}>all</option>
                 <option value="host" {% if cfg.apps.default_scope == 'host' %}selected{% endif %}>host only</option>
                 <option value="docker" {% if cfg.apps.default_scope == 'docker' %}selected{% endif %}>docker only</option>
               </select>
-              <label>Sort</label>
-              <select name="apps_default_sort">
+              <label for="apps-default-sort">Sort</label>
+              <select id="apps-default-sort" name="apps_default_sort">
                 <option value="cpu" {% if cfg.apps.default_sort == 'cpu' %}selected{% endif %}>cpu</option>
                 <option value="mem" {% if cfg.apps.default_sort == 'mem' %}selected{% endif %}>memory</option>
                 <option value="net" {% if cfg.apps.default_sort == 'net' %}selected{% endif %}>network</option>
                 <option value="disk" {% if cfg.apps.default_sort == 'disk' %}selected{% endif %}>disk</option>
               </select>
-              <label>Auto refresh</label>
-              <select name="apps_auto_refresh_sec">
+              <label for="apps-auto-refresh-sec">Auto refresh</label>
+              <select id="apps-auto-refresh-sec" name="apps_auto_refresh_sec">
                 <option value="1" {% if cfg.apps.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
                 <option value="3" {% if cfg.apps.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
                 <option value="5" {% if cfg.apps.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
@@ -271,8 +272,8 @@
             <h3>Network page defaults</h3>
             <div class="card-subtle">Network page defaults control its period, bucket view, refresh load, and interface filtering.</div>
             <div class="notif-field-grid compact-top network-settings-grid">
-              <label>Default rate view</label>
-              <select name="network_default_hours">
+              <label for="network-default-hours">Default rate view</label>
+              <select id="network-default-hours" name="network_default_hours">
                 <option value="0.25" {% if cfg.network.default_hours == 0.25 %}selected{% endif %}>15m</option>
                 <option value="0.5" {% if cfg.network.default_hours == 0.5 %}selected{% endif %}>30m</option>
                 <option value="1" {% if cfg.network.default_hours == 1 %}selected{% endif %}>1h</option>
@@ -285,14 +286,14 @@
                 <option value="8760" {% if cfg.network.default_hours == 8760 %}selected{% endif %}>1y</option>
                 <option value="87600" {% if cfg.network.default_hours == 87600 %}selected{% endif %}>all</option>
               </select>
-              <label>Default usage view</label>
-              <select name="network_default_granularity">
+              <label for="network-default-granularity">Default usage view</label>
+              <select id="network-default-granularity" name="network_default_granularity">
                 <option value="day" {% if cfg.network.default_granularity == 'day' %}selected{% endif %}>daily</option>
                 <option value="week" {% if cfg.network.default_granularity == 'week' %}selected{% endif %}>weekly</option>
                 <option value="month" {% if cfg.network.default_granularity == 'month' %}selected{% endif %}>monthly</option>
               </select>
-              <label>Auto refresh</label>
-              <select name="network_auto_refresh_sec">
+              <label for="network-auto-refresh-sec">Auto refresh</label>
+              <select id="network-auto-refresh-sec" name="network_auto_refresh_sec">
                 <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
                 <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
                 <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
@@ -301,15 +302,15 @@
                 <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
                 <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
               </select>
-              <label>Default bar days</label>
-              <select name="network_default_bar_days">
+              <label for="network-default-bar-days">Default bar days</label>
+              <select id="network-default-bar-days" name="network_default_bar_days">
                 {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
                 <option value="{{ n }}" {% if (cfg.network.default_bar_days or 90) == n %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
                 <option value="all" {% if cfg.network.default_bar_days == 'all' %}selected{% endif %}>all</option>
               </select>
-              <label>Default table days</label>
-              <select name="network_default_table_days">
+              <label for="network-default-table-days">Default table days</label>
+              <select id="network-default-table-days" name="network_default_table_days">
                 {% for n,label in [(30,'30d'),(60,'60d'),(90,'90d'),(180,'180d'),(365,'365d')] %}
                 <option value="{{ n }}" {% if (cfg.network.default_table_days or 90) == n %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
@@ -374,16 +375,16 @@
             <h3>Speed defaults</h3>
             <div class="card-subtle">Speed page defaults, auto WAN tests, local iperf port, and notification thresholds.</div>
             <div class="notif-field-grid compact-top network-settings-grid">
-              <label>Page refresh</label>
-              <select name="speed_page_refresh_sec">
+              <label for="speed-page-refresh-sec">Page refresh</label>
+              <select id="speed-page-refresh-sec" name="speed_page_refresh_sec">
                 <option value="5" {% if (cfg.speed.page_refresh_sec or 15) == 5 %}selected{% endif %}>5s</option>
                 <option value="10" {% if (cfg.speed.page_refresh_sec or 15) == 10 %}selected{% endif %}>10s</option>
                 <option value="15" {% if (cfg.speed.page_refresh_sec or 15) == 15 %}selected{% endif %}>15s</option>
                 <option value="30" {% if (cfg.speed.page_refresh_sec or 15) == 30 %}selected{% endif %}>30s</option>
                 <option value="60" {% if (cfg.speed.page_refresh_sec or 15) == 60 %}selected{% endif %}>1m</option>
               </select>
-              <label>Default provider</label>
-              <select name="speed_default_provider">
+              <label for="speed-default-provider">Default provider</label>
+              <select id="speed-default-provider" name="speed_default_provider">
                 <option value="ookla" {% if (cfg.speed.default_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
                 <option value="librespeed" {% if (cfg.speed.default_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
                 <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>

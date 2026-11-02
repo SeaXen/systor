@@ -10,11 +10,9 @@ without restarting the daemon.
 Run as a systemd service (see systemd/systor-collector.service).
 """
 from __future__ import annotations
-import json
 import logging
 import os
 import signal
-import sys
 import time
 from pathlib import Path
 
@@ -284,20 +282,25 @@ def run():
 
             # CPU load (higher is worse)
             r = _check("cpu_load_1m", cpu.get("load_1m"), True)
-            if r: events.append(("CPU Load", r, _fmt("cpu_load_1m", r[1], _th_metric(th, "cpu_load_1m")[0])))
+            if r:
+                events.append(("CPU Load", r, _fmt("cpu_load_1m", r[1], _th_metric(th, "cpu_load_1m")[0])))
             # CPU temp (higher is worse)
             r = _check("cpu_temp_c", cpu.get("temp_c"), True)
-            if r: events.append(("CPU Temperature", r, _fmt("cpu_temp_c", r[1], _th_metric(th, "cpu_temp_c")[0])))
+            if r:
+                events.append(("CPU Temperature", r, _fmt("cpu_temp_c", r[1], _th_metric(th, "cpu_temp_c")[0])))
             # Memory free (lower is worse)
             r = _check("mem_free_mb", mem.get("available_mb"), False)
-            if r: events.append(("Memory", r, _fmt("mem_free_mb", r[1], _th_metric(th, "mem_free_mb")[0])))
+            if r:
+                events.append(("Memory", r, _fmt("mem_free_mb", r[1], _th_metric(th, "mem_free_mb")[0])))
             # Swap used (higher is worse)
             r = _check("swap_used_mb", mem.get("swap_used_mb"), True)
-            if r: events.append(("Swap", r, _fmt("swap_used_mb", r[1], _th_metric(th, "swap_used_mb")[0])))
+            if r:
+                events.append(("Swap", r, _fmt("swap_used_mb", r[1], _th_metric(th, "swap_used_mb")[0])))
             # Disk (higher is worse)
             if worst_disk:
                 r = _check("disk_used_pct", worst_disk.get("used_pct"), True)
-                if r: events.append(("Disk", r, _fmt("disk_used_pct", r[1], _th_metric(th, "disk_used_pct")[0])))
+                if r:
+                    events.append(("Disk", r, _fmt("disk_used_pct", r[1], _th_metric(th, "disk_used_pct")[0])))
 
             for subj, (kind, value, threshold), msg in events:
                 title = f"🔴 {subj} ALERT" if kind == "alert" else f"✅ {subj} recovered"

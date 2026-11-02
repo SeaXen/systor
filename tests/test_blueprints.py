@@ -1,6 +1,5 @@
 """Tests for Flask modular blueprints: route registration, status codes, and backwards compatibility."""
 import pytest
-from pathlib import Path
 
 from systor.web import create_app
 from systor.storage import Storage

@@ -37,6 +37,7 @@
     </div>
   </div>
 
+  <h2 class="sr-only">Applications &amp; Containers Overview</h2>
   <div class="apps-top-grid">
     <div class="stat-card compact-stat apps-summary-card rx-card">
       <div class="label">Host</div>
@@ -112,11 +113,13 @@
     </table>
   </details>
 
+  <h2 class="sr-only">Host System Services</h2>
   <div class="table-card compact-table" style="margin-top: 1rem;" id="systemd-wrap">
     <div class="apps-card-head">
       <h3><span>Host System Services (systemd)</span><span class="network-mini" id="systemd-meta">loading units…</span></h3>
       <div class="dash-controls">
         <input type="text" id="systemd-search" class="control-input compact" placeholder="Filter services…" autocomplete="off" spellcheck="false" aria-label="Filter services" style="width:140px;">
+        <label for="systemd-state-filter" class="sr-only">Filter by state</label>
         <select id="systemd-state-filter" class="control-select">
           <option value="all">all states</option>
           <option value="active" selected>active</option>

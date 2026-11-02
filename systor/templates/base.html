@@ -70,6 +70,8 @@
 <main class="container" id="main-content">
   {% block content %}{% endblock %}
 </main>
+<script src="/static/js/app.js"></script>
+<script src="/static/js/dialog.js"></script>
 {% block scripts %}{% endblock %}
 <script>
 (function(){
@@ -205,14 +207,16 @@ document.addEventListener('DOMContentLoaded', function(){
     drawer.style.display = 'flex';
     if(termToken){
       setUnlocked();
+      cmdInput?.focus();
     } else {
       setLocked();
-      passInput.focus();
+      passInput?.focus();
     }
   }
 
   function closeDrawer(){
     drawer.style.display = 'none';
+    toggle?.focus();
   }
 
   toggle.addEventListener('click', () => {
@@ -318,10 +322,10 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 
 {% if client_private %}
-<div id="terminal-drawer" class="terminal-drawer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: var(--surface-0); border-top: 2px solid var(--teal, #1d9e75); z-index: 1100; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); flex-direction: column; overscroll-behavior: contain;" role="region" aria-label="Emergency Terminal Console">
+<div id="terminal-drawer" class="terminal-drawer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: var(--surface-0); border-top: 2px solid var(--teal, #1d9e75); z-index: 1100; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); flex-direction: column; overscroll-behavior: contain;" role="dialog" aria-modal="true" aria-labelledby="term-title">
   <div class="terminal-drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; background: var(--surface-1); border-bottom: 1px solid var(--border);">
     <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span class="mono" style="font-weight: 700; color: var(--teal, #1d9e75);">&gt;_ Emergency Terminal</span>
+      <span id="term-title" class="mono" style="font-weight: 700; color: var(--teal, #1d9e75);">&gt;_ Emergency Terminal</span>
       <span id="term-status-chip" class="status-chip neutral">Locked</span>
     </div>
     <div style="display: flex; gap: 0.5rem;">

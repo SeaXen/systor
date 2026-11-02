@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SeaXen/systor/releases/tag/v1.0.0"><img alt="release" src="https://img.shields.io/github/v/release/SeaXen/systor?display_name=tag&sort=semver&color=1f6feb"></a>
+  <a href="https://github.com/SeaXen/systor/releases/tag/v1.1.0"><img alt="release" src="https://img.shields.io/github/v/release/SeaXen/systor?display_name=tag&sort=semver&color=1f6feb"></a>
   <a href="https://github.com/SeaXen/systor/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-3fb950"></a>
   <img alt="python" src="https://img.shields.io/badge/python-3.9%2B-58a6ff">
   <a href="https://systor.xuup.top/"><img alt="demo" src="https://img.shields.io/badge/demo-live_dashboard-8957e5"></a>
@@ -37,12 +37,13 @@ Available as both a **zero-overhead bare-metal systemd installation** (<30MB RAM
 
 - **Live dashboard** — CPU, temperature, memory, swap, disk I/O, CPU load, network DL/UL, chart history, top processes, recent alerts
 - **Drive Health & SMART Insights** — NVMe/SATA/SAS drive telemetry, wear percentage, reallocated sectors, and real-time disk health scoring
-- **Service Uptime & Blackbox Monitoring** — Probes external or internal HTTP, HTTPS, TCP, Ping, and DNS endpoints with latency history
+- **Service Uptime & Health Monitoring** — Probes external or internal HTTP, HTTPS, and TCP endpoints with latency history
 - **Systemd Service Manager & Audit Logging** — Inspect, restart, and monitor host system services with security audit logs
 - **SSL / TLS Certificate Tracker** — Live certificate chain validation, issuer verification, and expiration countdowns
 - **Security Updates & Kernel Reboot Indicators** — Instant alerts when APT/DNF pending security updates or `/var/run/reboot-required` are detected
 - **Prometheus Metric Exporter (`/metrics`)** — Native OpenMetrics format endpoint for optional external Prometheus/Grafana scraping
-- **One-Click Disaster Recovery** — Full JSON backup export and zero-downtime restore for configurations, uptime targets, and audit histories
+- **Emergency Web Console** — Authenticated, rate-limited in-browser emergency console for diagnostic and recovery operations
+- **Disaster Recovery** — Full JSON configuration and history export with safe WAL-checkpoint database restoration
 - **Apps page** — host + Docker processes ranked by CPU, RAM, network, and disk activity
 - **Network page** — live traffic + daily / monthly / yearly usage views with interface filtering
 - **Speed page** — official Ookla CLI runs, saved server selection, scheduler, run history, packet loss, and alert thresholds
@@ -295,30 +296,62 @@ Message formatting is different per channel so alerts stay readable.
 
 ## Releases and changelog
 
-- First public release: **v0.1.0**
+- Current release: **v1.1.0**
+- First public release: **v1.0.0**
 - Human-readable change history: [`CHANGELOG.md`](CHANGELOG.md)
+- Release details: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)
 - GitHub releases: use the Releases tab for tagged snapshots and release notes
 
 ---
 
-## API
+## Emergency Terminal (Web Console)
 
-The front-end consumes JSON endpoints under `/api/`.
+Systor includes a secure in-browser emergency console for diagnostics and service triage.
 
-Common endpoints:
-- `GET /api/snapshot`
-- `GET /api/runtime`
-- `GET /api/series?metric=cpu_pct&hours=6`
-- `GET /api/network-series?hours=6`
-- `GET /api/apps?scope=all&sort=cpu&limit=24`
-- `GET /api/top-processes?by=cpu&n=10`
-- `GET /api/public-dashboard?hours=6`
-- `GET /api/alerts?limit=50`
-- `POST /api/restart-collector`
-- `POST /api/restart-web`
-- `GET /health`
+### Security Controls:
+1. **Private Network Only**: Only accessible from private LAN / Tailscale addresses (`is_request_private`).
+2. **Mandatory Admin Hash**: Requires `auth.password_hash` to be configured. Default credentials are unconditionally rejected.
+3. **Per-IP Rate Limiting**: Exponential cooldown on failed attempts prevents brute-force attacks.
+4. **Ephemerality**: Single-use cryptographically random tokens bound strictly to client IP with a 15-minute TTL.
+5. **Accessibility**: Screen-reader friendly modal dialog (`role="dialog"`, `aria-modal="true"`) with keyboard Tab trapping and focus restoration on close.
 
-Public mode intentionally exposes only a small read-only subset.
+To open the terminal, click the terminal icon `>_` in the header or invoke the drawer.
+
+---
+
+## Configuration Reference
+
+Configuration is loaded from `/etc/systor/config.yaml`, `~/.config/systor/config.yaml`, or `./systor.yaml`. Any setting can be overridden via `SYSTOR_*` environment variables.
+
+| YAML Key | Type | Default | Environment Variable | Description |
+|---|---|---|---|---|
+| `collector.poll_interval_sec` | int | `5` | `SYSTOR_POLL_INTERVAL` | Seconds between telemetry polling cycles |
+| `collector.retention_days` | int | `7` | `SYSTOR_RETENTION_DAYS` | Days to keep raw 5-second metrics |
+| `collector.rollup_after_hours` | int | `24` | - | Age in hours before averaging into 5-minute buckets |
+| `collector.rollup_retention_days` | int | `90` | - | Retention for rolled-up metrics |
+| `thresholds.cpu_load_1m.value` | float | `4.0` | `SYSTOR_CPU_LOAD` | Sustained 1-minute CPU load alert threshold |
+| `thresholds.cpu_temp_c.value` | float | `85.0` | `SYSTOR_CPU_TEMP` | Sustained CPU temperature threshold (°C) |
+| `thresholds.mem_free_mb.value` | int | `500` | `SYSTOR_MEM_FREE_MB` | Low memory alert threshold in MB |
+| `thresholds.swap_used_mb.value` | int | `4096` | `SYSTOR_SWAP_USED_MB` | High swap usage alert threshold in MB |
+| `thresholds.disk_used_pct.value` | int | `90` | `SYSTOR_DISK_PCT` | Disk space usage threshold percentage |
+| `thresholds.cooldown_sec` | int | `600` | `SYSTOR_COOLDOWN` | Cooldown between repeated alerts for the same metric |
+| `telegram.enabled` | bool | `false` | - | Enable Telegram notifications |
+| `telegram.bot_token` | str | `""` | `SYSTOR_TELEGRAM_BOT_TOKEN` | Telegram Bot API token |
+| `telegram.chat_id` | str | `""` | `SYSTOR_TELEGRAM_CHAT_ID` | Telegram chat ID for alert delivery |
+| `discord.enabled` | bool | `false` | - | Enable Discord notifications |
+| `discord.webhook_url` | str | `""` | `SYSTOR_DISCORD_WEBHOOK` | Discord incoming webhook URL |
+| `auth.enabled` | bool | `false` | - | Require authentication for private dashboard |
+| `auth.username` | str | `"admin"` | - | Administrator username |
+| `auth.password_hash` | str | `""` | - | Werkzeug password hash for admin / terminal login |
+| `apps.auto_refresh_sec` | int | `15` | `SYSTOR_APPS_REFRESH_SEC` | Process list auto-refresh frequency in seconds |
+| `apps.default_limit` | int | `10` | `SYSTOR_APPS_LIMIT` | Top processes to display by default |
+| `apps.docker_control` | bool | `false` | - | Allow compose project restart actions from UI |
+| `web.host` | str | `"0.0.0.0"` | `SYSTOR_WEB_HOST` | Bind address (`0.0.0.0` for LAN, `127.0.0.1` for local) |
+| `web.port` | int | `6677` | `SYSTOR_WEB_PORT` | HTTP listening port |
+| `web.trusted_proxies` | str | `"127.0.0.1, ::1"` | - | Comma-separated trusted upstream proxy IPs/CIDRs |
+| `storage_page.allowed_roots` | str | `"/mnt/tb"` | - | Colon or comma-separated permitted storage roots |
+| `logging.level` | str | `"INFO"` | - | Minimum logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `logging.file` | str | `"/var/log/systor/systor.log"` | - | Log file destination |
 
 ---
 
@@ -326,23 +359,65 @@ Public mode intentionally exposes only a small read-only subset.
 
 ```text
 systor/
+├── .github/
+│   └── workflows/ci.yml
+├── docs/
+│   ├── index.html
+│   └── landing.css
+├── systemd/
+│   ├── systor-collector.service
+│   └── systor-web.service
 ├── systor/
+│   ├── blueprints/
+│   │   ├── apps.py
+│   │   ├── auth.py
+│   │   ├── common.py
+│   │   ├── dashboard.py
+│   │   ├── network.py
+│   │   ├── settings.py
+│   │   ├── speed.py
+│   │   └── storage.py
+│   ├── services/
+│   │   ├── backup_service.py
+│   │   ├── runtime_service.py
+│   │   ├── security_audit_service.py
+│   │   ├── smart_service.py
+│   │   ├── storage_service.py
+│   │   ├── systemd_service.py
+│   │   └── uptime_service.py
+│   ├── static/
+│   │   ├── css/ (tokens.css, style.css, style.min.css)
+│   │   ├── js/ (app.js, dialog.js)
+│   │   └── img/
+│   ├── templates/
+│   ├── bot.py
 │   ├── cli.py
 │   ├── collector.py
 │   ├── config.py
 │   ├── metrics.py
 │   ├── notifier.py
+│   ├── security.py
+│   ├── sensors.py
 │   ├── speed.py
 │   ├── storage.py
-│   ├── web.py
-│   ├── static/
-│   └── templates/
-├── systemd/
-├── docs/
-├── install.sh
+│   ├── terminal.py
+│   └── web.py
+├── tests/
+├── tools/
+│   └── design_audit.py
+├── docker-compose.yml
+├── Dockerfile
+├── pyproject.toml
 ├── requirements.txt
-├── setup.py
-└── README.md
+├── requirements-dev.txt
+├── install.sh
+├── uninstall.sh
+├── README.md
+├── RELEASE_NOTES.md
+├── SECURITY.md
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+└── LICENSE
 ```
 
 ---
@@ -393,6 +468,14 @@ A static marketing page lives in [`docs/`](docs/) (`index.html` + `landing.css`)
 **Settings → Pages → Build from branch `main` → folder `/docs`**
 
 Public URL: **https://seaxen.github.io/systor/** (after GitHub finishes the first deploy).
+
+---
+
+## Community & Contributing
+
+- **Contributing Guide**: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- **Security Policy & Vulnerability Reporting**: [`SECURITY.md`](SECURITY.md)
+- **Code of Conduct**: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 
 ---
 

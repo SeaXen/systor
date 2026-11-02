@@ -1,5 +1,4 @@
 """Tests for security, trusted proxies, and path traversal protection."""
-import pytest
 from unittest.mock import MagicMock
 
 from systor.security import (
@@ -151,3 +150,49 @@ def test_storage_resolve_storage_path_security(monkeypatch, tmp_path):
     rp, code, err = resolve_storage_path(str(secret_file))
     assert code == 403
     assert "secret" in err.lower()
+
+
+def test_preview_rejects_outside_roots(monkeypatch, tmp_path):
+    from systor.web import create_app
+    from systor.storage import Storage
+    from systor.blueprints import common
+
+    db_file = tmp_path / "test_sec.db"
+    store = Storage(db_path=db_file)
+    common._storage = store
+    monkeypatch.setattr("systor.blueprints.common.get_storage", lambda: store)
+
+    safe_root = tmp_path / "allowed_root"
+    safe_root.mkdir()
+    (safe_root / "sample.txt").write_text("allowed content")
+
+    outside_dir = tmp_path / "secret_dir"
+    outside_dir.mkdir()
+    outside_file = outside_dir / "secret.txt"
+    outside_file.write_text("classified")
+
+    cfg = {
+        "web": {"host": "127.0.0.1", "port": 6677, "trusted_proxies": "127.0.0.1"},
+        "auth": {"enabled": False},
+        "storage_page": {"allowed_roots": [str(safe_root)]},
+    }
+    monkeypatch.setattr("systor.blueprints.common.load_config", lambda: cfg)
+    monkeypatch.setattr("systor.config.load_config", lambda: cfg)
+    monkeypatch.setattr("systor.services.storage_service.safe_roots", lambda: [safe_root.resolve()])
+    monkeypatch.setattr("systor.blueprints.storage.safe_roots", lambda: [safe_root.resolve()])
+    monkeypatch.setattr("systor.web.start_apps_cache_worker", lambda: None)
+
+    app = create_app(start_worker=False)
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    # Allowed file returns 200
+    res_ok = client.get(f"/api/storage/preview?path={safe_root / 'sample.txt'}")
+    assert res_ok.status_code == 200
+    assert res_ok.get_json()["ok"] is True
+
+    # Outside file returns 403
+    res_outside = client.get(f"/api/storage/preview?path={outside_file}")
+    assert res_outside.status_code == 403
+    assert "outside" in res_outside.get_json()["error"].lower() or "escapes" in res_outside.get_json()["error"].lower()
+

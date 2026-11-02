@@ -1,6 +1,5 @@
 """Unit tests for hardware sensor telemetry (GPU, Raspberry Pi, and UPS)."""
 from unittest.mock import MagicMock, patch
-import pytest
 
 from systor.sensors import (
     get_gpu_metrics,

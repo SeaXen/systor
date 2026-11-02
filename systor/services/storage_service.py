@@ -26,7 +26,7 @@ _DENY_PREFIXES = (
     "/etc", "/boot", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/proc", "/sys", "/dev", "/run",
     "/var/lib/docker", "/var/lib/containerd", "/root/.hermes", "/root/.ssh", "/root/.config", "/root/.cache",
 )
-_DENY_NAME_RE = re.compile(r"(\.env$|id_rsa|id_ed25519|authorized_keys|token|secret|credential|auth\.json)", re.I)
+_DENY_NAME_RE = re.compile(r"(\.env$|id_rsa|id_ed25519|\.pem$|\.key$)", re.I)
 
 
 def format_ts(ts: float) -> str:
@@ -160,12 +160,16 @@ def resolve_storage_path(value: str | None, must_exist: bool = True) -> tuple[Pa
 def resolve_storage_browse_path(value: str | None) -> tuple[Path | None, bool, int, str]:
     """Resolve browse path. Returns (Path, managed, status_code, error)."""
     raw = (value or "").strip()
-    if raw == "/":
-        return Path("/"), False, 200, ""
     roots = safe_roots()
+    if not roots:
+        return None, False, 403, "outside allowed roots"
+
+    if not raw or raw == "/":
+        return roots[0], True, 200, ""
+
     p = Path(raw).expanduser()
     if not p.is_absolute():
-        p = (roots[0] / p) if roots else Path("/mnt/tb") / p
+        p = roots[0] / p
     try:
         rp = p.resolve(strict=True)
     except FileNotFoundError:
@@ -174,12 +178,12 @@ def resolve_storage_browse_path(value: str | None) -> tuple[Path | None, bool, i
         return None, False, 400, str(e)
 
     sp = str(rp)
-    if sp == "/" or any(sp == x or sp.startswith(x + "/") for x in _DENY_PREFIXES):
-        return None, False, 403, "blocked system or secret path"
     if _DENY_NAME_RE.search(sp):
         return None, False, 403, "blocked secret-like path"
     managed = any(is_under(root, rp) for root in roots)
-    return rp, managed, 200, ""
+    if not managed:
+        return None, False, 403, "outside allowed roots"
+    return rp, True, 200, ""
 
 
 def dir_size_immediate(path: Path) -> tuple[int, int, int]:

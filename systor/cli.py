@@ -5,14 +5,12 @@ Install via setup.py / pip install . — provides the `systor` command.
 from __future__ import annotations
 import argparse
 import json
-import os
 import sys
-from pathlib import Path
 
 from .config import load_config, save_config
 from .metrics import collect_snapshot
 from .notifier import send_telegram, send_discord
-from .storage import Storage, DEFAULT_DB_PATH
+from .storage import Storage
 from . import __version__, __app_name__
 
 

@@ -1,0 +1,22 @@
+# Development / CI dependencies for systor.
+# Install with:  pip install -r requirements-dev.txt
+#                playwright install chromium
+#
+# The design audit (tools/design_audit.py) degrades gracefully if these are
+# absent, so a plain `pytest` run never breaks because of them.
+
+-r requirements.txt
+
+# Test / CI
+pytest>=8.0
+pytest-cov>=5.0
+
+# Design & accessibility audit (tools/design_audit.py)
+playwright>=1.40
+Pillow>=10.0
+
+# Lint / types / security (Phase 3 of SYSTOR-10x10-PLAN.md)
+ruff>=0.6
+mypy>=1.10
+bandit>=1.7
+pip-audit>=2.7

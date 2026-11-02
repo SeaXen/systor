@@ -15,7 +15,6 @@ import tarfile
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
 
 from .. import __version__, __app_name__
 from ..config import load_config, save_config
@@ -91,9 +90,15 @@ def restore_backup_archive(archive_bytes: bytes, storage) -> tuple[bool, str]:
                 for member in tar.getmembers():
                     if member.name.startswith("/") or ".." in member.name:
                         return False, "Dangerous path detected in archive"
-                if hasattr(tarfile, "data_filter"):
+                try:
                     tar.extractall(path=temp_dir, filter="data")
-                else:
+                except (TypeError, AttributeError):  # Python < 3.12
+                    for m in tar.getmembers():
+                        if not (m.isreg() or m.isdir()):
+                            return False, "non-regular member in archive"
+                        dest = os.path.realpath(os.path.join(temp_dir, m.name))
+                        if not dest.startswith(str(temp_dir)):
+                            return False, "member escapes destination"
                     tar.extractall(path=temp_dir)
         except Exception as e:
             return False, f"Failed to extract backup archive: {e}"
@@ -120,16 +125,13 @@ def restore_backup_archive(archive_bytes: bytes, storage) -> tuple[bool, str]:
 
         with storage._lock:
             try:
+                if hasattr(storage, "checkpoint"):
+                    storage.checkpoint()
                 if active_db.exists():
                     shutil.copy2(active_db, backup_path)
                 shutil.copy2(restored_db, active_db)
-                # Clean up any lingering WAL/SHM from previous database so SQLite starts clean
-                wal_file = active_db.with_name(active_db.name + "-wal")
-                shm_file = active_db.with_name(active_db.name + "-shm")
-                if wal_file.exists():
-                    wal_file.unlink(missing_ok=True)
-                if shm_file.exists():
-                    shm_file.unlink(missing_ok=True)
+                if hasattr(storage, "checkpoint"):
+                    storage.checkpoint()
             except Exception as e:
                 return False, f"Error swapping database file: {e}"
 

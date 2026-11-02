@@ -6,7 +6,6 @@ and Fail2ban active jails with zero external dependencies and safe caching.
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shutil
 import subprocess

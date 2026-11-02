@@ -12,7 +12,6 @@ import threading
 import time
 import urllib.request
 import urllib.parse
-from typing import Any
 
 from .metrics import collect_snapshot
 from .storage import Storage, DEFAULT_DB_PATH

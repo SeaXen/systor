@@ -19,6 +19,7 @@ _uptime_thread: threading.Thread | None = None
 _uptime_stop = threading.Event()
 _last_check_ts: dict[int, float] = {}
 _fail_count: dict[int, int] = {}
+_in_alert: dict[int, bool] = {}
 
 
 def ping_target(target: dict[str, Any]) -> tuple[bool, int | None, float, str | None]:
@@ -57,11 +58,14 @@ def ping_target(target: dict[str, Any]) -> tuple[bool, int | None, float, str | 
     )
 
     try:
-        # Avoid SSL verification failure on local self-signed homelab certs
         import ssl
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        verify_tls = target.get("verify_tls", True) if isinstance(target, dict) else True
+        if verify_tls:
+            ctx = ssl.create_default_context()
+        else:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
 
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
             code = resp.getcode()
@@ -97,12 +101,14 @@ def run_single_audit_cycle(storage) -> None:
             if not ok:
                 fails = _fail_count.get(tid, 0) + 1
                 _fail_count[tid] = fails
-                if fails == 2:  # Alert on 2 consecutive failures
+                if fails >= 2 and not _in_alert.get(tid, False):
+                    _in_alert[tid] = True
                     name = t.get("name", f"Target #{tid}")
                     msg = f"Service '{name}' is DOWN: {err or f'HTTP {code}'}"
                     storage.log_alert(f"uptime.{name}", "alert", code or 0, t.get("expected_status", 200), msg)
             else:
-                if _fail_count.get(tid, 0) >= 2:
+                if _in_alert.get(tid, False):
+                    _in_alert[tid] = False
                     name = t.get("name", f"Target #{tid}")
                     storage.log_alert(f"uptime.{name}", "recover", code or 200, t.get("expected_status", 200), f"Service '{name}' is back online.")
                 _fail_count[tid] = 0

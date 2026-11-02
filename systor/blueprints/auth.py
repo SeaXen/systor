@@ -1,7 +1,6 @@
 """Authentication blueprint for Systor."""
 from __future__ import annotations
-import time
-from flask import Blueprint, render_template, request, redirect, url_for, abort, session
+from flask import Blueprint, render_template, request, redirect, url_for, abort, current_app
 from werkzeug.security import check_password_hash
 
 from .common import (
@@ -24,7 +23,7 @@ def _req_ip() -> str:
 def page_login():
     if not client_private():
         abort(404)
-    if not auth_enabled() and request.args.get("preview") != "1":
+    if not auth_enabled() and not current_app.config.get("AUDIT_MODE") and request.args.get("preview") != "1":
         return redirect(url_for("dashboard.page_dashboard"))
     if auth_logged_in():
         nxt = str(request.values.get("next") or "/")

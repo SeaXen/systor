@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-import shlex
 import subprocess
 import time
 from typing import Any
@@ -38,9 +37,7 @@ def authenticate_terminal_session(
         if not check_password_hash(stored_password_hash, password):
             return False, "Incorrect admin password", None
     else:
-        # Default fallback for unconfigured auth: require confirmation string
-        if password != "admin" and password != "systor":
-            return False, "Incorrect password. Set auth.password in config to secure console.", None
+        return False, "Set auth.password_hash before using the emergency console.", None
 
     token = secrets.token_urlsafe(32)
     now = time.time()

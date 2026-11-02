@@ -24,9 +24,40 @@ def page_dashboard():
     return render_template("dashboard.html", cfg=cfg)
 
 
+def _clean_config(cfg: dict) -> dict:
+    if not isinstance(cfg, dict):
+        return cfg
+    import copy
+    c = copy.deepcopy(cfg)
+    for section in ("telegram", "discord", "auth", "storage_page"):
+        if section in c and isinstance(c[section], dict):
+            for secret_key in ("bot_token", "webhook_url", "password_hash", "session_secret", "action_password_hash"):
+                if secret_key in c[section] and c[section][secret_key]:
+                    c[section][secret_key] = "********"
+    return c
+
+
 @dashboard_bp.route("/health")
 def health():
-    return jsonify({"ok": True, "ts": time.time()})
+    cfg = load_config()
+    poll_sec = int(cfg.get("collector", {}).get("poll_interval_sec", 2))
+    try:
+        st = get_storage().stats()
+        newest = st.get("newest_sample_ts")
+        now = time.time()
+        if st.get("samples", 0) > 0 and newest is not None:
+            age = now - newest
+            if age > (3 * poll_sec):
+                return jsonify({
+                    "ok": False,
+                    "error": f"Stale collector data: newest sample is {age:.1f}s old (limit {3 * poll_sec}s)",
+                    "newest_sample_ts": newest,
+                    "age_sec": round(age, 1),
+                    "ts": now
+                }), 503
+        return jsonify({"ok": True, "ts": now, "db_ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Database unreachable: {e}", "ts": time.time()}), 503
 
 
 @dashboard_bp.route("/api/version")
@@ -64,7 +95,7 @@ def api_series():
 def api_system():
     cfg = load_config()
     return jsonify({
-        "config": cfg,
+        "config": _clean_config(cfg),
         "snapshot": collect_snapshot(),
         "db_stats": get_storage().stats(),
     })
@@ -193,7 +224,6 @@ def prometheus_metrics():
     snap = collect_snapshot()
     cpu = snap.get("cpu", {})
     mem = snap.get("memory", {})
-    net = snap.get("network", {})
     disk_io = snap.get("disk_io", {})
 
     lines: list[str] = [

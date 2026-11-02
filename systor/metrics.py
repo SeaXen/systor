@@ -6,11 +6,27 @@ The state is minimal: a few ints and dicts, total ~1 KB.
 """
 from __future__ import annotations
 import os
-import shutil
 import subprocess
 import time
+import threading
 from pathlib import Path
 from typing import Any
+
+_METRIC_LOCK = threading.RLock()
+_PAGE_SIZE_KB: int | None = None
+
+
+def _page_size_kb() -> int:
+    global _PAGE_SIZE_KB
+    if _PAGE_SIZE_KB is None:
+        try:
+            if hasattr(os, "sysconf"):
+                _PAGE_SIZE_KB = os.sysconf("SC_PAGE_SIZE") // 1024
+            else:
+                _PAGE_SIZE_KB = 4
+        except Exception:
+            _PAGE_SIZE_KB = 4
+    return _PAGE_SIZE_KB or 4
 
 
 # Module-level state for deltas
@@ -18,7 +34,7 @@ _prev_cpu_stat: tuple[int, int] | None = None   # (total, idle)
 _prev_disk: dict[str, tuple[int, int]] = {}     # name -> (read_sectors, write_sectors)
 _prev_net: tuple[int, int, float] | None = None # (rx, tx, ts)
 _prev_net_ifaces: dict[str, tuple[int, int]] = {}
-_prev_proc: dict[int, tuple[int, int]] = {}     # pid -> (utime, stime) in clock ticks
+_prev_proc: dict[int, tuple[int, int, int]] = {} # pid -> (utime, stime, rss_pages)
 _last_proc_scan_ts: float = 0.0
 _last_disk_ts: float = 0.0
 _last_net_ts: float = 0.0
@@ -54,19 +70,20 @@ def read_cpu_percent(prev_total: int | None = None, prev_idle: int | None = None
 def _cpu_percent_delta() -> float | None:
     """Track CPU% across calls (no per-call sleep, so very cheap)."""
     global _prev_cpu_stat
-    try:
-        total, idle = _stat_total_idle()
-        prev = _prev_cpu_stat
-        _prev_cpu_stat = (total, idle)
-        if prev is None:
+    with _METRIC_LOCK:
+        try:
+            total, idle = _stat_total_idle()
+            prev = _prev_cpu_stat
+            _prev_cpu_stat = (total, idle)
+            if prev is None:
+                return None
+            dt = total - prev[0]
+            di = idle - prev[1]
+            if dt <= 0:
+                return 0.0
+            return round(100.0 * (dt - di) / dt, 1)
+        except Exception:
             return None
-        dt = total - prev[0]
-        di = idle - prev[1]
-        if dt <= 0:
-            return 0.0
-        return round(100.0 * (dt - di) / dt, 1)
-    except Exception:
-        return None
 
 
 def _stat_total_idle() -> tuple[int, int]:
@@ -193,35 +210,36 @@ def read_disk_io_mbps(elapsed_sec: float | None = None) -> dict:
     from the last call (also returns zeros on first call).
     """
     global _prev_disk, _last_disk_ts
-    try:
-        cur = _read_diskstats_raw()
-        prev = _prev_disk
-        now = time.time()
-        if elapsed_sec is None:
-            elapsed = (now - _last_disk_ts) if _last_disk_ts else 0
-        else:
-            elapsed = elapsed_sec
-        _prev_disk = cur
-        _last_disk_ts = now
-        if not prev or elapsed <= 0:
+    with _METRIC_LOCK:
+        try:
+            cur = _read_diskstats_raw()
+            prev = _prev_disk
+            now = time.time()
+            if elapsed_sec is None:
+                elapsed = (now - _last_disk_ts) if _last_disk_ts else 0
+            else:
+                elapsed = elapsed_sec
+            _prev_disk = cur
+            _last_disk_ts = now
+            if not prev or elapsed <= 0:
+                return {"read_mbps": 0.0, "write_mbps": 0.0, "devices": []}
+            devs = []
+            total_r = 0.0
+            total_w = 0.0
+            for name, (r, w) in cur.items():
+                if name in prev:
+                    pr, pw = prev[name]
+                    d_r = max(0, r - pr)
+                    d_w = max(0, w - pw)
+                    # sectors are 512 bytes
+                    r_mbps = round(d_r * 512 / elapsed / (1024 * 1024), 3)
+                    w_mbps = round(d_w * 512 / elapsed / (1024 * 1024), 3)
+                    devs.append({"name": name, "read_mbps": r_mbps, "write_mbps": w_mbps})
+                    total_r += r_mbps
+                    total_w += w_mbps
+            return {"read_mbps": round(total_r, 3), "write_mbps": round(total_w, 3), "devices": devs}
+        except Exception:
             return {"read_mbps": 0.0, "write_mbps": 0.0, "devices": []}
-        devs = []
-        total_r = 0.0
-        total_w = 0.0
-        for name, (r, w) in cur.items():
-            if name in prev:
-                pr, pw = prev[name]
-                d_r = max(0, r - pr)
-                d_w = max(0, w - pw)
-                # sectors are 512 bytes
-                r_mbps = round(d_r * 512 / elapsed / (1024 * 1024), 3)
-                w_mbps = round(d_w * 512 / elapsed / (1024 * 1024), 3)
-                devs.append({"name": name, "read_mbps": r_mbps, "write_mbps": w_mbps})
-                total_r += r_mbps
-                total_w += w_mbps
-        return {"read_mbps": round(total_r, 3), "write_mbps": round(total_w, 3), "devices": devs}
-    except Exception:
-        return {"read_mbps": 0.0, "write_mbps": 0.0, "devices": []}
 
 
 def read_uptime_sec() -> int | None:
@@ -260,43 +278,45 @@ def read_network_stats() -> dict[str, int] | None:
 def read_network_interfaces() -> list[dict]:
     """Per-interface network counters + cheap delta rates from /proc/net/dev."""
     global _prev_net_ifaces, _last_net_ts
-    try:
-        rows = []
-        cur: dict[str, tuple[int, int]] = {}
-        now = time.time()
-        elapsed = (now - _last_net_ts) if _last_net_ts else 0.0
-        for line in Path('/proc/net/dev').read_text().splitlines()[2:]:
-            if ':' not in line:
-                continue
-            iface, rest = line.split(':', 1)
-            iface = iface.strip()
-            if iface == 'lo':
-                continue
-            cols = rest.split()
-            try:
-                rx = int(cols[0]); tx = int(cols[8])
-            except (ValueError, IndexError):
-                continue
-            cur[iface] = (rx, tx)
-            prev = _prev_net_ifaces.get(iface)
-            rx_mbps = tx_mbps = 0.0
-            if prev is not None and elapsed > 0:
-                rx_mbps = max(0.0, (rx - prev[0]) / elapsed / (1024 * 1024))
-                tx_mbps = max(0.0, (tx - prev[1]) / elapsed / (1024 * 1024))
-            rows.append({
-                'iface': iface,
-                'rx_bytes': rx,
-                'tx_bytes': tx,
-                'total_bytes': rx + tx,
-                'rx_mbps': round(rx_mbps, 4),
-                'tx_mbps': round(tx_mbps, 4),
-            })
-        _prev_net_ifaces = cur
-        _last_net_ts = now
-        rows.sort(key=lambda r: (r['rx_mbps'] + r['tx_mbps'], r['total_bytes']), reverse=True)
-        return rows
-    except Exception:
-        return []
+    with _METRIC_LOCK:
+        try:
+            rows = []
+            cur: dict[str, tuple[int, int]] = {}
+            now = time.time()
+            elapsed = (now - _last_net_ts) if _last_net_ts else 0.0
+            for line in Path('/proc/net/dev').read_text().splitlines()[2:]:
+                if ':' not in line:
+                    continue
+                iface, rest = line.split(':', 1)
+                iface = iface.strip()
+                if iface == 'lo':
+                    continue
+                cols = rest.split()
+                try:
+                    rx = int(cols[0])
+                    tx = int(cols[8])
+                except (ValueError, IndexError):
+                    continue
+                cur[iface] = (rx, tx)
+                prev = _prev_net_ifaces.get(iface)
+                rx_mbps = tx_mbps = 0.0
+                if prev is not None and elapsed > 0:
+                    rx_mbps = max(0.0, (rx - prev[0]) / elapsed / (1024 * 1024))
+                    tx_mbps = max(0.0, (tx - prev[1]) / elapsed / (1024 * 1024))
+                rows.append({
+                    'iface': iface,
+                    'rx_bytes': rx,
+                    'tx_bytes': tx,
+                    'total_bytes': rx + tx,
+                    'rx_mbps': round(rx_mbps, 4),
+                    'tx_mbps': round(tx_mbps, 4),
+                })
+            _prev_net_ifaces = cur
+            _last_net_ts = now
+            rows.sort(key=lambda r: (r['rx_mbps'] + r['tx_mbps'], r['total_bytes']), reverse=True)
+            return rows
+        except Exception:
+            return []
 
 
 # ---------- Process list (no psutil dep) ----------
@@ -360,51 +380,52 @@ def read_top_processes(n: int = 10, by: str = "cpu") -> list[dict]:
     Cost: O(num_procs) syscalls. For 250 procs ~5ms.
     """
     global _prev_proc, _last_proc_scan_ts
-    clk_tck = 100
-    if hasattr(os, "sysconf"):
+    with _METRIC_LOCK:
+        clk_tck = 100
+        if hasattr(os, "sysconf"):
+            try:
+                clk_tck = os.sysconf("SC_CLK_TCK") or 100
+            except Exception:
+                clk_tck = 100
+        now = time.time()
+        elapsed = now - _last_proc_scan_ts if _last_proc_scan_ts else None
+        _last_proc_scan_ts = now
+
+        procs = []
         try:
-            clk_tck = os.sysconf("SC_CLK_TCK") or 100
+            pids = [int(p) for p in os.listdir("/proc") if p.isdigit()]
         except Exception:
-            clk_tck = 100
-    now = time.time()
-    elapsed = now - _last_proc_scan_ts if _last_proc_scan_ts else None
-    _last_proc_scan_ts = now
+            return []
 
-    procs = []
-    try:
-        pids = [int(p) for p in os.listdir("/proc") if p.isdigit()]
-    except Exception:
-        return []
+        cur_proc: dict[int, tuple[int, int, int]] = {}
+        for pid in pids:
+            s = _read_proc_stat(pid)
+            if s is None:
+                continue
+            comm, utime, stime, rss_pages, _start = s
+            cur_proc[pid] = (utime, stime, rss_pages)
+            prev = _prev_proc.get(pid)
+            if prev is not None and elapsed and elapsed > 0:
+                d_ut = max(0, utime - prev[0])
+                d_st = max(0, stime - prev[1])
+                cpu_pct = round(100.0 * (d_ut + d_st) / clk_tck / elapsed, 1)
+            else:
+                cpu_pct = 0.0
+            procs.append({
+                "pid": pid,
+                "name": comm[:60],
+                "user": _read_proc_uid(pid),
+                "cpu_percent": cpu_pct,
+                "mem_mb": round(rss_pages * _page_size_kb() / 1024, 1),
+                "cmdline": _read_proc_cmdline(pid),
+            })
+        _prev_proc = cur_proc
 
-    cur_proc: dict[int, tuple[int, int, int]] = {}
-    for pid in pids:
-        s = _read_proc_stat(pid)
-        if s is None:
-            continue
-        comm, utime, stime, rss_pages, _start = s
-        cur_proc[pid] = (utime, stime, rss_pages)
-        prev = _prev_proc.get(pid)
-        if prev is not None and elapsed and elapsed > 0:
-            d_ut = max(0, utime - prev[0])
-            d_st = max(0, stime - prev[1])
-            cpu_pct = round(100.0 * (d_ut + d_st) / clk_tck / elapsed, 1)
+        if by == "mem":
+            procs.sort(key=lambda p: p["mem_mb"], reverse=True)
         else:
-            cpu_pct = 0.0
-        procs.append({
-            "pid": pid,
-            "name": comm[:60],
-            "user": _read_proc_uid(pid),
-            "cpu_percent": cpu_pct,
-            "mem_mb": round(rss_pages * 4 / 1024, 1),  # pages * 4 KB → MB
-            "cmdline": _read_proc_cmdline(pid),
-        })
-    _prev_proc = cur_proc
-
-    if by == "mem":
-        procs.sort(key=lambda p: p["mem_mb"], reverse=True)
-    else:
-        procs.sort(key=lambda p: (p["cpu_percent"], p["mem_mb"]), reverse=True)
-    return procs[:n]
+            procs.sort(key=lambda p: (p["cpu_percent"], p["mem_mb"]), reverse=True)
+        return procs[:n]
 
 
 def read_total_memory_mb() -> int:

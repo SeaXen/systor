@@ -69,6 +69,7 @@ DEFAULT_CONFIG: dict = {
         "default_scope": "all",
         "default_sort": "cpu",
         "default_limit": 10,
+        "docker_control": False,
     },
     "speed": {
         "page_refresh_sec": 0,
@@ -135,6 +136,12 @@ def _yaml_to_dict(text: str) -> dict:
                 parent[k] = d
                 stack.append((indent, d))
             else:
+                # Strip inline comments from unquoted scalars
+                if not ((v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'"))):
+                    if " #" in v:
+                        v = v.split(" #", 1)[0].rstrip()
+                    elif "\t#" in v:
+                        v = v.split("\t#", 1)[0].rstrip()
                 # scalar
                 if v.lower() in ("true", "false"):
                     val: Any = v.lower() == "true"
@@ -297,6 +304,8 @@ def save_config(cfg: dict, path: Path | None = None) -> Path:
 
 
 def _scalar_repr(v: Any) -> str:
-    if isinstance(v, bool): return "true" if v else "false"
-    if isinstance(v, (int, float)): return str(v)
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
     return f'"{v}"'

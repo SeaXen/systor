@@ -1,7 +1,6 @@
 """Runtime inspection, process metrics, and Docker/Host monitoring service."""
 from __future__ import annotations
 import logging
-import os
 import re
 import subprocess
 import sys
@@ -72,25 +71,32 @@ def get_docker_apps(limit: int = 24) -> list[dict]:
         ).stdout.splitlines()
         rows: list[dict] = []
         for line in out:
-            parts = line.split("\t")
-            if len(parts) < 6:
+            try:
+                parts = line.split("\t")
+                if len(parts) < 6:
+                    continue
+                cid, name, cpu_s, mem_s, net_s, blk_s = parts[:6]
+                cpu_clean = cpu_s.strip().rstrip("%")
+                try:
+                    cpu_pct = float(cpu_clean) if cpu_clean else 0.0
+                except ValueError:
+                    cpu_pct = 0.0
+                mem_used_s = mem_s.split("/")[0].strip()
+                net_in_s = net_s.split("/")[0].strip()
+                net_out_s = net_s.split("/")[1].strip() if "/" in net_s else "0B"
+                blk_in_s = blk_s.split("/")[0].strip()
+                blk_out_s = blk_s.split("/")[1].strip() if "/" in blk_s else "0B"
+                rows.append({
+                    "kind": "docker", "id": cid[:12], "name": name,
+                    "cpu_percent": round(cpu_pct, 2),
+                    "mem_mb": _parse_docker_size_mb(mem_used_s),
+                    "net_in_mb": _parse_docker_size_mb(net_in_s),
+                    "net_out_mb": _parse_docker_size_mb(net_out_s),
+                    "disk_in_mb": _parse_docker_size_mb(blk_in_s),
+                    "disk_out_mb": _parse_docker_size_mb(blk_out_s),
+                })
+            except Exception:
                 continue
-            cid, name, cpu_s, mem_s, net_s, blk_s = parts[:6]
-            cpu_pct = float(cpu_s.strip().rstrip("%") or 0)
-            mem_used_s = mem_s.split("/")[0].strip()
-            net_in_s = net_s.split("/")[0].strip()
-            net_out_s = net_s.split("/")[1].strip() if "/" in net_s else "0B"
-            blk_in_s = blk_s.split("/")[0].strip()
-            blk_out_s = blk_s.split("/")[1].strip() if "/" in blk_s else "0B"
-            rows.append({
-                "kind": "docker", "id": cid[:12], "name": name,
-                "cpu_percent": round(cpu_pct, 2),
-                "mem_mb": _parse_docker_size_mb(mem_used_s),
-                "net_in_mb": _parse_docker_size_mb(net_in_s),
-                "net_out_mb": _parse_docker_size_mb(net_out_s),
-                "disk_in_mb": _parse_docker_size_mb(blk_in_s),
-                "disk_out_mb": _parse_docker_size_mb(blk_out_s),
-            })
         with _docker_cache_lock:
             _docker_cache["ts"] = now
             _docker_cache["rows"] = rows
@@ -324,6 +330,10 @@ def restart_compose_project(project: str) -> tuple[bool, str]:
     clean = project.strip()
     if not re.match(r"^[a-zA-Z0-9_\-]+$", clean):
         return False, f"Invalid project name: '{clean}'"
+
+    from ..config import load_config
+    if not load_config().get("apps", {}).get("docker_control", False):
+        return False, "Docker container control is disabled in configuration (apps.docker_control: false)"
 
     docker = shutil.which("docker")
     if not docker:

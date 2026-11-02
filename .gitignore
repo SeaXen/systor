@@ -42,6 +42,8 @@ env/
 .coverage
 htmlcov/
 tests/screenshots/
+report.json
+out/
 
 # OS files
 Thumbs.db

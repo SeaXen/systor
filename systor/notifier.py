@@ -6,7 +6,6 @@ import logging
 import urllib.request
 import urllib.error
 import urllib.parse
-from typing import Any
 
 log = logging.getLogger("systor.notifier")
 

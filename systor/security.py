@@ -3,7 +3,6 @@ from __future__ import annotations
 import ipaddress
 import re
 from typing import Sequence
-from werkzeug.security import check_password_hash
 
 
 def parse_trusted_proxies(raw: str | Sequence[str] | None) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:

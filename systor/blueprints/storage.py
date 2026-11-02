@@ -1,14 +1,11 @@
 """Storage file manager blueprint for Systor: browse, upload, download, trash, checksum."""
 from __future__ import annotations
-import hashlib
 import json
 import logging
 import os
 import re
 import shutil
 import tempfile
-import threading
-import time
 import zipfile
 from pathlib import Path
 from flask import Blueprint, render_template, request, jsonify, abort, send_file, after_this_request
@@ -21,9 +18,8 @@ from ..services.storage_service import (
     storage_cfg, storage_public_cfg, verify_storage_action_password,
     safe_roots, storage_roots_payload, resolve_storage_path,
     resolve_storage_browse_path, mount_payload, auto_storage_roots,
-    virtual_root_entries, quick_storage_analysis, dir_size_limited,
-    entry_payload, STORAGE_OP_LOG, log_storage_op, trash_destination,
-    _storage_deep_state, _storage_deep_lock, _DENY_NAME_RE, is_under,
+    virtual_root_entries, quick_storage_analysis, entry_payload, STORAGE_OP_LOG, log_storage_op, trash_destination,
+    _DENY_NAME_RE, is_under,
     format_ts
 )
 from ..services.smart_service import get_drive_health
@@ -37,7 +33,7 @@ def _get_action_pw(body: dict | None = None) -> str:
     pw = ""
     if body:
         pw = str(body.get("action_password") or "")
-    return pw or request.headers.get("X-Storage-Password", "") or request.args.get("pw", "")
+    return pw or request.headers.get("X-Storage-Password", "")
 
 
 @storage_bp.route("/storage", endpoint="page_storage")
@@ -227,6 +223,9 @@ def api_storage_preview():
     p, code, err = resolve_storage_path(request.args.get("path"), must_exist=True)
     if not p or not p.is_file():
         return jsonify({"ok": False, "error": err or "preview supports files only"}), code
+    roots = safe_roots()
+    if not any(is_under(root, p) for root in roots):
+        return jsonify({"ok": False, "error": "outside allowed roots"}), 403
     st = p.stat()
     suffix = p.suffix.lower()
     text_ext = {".txt", ".md", ".log", ".json", ".yaml", ".yml", ".toml", ".csv", ".py", ".sh", ".js", ".ts", ".css", ".html", ".xml"}

@@ -2,30 +2,38 @@
 name: systor
 description: Zero-dependency, engineering-grade host and container telemetry design system
 colors:
-  bg: "#0f1117"
-  bg-elev: "#161b22"
-  bg-card: "#161b22"
-  bg-input: "#0b0f14"
-  bg-hover: "#21262d"
+  bg: "#0b0b0b"
+  bg-elev: "#151515"
+  bg-card: "#1a1a19"
+  bg-input: "#111110"
+  bg-hover: "#222220"
   border: "#30363d"
   border-2: "#3d444d"
-  text: "#c9d1d9"
-  text-muted: "#8b949e"
-  text-bright: "#e6edf3"
+  text: "#d4d3c9"
+  text-muted: "#9e9c94"
+  text-bright: "#f5f4f0"
   white: "#ffffff"
-  primary: "#58a6ff"
-  primary-light: "#9ecbff"
-  primary-deep: "#1f6feb"
+  teal: "#1d9e75"
+  teal-strong: "#0d5c45"
+  teal-text: "#2dd4bf"
+  teal-light: "#177f5e"
+  primary: "#1d9e75"
+  primary-light: "#2dd4bf"
+  primary-deep: "#0d5c45"
+  blue: "#58a6ff"
+  blue-2: "#1f6feb"
   success: "#3fb950"
   success-light: "#96f2a6"
-  warning: "#d29922"
+  warning: "#e3b341"
   warning-light: "#ffcc8a"
   danger: "#f85149"
   danger-light: "#ff938a"
-  purple: "#bc8cff"
+  purple: "#a78bfa"
   purple-light: "#d8b9ff"
-  cyan: "#22d3ee"
+  cyan: "#2dd4bf"
   cyan-light: "#8be9ff"
+  paper-bg: "#f9f9f7"
+  paper-card: "#ffffff"
   tag-video: "#ffb86c"
   tag-doc: "#93c5fd"
   tag-image: "#a7f3d0"
@@ -38,6 +46,24 @@ typography:
     fontWeight: 650
     lineHeight: 1.1
     letterSpacing: "normal"
+  kpi:
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    fontSize: "26px"
+    fontWeight: 700
+    lineHeight: 1.0
+    letterSpacing: "-0.02em"
+  heading-2:
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    fontSize: "18px"
+    fontWeight: 650
+    lineHeight: 1.2
+    letterSpacing: "normal"
+  subheading:
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    fontSize: "15px"
+    fontWeight: 600
+    lineHeight: 1.25
+    letterSpacing: "normal"
   title:
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     fontSize: "14px"
@@ -49,6 +75,12 @@ typography:
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.5
+    letterSpacing: "normal"
+  compact:
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.4
     letterSpacing: "normal"
   label:
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
@@ -63,10 +95,13 @@ typography:
     lineHeight: 1.35
     letterSpacing: "normal"
 rounded:
-  sm: "4px"
-  md: "6px"
-  lg: "8px"
-  xl: "12px"
+  xs: "4px"
+  sm: "6px"
+  base: "7px"
+  md: "8px"
+  lg: "10px"
+  card: "12px"
+  modal: "16px"
   pill: "999px"
 spacing:
   xs: "4px"

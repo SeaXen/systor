@@ -31,7 +31,11 @@ services:
 
       # Host systemd management via D-Bus and container inspect
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Docker socket is opt-in for container inspect/management:
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    security_opt:
+      - no-new-privileges:true
 
     environment:
       - SYSTOR_WEB_HOST=0.0.0.0

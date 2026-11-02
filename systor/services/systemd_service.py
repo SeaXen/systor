@@ -12,22 +12,34 @@ import shutil
 import subprocess
 from typing import Any
 
+import time
+
 log = logging.getLogger("systor.services.systemd")
 
 # Allowed service unit name pattern
 _UNIT_RE = re.compile(r"^[a-zA-Z0-9_\-\.@]+\.service$")
 
-# Safety deny-list to prevent breaking host OS
+# Safety deny-list to prevent breaking host OS and remote connectivity
 _DENY_UNITS = {
     "init.scope",
     "systemd-journald.service",
     "systemd-udevd.service",
     "systemd-logind.service",
     "systemd-networkd.service",
+    "systemd-resolved.service",
     "dbus.service",
     "emergency.service",
     "rescue.service",
+    "ssh.service",
+    "sshd.service",
+    "docker.service",
+    "ufw.service",
+    "iptables.service",
+    "networking.service",
+    "network.service",
 }
+
+_last_restart_by_ip: dict[str, float] = {}
 
 
 def list_systemd_services() -> dict[str, Any]:
@@ -100,6 +112,14 @@ def restart_systemd_service(unit: str, user: str, ip: str, storage) -> tuple[boo
         msg = f"Operation rejected: '{clean_unit}' is a critical protected system service."
         storage.log_systemd_action(clean_unit, "restart", user, ip, False, msg)
         return False, msg
+
+    now = time.time()
+    last = _last_restart_by_ip.get(ip, 0.0)
+    if (now - last) < 10.0:
+        msg = f"Rate limit exceeded: please wait {round(10.0 - (now - last), 1)}s before restarting another service."
+        storage.log_systemd_action(clean_unit, "restart", user, ip, False, msg)
+        return False, msg
+    _last_restart_by_ip[ip] = now
 
     systemctl = shutil.which("systemctl")
     if not systemctl:

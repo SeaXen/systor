@@ -16,6 +16,7 @@ import time
 import socket
 import threading
 from pathlib import Path
+import pytest
 
 # Ensure project root is in sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -29,7 +30,8 @@ if sys.stdout.encoding != "utf-8":
     except Exception:
         pass
 
-from playwright.sync_api import sync_playwright
+playwright = pytest.importorskip("playwright", reason="playwright is not installed")
+from playwright.sync_api import sync_playwright  # noqa: E402
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 6677

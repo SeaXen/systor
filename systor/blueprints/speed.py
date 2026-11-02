@@ -10,8 +10,7 @@ from ..speed import (
     list_ookla_servers, list_librespeed_servers
 )
 from ..services.speed_service import (
-    speed_live_copy, speed_live_reset, speed_live_worker,
-    stop_speed_live, start_speed_live
+    speed_live_copy, stop_speed_live, start_speed_live
 )
 from .common import get_storage
 
@@ -70,7 +69,6 @@ def api_speed_status():
 def api_speed_live_start():
     body = request.get_json(silent=True) or {}
     server_id = str(body.get("server_id") or "").strip()
-    target = str(body.get("target") or "").strip()
     run_type = str(body.get("run_type") or "manual").strip().lower()
 
     def on_success(row):

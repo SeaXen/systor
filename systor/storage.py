@@ -2,7 +2,6 @@
 from __future__ import annotations
 import sqlite3
 import time
-import json
 import threading
 import datetime as dt
 from pathlib import Path
@@ -136,7 +135,7 @@ class Storage:
         self.db_path = Path(db_path)
         self.retention_days = retention_days
         self.rollup_retention_days = rollup_retention_days
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as c:
             c.executescript(SCHEMA)
@@ -170,10 +169,20 @@ class Storage:
     def _conn(self):
         c = sqlite3.connect(self.db_path, timeout=10, isolation_level=None)
         c.row_factory = sqlite3.Row
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=5000")
         try:
             yield c
         finally:
             c.close()
+
+    def checkpoint(self) -> None:
+        """Safely checkpoint WAL to database file."""
+        with self._lock, self._conn() as c:
+            try:
+                c.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except Exception:
+                pass
 
     def insert_sample(self, s: dict) -> None:
         with self._lock, self._conn() as c:
