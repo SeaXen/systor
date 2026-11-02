@@ -13,7 +13,14 @@ setup(
     packages=find_packages(exclude=["tests", "tests.*"]),
     include_package_data=True,
     package_data={
-        "systor": ["templates/*.html", "static/css/*.css", "static/js/*.js"],
+        "systor": [
+            "templates/*.html",
+            "static/css/*.css",
+            "static/js/*.js",
+            "static/img/*",
+            "static/*.json",
+            "static/*.js",
+        ],
     },
     entry_points={
         "console_scripts": [

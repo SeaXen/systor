@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on Keep a Changelog.
 
-## [1.0.0] - 2026-10-31
+## [1.0.0] - 2026-11-02
 
 ### Added
+- **ExamForge Design System & 3-Way Theme Switcher**: Added Warm Dark (`#0b0b0b` neutral slate + signature teal `#1d9e75`), Paper Light (`#f9f9f7` warm paper), and Classic Dark (`#0f1117` GitHub dark + blue `#58a6ff`) with zero-flash preload, persistent local storage, and real-time Chart.js palette adaptation.
+- **Progressive Web App (PWA) Support**: Native standalone web application capabilities, Web App Manifest (`manifest.json`), high-resolution app icons (192x192, 512x512 maskable), and Service Worker (`sw.js`) with Cache-First static asset caching and Network-Only live telemetry.
+- **Mobile Responsive Layout Hardening**: Zero horizontal layout overflow across all viewports (down to 390px mobile) and full compliance with touch target floors (`>=40px`).
+- **Web Interface Guidelines & A11y Compliance**: Full accessibility alignment with semantic HTML, keyboard handlers, autocomplete tags, and `prefers-reduced-motion` compliance.
 - **Drive Health & SMART Insights**: Real-time NVMe/SATA/SAS telemetry, wear levels, reallocated sectors, and disk health indicators.
 - **Service Uptime & Blackbox Monitoring**: Configurable background probes for HTTP, HTTPS, TCP, Ping, and DNS endpoints with latency tracking and history.
 - **Systemd Service Manager & Audit Logging**: Host system service controls (start/stop/restart) with security audit history.
@@ -15,7 +19,7 @@ The format is loosely based on Keep a Changelog.
 - **Prometheus Metric Exporter (`/metrics`)**: OpenMetrics scraping endpoint for external Prometheus/Grafana collectors.
 - **One-Click Disaster Recovery**: Complete JSON configuration export and zero-downtime database restore.
 - **Official Multi-Architecture Docker Container**: Automated `linux/amd64` and `linux/arm64` builds on GitHub Container Registry (`ghcr.io/seaxen/systor:latest`).
-- **Least-Privilege Docker Compose Setup**: Host PID namespace with read-only `/sys`, `/dev`, D-Bus, and Docker sockets without `--privileged`.
+- **Host Network & Process Monitoring Docker Setup**: Host PID namespace with host networking, `/proc`, `/sys`, `/dev`, D-Bus, and Docker sockets without `--privileged`.
 - **Automated 1-Line Remote Installer**: Headless `curl -sSL ... | sudo bash` auto-bootstrapping installer alongside local git support.
 - **Unified Process Supervision**: Built-in `systor serve all` coordinating background metrics collection and Waitress web serving with `tini` signal handling.
 

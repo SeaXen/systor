@@ -7,12 +7,14 @@ services:
     container_name: systor
     restart: unless-stopped
 
-    # Host PID namespace gives Systor direct access to host processes and /proc
+    # Host PID and Network namespaces for direct access to host processes, /proc, and network adapters
     pid: host
+    network_mode: host
 
-    # Standard web dashboard port
-    ports:
-      - "${SYSTOR_PORT:-6677}:6677"
+    # Note: On macOS/Windows Docker Desktop where network_mode: host is unsupported,
+    # comment out 'network_mode: host' and uncomment ports below:
+    # ports:
+    #   - "${SYSTOR_PORT:-6677}:6677"
 
     # Least-privilege volume mounts for metrics, SMART disk telemetry, and services
     volumes:
@@ -22,8 +24,10 @@ services:
       - systor_log:/var/log/systor
 
       # Host metrics and hardware sensors (read-only)
+      - /proc:/proc:ro
       - /sys:/sys:ro
       - /dev:/dev:ro
+      - /etc/os-release:/etc/os-release:ro
 
       # Host systemd management via D-Bus and container inspect
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro

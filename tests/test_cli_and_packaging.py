@@ -114,6 +114,28 @@ class TestCliAndPackaging(unittest.TestCase):
         self.assertIn('systor:theme-change', app_js_text)
         self.assertIn('updateChartColors', app_js_text)
 
+    def test_pwa_manifest_and_service_worker(self):
+        """Verify PWA manifest, service worker, and web app icons."""
+        repo_root = Path(__file__).resolve().parent.parent
+        manifest = repo_root / "systor" / "static" / "manifest.json"
+        sw = repo_root / "systor" / "static" / "sw.js"
+        icon192 = repo_root / "systor" / "static" / "img" / "icon-192.png"
+        icon512 = repo_root / "systor" / "static" / "img" / "icon-512.png"
+        base_html = repo_root / "systor" / "templates" / "base.html"
+
+        self.assertTrue(manifest.exists(), "manifest.json must exist")
+        self.assertTrue(sw.exists(), "sw.js must exist")
+        self.assertTrue(icon192.exists(), "icon-192.png must exist")
+        self.assertTrue(icon512.exists(), "icon-512.png must exist")
+
+        base_text = base_html.read_text(encoding="utf-8")
+        self.assertIn('rel="manifest"', base_text)
+        self.assertIn('serviceWorker.register', base_text)
+
+        sw_text = sw.read_text(encoding="utf-8")
+        self.assertIn("systor-shell-v1.0.0", sw_text)
+        self.assertIn("/api/", sw_text)
+
 
 if __name__ == "__main__":
     unittest.main()

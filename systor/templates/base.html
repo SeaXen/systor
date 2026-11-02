@@ -9,7 +9,8 @@
 <meta name="format-detection" content="telephone=no">
 <title>{% block title %}systor{% endblock %}</title>
 <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}?v=2">
-<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/systor-logo-header.png') }}?v=2">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.min.css') }}?v=3.0">
 <script>
   (function(){
@@ -148,6 +149,13 @@
   // Initialize UI state
   const curTheme = document.documentElement.getAttribute('data-theme') || 'warm-dark';
   updateThemeUI(curTheme);
+
+  // Register PWA Service Worker for offline shell and asset caching
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}").catch(function() {});
+    });
+  }
 })();
 </script>
 </body>
