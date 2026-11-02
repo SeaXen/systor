@@ -116,8 +116,8 @@
           <div class="settings-card">
             <h3>Appearance &amp; Theme</h3>
             <div class="card-subtle">Choose your active color scheme and surface styling. Changes apply immediately and save across sessions.</div>
-            <div class="theme-picker-grid">
-              <div class="theme-picker-card" data-theme-choice="warm-dark" onclick="window.setSystorTheme('warm-dark')">
+            <div class="theme-picker-grid" role="radiogroup" aria-label="Theme selection">
+              <button type="button" class="theme-picker-card" data-theme-choice="warm-dark" role="radio" aria-checked="false" onclick="window.setSystorTheme('warm-dark')">
                 <div class="theme-picker-head">
                   <span class="theme-picker-title">🌙 Warm Dark</span>
                   <span class="status-chip mini-chip ok">New Design</span>
@@ -129,9 +129,9 @@
                   <span class="theme-preview-chip" style="background:#1a1a19" title="Surface 2 (#1a1a19)"></span>
                   <span class="theme-preview-chip" style="background:#1d9e75" title="Teal Accent (#1d9e75)"></span>
                 </div>
-              </div>
+              </button>
 
-              <div class="theme-picker-card" data-theme-choice="light" onclick="window.setSystorTheme('light')">
+              <button type="button" class="theme-picker-card" data-theme-choice="light" role="radio" aria-checked="false" onclick="window.setSystorTheme('light')">
                 <div class="theme-picker-head">
                   <span class="theme-picker-title">☀ Paper Light</span>
                   <span class="status-chip mini-chip">Day Mode</span>
@@ -143,9 +143,9 @@
                   <span class="theme-preview-chip" style="background:#ffffff" title="Surface 2 (#ffffff)"></span>
                   <span class="theme-preview-chip" style="background:#1d9e75" title="Teal Accent (#1d9e75)"></span>
                 </div>
-              </div>
+              </button>
 
-              <div class="theme-picker-card" data-theme-choice="classic-dark" onclick="window.setSystorTheme('classic-dark')">
+              <button type="button" class="theme-picker-card" data-theme-choice="classic-dark" role="radio" aria-checked="false" onclick="window.setSystorTheme('classic-dark')">
                 <div class="theme-picker-head">
                   <span class="theme-picker-title">🌌 Classic Dark</span>
                   <span class="status-chip mini-chip">Previous Dark</span>
@@ -157,7 +157,7 @@
                   <span class="theme-preview-chip" style="background:#21262d" title="Hover (#21262d)"></span>
                   <span class="theme-preview-chip" style="background:#58a6ff" title="Blue Accent (#58a6ff)"></span>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 
@@ -1171,7 +1171,7 @@ if (restoreFileEl && restoreBtnEl) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Restore failed');
-      showFlash('ok', data.message || 'System restored successfully! Reloading in 2s...', 10000);
+      showFlash('ok', data.message || 'System restored successfully! Reloading in 2s…', 10000);
       setTimeout(() => location.reload(), 2000);
     } catch (e) {
       showFlash('err', 'Restore failed: ' + e.message);

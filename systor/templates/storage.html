@@ -93,7 +93,7 @@
       </div>
     </div>
     <div class="storage-file-tools">
-      <input id="storage-search" class="storage-path-input" placeholder="Search/filter files…" aria-label="Search or filter files">
+      <input id="storage-search" class="storage-path-input" placeholder="Search/filter files…" aria-label="Search or filter files" autocomplete="off" spellcheck="false">
       <label for="storage-page-size">per page</label>
       <select id="storage-page-size" class="control-select"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
       <span id="storage-page-info" class="storage-page-info">—</span>
@@ -113,18 +113,18 @@
     <div class="settings-grid storage-settings-grid">
       <div class="settings-card">
         <h3>Allowed Roots</h3>
-        <textarea id="storage-allowed-roots" class="storage-textarea mono" rows="5" aria-label="Allowed roots list"></textarea>
+        <textarea id="storage-allowed-roots" class="storage-textarea mono" rows="5" aria-label="Allowed roots list" autocomplete="off" spellcheck="false"></textarea>
         <p class="muted-small">One path per line. Actions never escape these roots. Public Cloudflare access stays read-only.</p>
       </div>
       <div class="settings-card">
         <h3>Safety</h3>
         <label class="toggle-row"><input type="checkbox" id="storage-action-password-required"> Require password for major actions</label>
-        <label class="field-row" for="storage-action-password">Action password <input id="storage-action-password" class="control-input" type="password" placeholder="set/change"></label>
+        <label class="field-row" for="storage-action-password">Action password <input id="storage-action-password" class="control-input" type="password" placeholder="set/change" autocomplete="current-password"></label>
         <p class="muted-small" id="storage-password-state">Password not set</p>
         <label class="toggle-row"><input type="checkbox" id="storage-public-readonly" checked> Public/tunnel read-only</label>
         <label class="toggle-row"><input type="checkbox" id="storage-trash-enabled" checked> Delete to trash first</label>
         <label class="toggle-row"><input type="checkbox" id="storage-no-right-click"> Disable right-click on Storage page</label>
-        <label class="field-row" for="storage-max-scan">Analysis max files <input id="storage-max-scan" class="control-input" type="number" min="100" max="200000" step="100" value="20000"></label>
+        <label class="field-row" for="storage-max-scan">Analysis max files <input id="storage-max-scan" class="control-input" type="number" min="100" max="200000" step="100" value="20000" autocomplete="off"></label>
         <button class="btn compact" id="storage-save-settings">Save Storage Settings</button>
         <div id="storage-save-result" class="save-result"></div>
       </div>
@@ -210,7 +210,7 @@ function showContext(e,row){const m=$('#storage-context-menu'); if(!m)return; st
 async function openPath(p,type){if(type==='dir'){st.path=p; await loadBrowse();}}
 function getActionPassword(){if(!st.actionPwRequired)return ''; if(st.actionPw)return st.actionPw; const pw=prompt(st.hasActionPw?'Storage action password':'Set password in Storage Settings first'); if(!pw) throw new Error('Action password required'); st.actionPw=pw; return pw;}
 async function downloadSelected(){const items=selected(); if(!items.length){alert('Select one file/folder first');return;} let pw=''; try{pw=getActionPassword();}catch(e){alert(e.message);return;} window.location.href='/api/storage/download?path='+encodeURIComponent(items[0])+(pw?'&pw='+encodeURIComponent(pw):'');}
-async function previewSelected(path){const box=$('#storage-preview'); try{const j=await api('/api/storage/preview?path='+encodeURIComponent(path)); box.hidden=false; if(j.kind==='text') box.innerHTML=`<div><strong>${esc(j.name)}</strong> · ${fmtBytes(j.size)}</div><pre>${esc(j.text)}</pre>`; else if(j.kind==='image') box.innerHTML=`<div><strong>${esc(j.name)}</strong> · ${fmtBytes(j.size)}</div><img src="${esc(j.download_url)}" alt="preview">`; else box.innerHTML=`<div><strong>${esc(j.name)}</strong> · ${fmtBytes(j.size)}</div><p>${esc(j.message||'No preview')}</p>`;}catch(e){box.hidden=false; box.innerHTML=`<p class="empty-cell">Preview: ${esc(e.message)}</p>`;}}
+async function previewSelected(path){const box=$('#storage-preview'); try{const j=await api('/api/storage/preview?path='+encodeURIComponent(path)); box.hidden=false; if(j.kind==='text') box.innerHTML=`<div><strong>${esc(j.name)}</strong> · ${fmtBytes(j.size)}</div><pre>${esc(j.text)}</pre>`; else if(j.kind==='image') box.innerHTML=`<div><strong>${esc(j.name)}</strong> · ${fmtBytes(j.size)}</div><img src="${esc(j.download_url)}" alt="File preview" width="600" height="340" loading="lazy" style="max-width:100%;height:auto;object-fit:contain;">`; else box.innerHTML=`<div><strong>${esc(j.name)}</strong> · ${fmtBytes(j.size)}</div><p>${esc(j.message||'No preview')}</p>`;}catch(e){box.hidden=false; box.innerHTML=`<p class="empty-cell">Preview: ${esc(e.message)}</p>`;}}
 async function startDeepScan(){const limit=Number($('#storage-max-scan')?.value||20000); $('#analysis-summary').textContent='Deep scan running in background…'; await api('/api/storage/deep-scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:st.path,limit,action_password:getActionPassword()})}); const poll=setInterval(async()=>{try{const j=await api('/api/storage/deep-scan'); const s=j.state||{}; if(s.running){$('#analysis-summary').textContent=`Deep scan running · ${s.scanned||0} scanned · ${s.files_found||0} files · ${Math.round((Date.now()/1000)-(s.started||0))}s · ${short(s.current||'')}`;} else {clearInterval(poll); if(s.error) $('#analysis-summary').textContent='Deep scan error: '+s.error; else {const sm=s.result?.summary||{}; $('#analysis-summary').innerHTML=`Deep scan done · <strong>${s.result?.scanned||0}</strong> scanned · <strong>${sm.files||0}</strong> files · <strong>${sm.folders||0}</strong> folders · <strong>${fmtBytes(sm.total_file_size||0)}</strong>`;}}}catch(e){clearInterval(poll); $('#analysis-summary').textContent='Deep scan status error: '+e.message;}},1500);}
 async function checksumDupes(){const limit=Number($('#storage-max-scan')?.value||3000); $('#analysis-summary').textContent='Checksum duplicate scan running…'; const pw=getActionPassword(); const j=await api(`/api/storage/checksum-duplicates?path=${encodeURIComponent(st.path)}&limit=${limit}${pw?'&pw='+encodeURIComponent(pw):''}`); $('#analysis-grid').hidden=false; $('#analysis-dupes').innerHTML=(j.groups||[]).map(g=>`<tr><td title="${esc((g.paths||[]).join('\n'))}">${esc(short(g.sha256))}</td><td>${g.count}</td><td class="text-right mono">${fmtBytes(g.size)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty-cell">No checksum-confirmed duplicates</td></tr>'; $('#analysis-summary').innerHTML=`Checksum scan · <strong>${j.scanned}</strong> files · <strong>${(j.groups||[]).length}</strong> confirmed duplicate groups`;}
 

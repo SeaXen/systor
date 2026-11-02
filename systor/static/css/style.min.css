@@ -350,7 +350,7 @@ table, .mono, .stat-card, .status-chip, .badge, .value, .kpi-val, .kpi-box, .spe
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
   position: relative;
   text-align: left;
 }

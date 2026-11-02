@@ -143,10 +143,10 @@
     </div>
     <div id="uptime-add-form" class="uptime-form" style="display:none; padding: 0.75rem; background: var(--bg-panel-subtle, #141822); border-bottom: 1px solid var(--border, #222938); margin-bottom: 0.5rem;">
       <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
-        <input type="text" id="up-name" class="control-input" placeholder="Service Name (e.g. Plex)" style="width:180px;">
-        <input type="text" id="up-url" class="control-input" placeholder="http://192.168.1.50:32400" style="flex:1; min-width:220px;">
-        <input type="number" id="up-expected" class="control-input" placeholder="200" value="200" style="width:70px;">
-        <input type="number" id="up-interval" class="control-input" placeholder="60s" value="60" style="width:70px;">
+        <input type="text" id="up-name" class="control-input" placeholder="Service Name (e.g. Plex)" style="width:180px;" autocomplete="off" spellcheck="false" aria-label="Service Name">
+        <input type="text" id="up-url" class="control-input" placeholder="http://192.168.1.50:32400" style="flex:1; min-width:220px;" autocomplete="off" spellcheck="false" aria-label="Service URL">
+        <input type="number" id="up-expected" class="control-input" placeholder="200" value="200" style="width:70px;" autocomplete="off" aria-label="Expected HTTP Status">
+        <input type="number" id="up-interval" class="control-input" placeholder="60s" value="60" style="width:70px;" autocomplete="off" aria-label="Check interval in seconds">
         <button class="btn ok compact" id="up-save-btn">Save</button>
         <button class="btn secondary compact" id="up-cancel-btn">Cancel</button>
       </div>
@@ -172,7 +172,7 @@
     <div class="apps-card-head">
       <h3><span>SSL / TLS Certificate Expiry Tracker</span><span class="network-mini" id="ssl-meta">certificates & Let's Encrypt</span></h3>
       <div class="dash-controls">
-        <input type="text" id="ssl-host-input" class="control-input compact" placeholder="Check domain (e.g. mydomain.com)" style="width:200px;">
+        <input type="text" id="ssl-host-input" class="control-input compact" placeholder="Check domain (e.g. mydomain.com)" style="width:200px;" autocomplete="off" spellcheck="false" aria-label="Domain to check">
         <button class="btn secondary compact" id="ssl-check-btn">Check Cert</button>
       </div>
     </div>
