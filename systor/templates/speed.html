@@ -87,25 +87,25 @@
             <div class="table-card compact-table speed-schedule-card">
         <h3><span>Scheduler</span><span class="network-mini" id="speed-schedule-meta">loading…</span></h3>
       <div class="speed-schedule-form">
-        <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-enabled-input"> <span>Enable scheduled speedtest</span></label>
-        <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-notify-input"> <span>Notify on bad result</span></label>
+        <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-enabled-input" aria-label="Enable scheduled speedtest"> <span>Enable scheduled speedtest</span></label>
+        <label class="toggle-inline"><input type="checkbox" class="checkbox" id="auto-notify-input" aria-label="Notify on bad result"> <span>Notify on bad result</span></label>
         <label for="auto-interval-input">run every (min)</label>
-        <input type="number" id="auto-interval-input" min="5" step="5" autocomplete="off">
+        <input type="number" id="auto-interval-input" min="5" step="5" autocomplete="off" aria-label="Run interval in minutes">
         <label for="auto-min-dl-input">minimum DL</label>
-        <input type="number" id="auto-min-dl-input" min="0" step="0.1" autocomplete="off">
+        <input type="number" id="auto-min-dl-input" min="0" step="0.1" autocomplete="off" aria-label="Minimum download speed threshold in Mbps">
         <label for="auto-min-ul-input">minimum UL</label>
-        <input type="number" id="auto-min-ul-input" min="0" step="0.1" autocomplete="off">
+        <input type="number" id="auto-min-ul-input" min="0" step="0.1" autocomplete="off" aria-label="Minimum upload speed threshold in Mbps">
         <label for="ookla-server-id-input">saved server id</label>
-        <input type="text" id="ookla-server-id-input" placeholder="auto" autocomplete="off" spellcheck="false">
+        <input type="text" id="ookla-server-id-input" placeholder="auto (e.g. 1234)…" autocomplete="off" spellcheck="false" aria-label="Saved Ookla server ID">
         <label for="speed-page-refresh-input">status poll</label>
-        <select id="speed-page-refresh-input" class="control-select">
+        <select id="speed-page-refresh-input" class="control-select" aria-label="Speed page status poll interval">
           <option value="0">off</option>
           <option value="15">15s</option>
           <option value="30">30s</option>
           <option value="60">60s</option>
         </select>
         <label for="history-page-size-input">history rows/page</label>
-        <select id="history-page-size-input" class="control-select">
+        <select id="history-page-size-input" class="control-select" aria-label="History rows per page">
           <option value="10">10</option>
           <option value="25">25</option>
           <option value="50">50</option>

@@ -1030,9 +1030,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, .control-sele
 .speed-preset-btn{border-color:#2f3845;background:#11161d;color:#c9d1d9;}
 .speed-preset-btn.active{background:rgba(34,211,238,.14);border-color:rgba(34,211,238,.45);color:#7dd3fc;box-shadow:inset 0 0 0 1px rgba(34,211,238,.08);}
 .speed-schedule-form input,.speed-schedule-form select{background:#0f141b !important;color:#e6edf3 !important;border:1px solid #2d3746 !important;border-radius:9px;height:32px;padding:0 10px;box-shadow:none;appearance:none;}
-.speed-schedule-form input::placeholder{color:#7f8b99;}
-.speed-schedule-form input:focus,.speed-schedule-form select:focus{outline:none;border-color:#3b82f6 !important;box-shadow:0 0 0 2px rgba(59,130,246,.15);}
-.speed-schedule-form input[type="checkbox"]{width:15px;height:15px;accent-color:#22c55e;background:transparent !important;border:none !important;padding:0;}
+.speed-schedule-form input:focus-visible,.speed-schedule-form select:focus-visible,.speed-schedule-form input:focus,.speed-schedule-form select:focus{outline:none;border-color:var(--accent,#1d9e75) !important;box-shadow:0 0 0 2px rgba(29,158,117,.25);}
 .speed-live-runner{margin-top:12px;border:1px solid #273244;border-radius:12px;padding:10px 12px;background:linear-gradient(180deg,rgba(13,18,25,.92),rgba(16,22,30,.92));}
 .speed-live-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
 .speed-live-phase{font-size:11px;text-transform:uppercase;letter-spacing:.55px;color:#8b949e;}
@@ -1525,3 +1523,21 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, .control-sele
 /* v2.5 Storage hardening: action password, trash restore, ops controls */
 #storage-password-state{color:#9ecbff}.storage-grid-2 .apps-card-head .dash-controls{gap:5px}.storage-panel[data-panel="ops"] .storage-grid-2{align-items:start}.storage-panel[data-panel="ops"] .btn[data-restore]{padding:3px 7px;font-size:11px}.storage-action-locked{border-color:rgba(255,184,108,.42)!important;color:#ffcc8a!important;background:rgba(255,184,108,.10)!important}
 @media(max-width:800px){.storage-panel[data-panel="ops"] .storage-grid-2{grid-template-columns:1fr}.storage-panel[data-panel="ops"] .apps-card-head{display:grid;grid-template-columns:1fr;gap:5px}.storage-panel[data-panel="ops"] .apps-card-head .dash-controls{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}}
+
+/* Web Interface Guidelines: motion & overscroll containment */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (pointer: fine) {
+  html {
+    overscroll-behavior: none;
+  }
+}
+.modal-card, .import-modal, .terminal-drawer, .modal-backdrop {
+  overscroll-behavior: contain;
+}

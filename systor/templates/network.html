@@ -42,7 +42,7 @@
       <label for="net-iface-filter">iface</label>
       <select id="net-iface-filter" class="control-select"><option value="all">all</option></select>
       <label for="net-refresh-sec">refresh</label>
-      <select id="net-refresh-sec" class="control-select">
+      <select id="net-refresh-sec" class="control-select" aria-label="Network auto-refresh interval">
         <option value="1" {% if cfg.network.auto_refresh_sec == 1 %}selected{% endif %}>1s</option>
         <option value="3" {% if cfg.network.auto_refresh_sec == 3 %}selected{% endif %}>3s</option>
         <option value="5" {% if cfg.network.auto_refresh_sec == 5 %}selected{% endif %}>5s</option>
@@ -51,7 +51,7 @@
         <option value="30" {% if cfg.network.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
         <option value="60" {% if cfg.network.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
       </select>
-      <label class="toggle-inline"><input type="checkbox" id="hide-virtual-toggle" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide docker/bridge/veth</label>
+      <label class="toggle-inline"><input type="checkbox" id="hide-virtual-toggle" {% if cfg.network.hide_virtual_default %}checked{% endif %} aria-label="Hide virtual docker, bridge, and veth interfaces"> hide docker/bridge/veth</label>
       <button class="btn secondary compact" id="net-refresh">Refresh</button>
     </div>
   </div>
@@ -172,7 +172,7 @@
     <div class="apps-card-head">
       <h3><span>SSL / TLS Certificate Expiry Tracker</span><span class="network-mini" id="ssl-meta">certificates & Let's Encrypt</span></h3>
       <div class="dash-controls">
-        <input type="text" id="ssl-host-input" class="control-input compact" placeholder="Check domain (e.g. mydomain.com)" style="width:200px;" autocomplete="off" spellcheck="false" aria-label="Domain to check">
+        <input type="text" id="ssl-host-input" class="control-input compact" placeholder="Check domain (e.g. example.com)…" style="width:200px;" autocomplete="off" spellcheck="false" aria-label="Domain to check">
         <button class="btn secondary compact" id="ssl-check-btn">Check Cert</button>
       </div>
     </div>

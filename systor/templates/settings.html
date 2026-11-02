@@ -172,15 +172,15 @@
             <div class="slider-grid">
               <div class="slider-card">
                 <div class="slider-head"><strong>CPU load</strong><span id="cpu-load-slider-val">4.0</span></div>
-                <input id="cpu-load-slider" type="range" min="1" max="16" step="0.1">
+                <input id="cpu-load-slider" type="range" min="1" max="16" step="0.1" aria-label="CPU load warning threshold">
               </div>
               <div class="slider-card">
                 <div class="slider-head"><strong>RAM free</strong><span id="mem-free-slider-val">500 MB</span></div>
-                <input id="mem-free-slider" type="range" min="128" max="4096" step="64">
+                <input id="mem-free-slider" type="range" min="128" max="4096" step="64" aria-label="RAM free minimum threshold">
               </div>
               <div class="slider-card">
                 <div class="slider-head"><strong>CPU temp</strong><span id="cpu-temp-slider-val">85 °C</span></div>
-                <input id="cpu-temp-slider" type="range" min="50" max="100" step="1">
+                <input id="cpu-temp-slider" type="range" min="50" max="100" step="1" aria-label="CPU temperature threshold">
               </div>
             </div>
           </div>
@@ -262,8 +262,8 @@
                 <option value="30" {% if cfg.apps.auto_refresh_sec == 30 %}selected{% endif %}>30s</option>
                 <option value="60" {% if cfg.apps.auto_refresh_sec == 60 %}selected{% endif %}>1m</option>
               </select>
-              <label>Rows per card</label>
-              <input type="number" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1">
+              <label for="apps-default-limit">Rows per card</label>
+              <input type="number" id="apps-default-limit" name="apps_default_limit" value="{{ cfg.apps.default_limit or 10 }}" min="4" max="30" step="1" autocomplete="off" aria-label="Rows per card">
             </div>
           </div>
 
@@ -315,10 +315,10 @@
                 {% endfor %}
                 <option value="all" {% if cfg.network.default_table_days == 'all' %}selected{% endif %}>all</option>
               </select>
-              <label>Default iface</label>
-              <input type="text" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0">
-              <label>Hide docker/bridge/veth by default</label>
-              <label><input type="checkbox" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %}> hide virtual interfaces</label>
+              <label for="network-default-iface">Default iface</label>
+              <input type="text" id="network-default-iface" name="network_default_iface" value="{{ cfg.network.default_iface or 'all' }}" placeholder="all / eth0 / tailscale0…" autocomplete="off" spellcheck="false" aria-label="Default network interface">
+              <label for="network-hide-virtual-default">Hide docker/bridge/veth by default</label>
+              <label><input type="checkbox" id="network-hide-virtual-default" class="checkbox" name="network_hide_virtual_default" {% if cfg.network.hide_virtual_default %}checked{% endif %} aria-label="Hide virtual interfaces by default"> hide virtual interfaces</label>
             </div>
           </div>
         </div>
@@ -340,14 +340,14 @@
             <tr>
               <td>
                 <label class="threshold-name">
-                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %}>
+                  <input type="checkbox" class="checkbox" name="threshold_{{ metric_key }}_enabled" {% if enabled %}checked{% endif %} aria-label="Enable {{ label }} alert threshold">
                   <span>{{ label }}</span>
                 </label>
               </td>
               <td class="text-muted">{% if higher_is_worse %}&gt;{% else %}&lt;{% endif %}</td>
-              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}"></td>
+              <td><input type="number" step="any" name="threshold_{{ metric_key }}_value" value="{{ value }}" placeholder="{{ default_value }}" autocomplete="off" aria-label="{{ label }} alert trigger value"></td>
               <td class="text-muted">{{ unit }}</td>
-              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}"></td>
+              <td><input type="number" step="1" min="1" name="threshold_{{ metric_key }}_duration" value="{{ duration }}" placeholder="{{ default_min }}" autocomplete="off" aria-label="{{ label }} hold duration in minutes"></td>
               <td class="text-muted">min</td>
             </tr>
             {%- endmacro %}
@@ -364,8 +364,8 @@
               </tbody>
             </table>
             <div class="notif-actions">
-              <label class="inline-help">Cooldown</label>
-              <input type="number" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px">
+              <label for="settings-cooldown-sec" class="inline-help">Cooldown</label>
+              <input type="number" id="settings-cooldown-sec" name="cooldown_sec" value="{{ cfg.thresholds.cooldown_sec }}" min="0" step="30" style="width:110px" autocomplete="off" aria-label="Alert cooldown in seconds">
               <span class="inline-help">seconds between repeats per metric</span>
             </div>
           </div>
@@ -389,33 +389,33 @@
                 <option value="notion" {% if (cfg.speed.default_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
                 <option value="cloudflare" {% if (cfg.speed.default_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
               </select>
-              <label><input type="checkbox" class="checkbox" name="speed_auto_enabled" {% if cfg.speed.auto_enabled %}checked{% endif %}> Auto speed test</label>
+              <label><input type="checkbox" class="checkbox" name="speed_auto_enabled" {% if cfg.speed.auto_enabled %}checked{% endif %} aria-label="Enable auto speed test"> Auto speed test</label>
               <div class="inline-help">Runs inside the collector loop. Keep intervals sane; WAN tests are heavier than normal metrics.</div>
-              <label>Auto provider</label>
-              <select name="speed_auto_provider">
+              <label for="speed-auto-provider">Auto provider</label>
+              <select id="speed-auto-provider" name="speed_auto_provider" aria-label="Automated speed test provider">
                 <option value="ookla" {% if (cfg.speed.auto_provider or 'ookla') == 'ookla' %}selected{% endif %}>ookla</option>
                 <option value="librespeed" {% if (cfg.speed.auto_provider or 'speedtest') == 'librespeed' %}selected{% endif %}>librespeed</option>
                 <option value="notion" {% if (cfg.speed.auto_provider or 'speedtest') == 'notion' %}selected{% endif %}>notion</option>
                 <option value="cloudflare" {% if (cfg.speed.auto_provider or 'speedtest') == 'cloudflare' %}selected{% endif %}>cloudflare</option>
               </select>
-              <label>Auto interval</label>
-              <input type="number" name="speed_auto_interval_min" value="{{ cfg.speed.auto_interval_min or 180 }}" min="5" step="5">
-              <label><input type="checkbox" class="checkbox" name="speed_notify_enabled" {% if cfg.speed.notify_enabled %}checked{% endif %}> Notify on low speed</label>
+              <label for="speed-auto-interval">Auto interval</label>
+              <input type="number" id="speed-auto-interval" name="speed_auto_interval_min" value="{{ cfg.speed.auto_interval_min or 180 }}" min="5" step="5" autocomplete="off" aria-label="Auto test interval in minutes">
+              <label><input type="checkbox" class="checkbox" name="speed_notify_enabled" {% if cfg.speed.notify_enabled %}checked{% endif %} aria-label="Notify on low speed"> Notify on low speed</label>
               <div class="inline-help">Uses Telegram + Discord if enabled and saved.</div>
-              <label>Min download</label>
-              <input type="number" name="speed_min_download_mbps" value="{{ cfg.speed.min_download_mbps or 50 }}" min="0" step="0.1">
-              <label>Min upload</label>
-              <input type="number" name="speed_min_upload_mbps" value="{{ cfg.speed.min_upload_mbps or 20 }}" min="0" step="0.1">
-              <label>LibreSpeed server ID</label>
-              <input type="text" name="speed_librespeed_server_id" value="{{ cfg.speed.librespeed_server_id or '' }}" placeholder="blank = auto">
-              <label>Ookla server ID</label>
-              <input type="text" name="speed_ookla_server_id" value="{{ cfg.speed.ookla_server_id or '' }}" placeholder="blank = auto">
-              <label>Local LibreSpeed port</label>
-              <input type="number" name="speed_local_librespeed_port" value="{{ cfg.speed.local_librespeed_port or 8077 }}" min="1" max="65535" step="1">
-              <label>History page size</label>
-              <input type="number" name="speed_history_page_size" value="{{ cfg.speed.history_page_size or 25 }}" min="5" max="100" step="5">
-              <label>iperf port</label>
-              <input type="number" name="speed_iperf_port" value="{{ cfg.speed.iperf_port or 5201 }}" min="1" max="65535" step="1">
+              <label for="speed-min-dl">Min download</label>
+              <input type="number" id="speed-min-dl" name="speed_min_download_mbps" value="{{ cfg.speed.min_download_mbps or 50 }}" min="0" step="0.1" autocomplete="off" aria-label="Minimum download speed in Mbps">
+              <label for="speed-min-ul">Min upload</label>
+              <input type="number" id="speed-min-ul" name="speed_min_upload_mbps" value="{{ cfg.speed.min_upload_mbps or 20 }}" min="0" step="0.1" autocomplete="off" aria-label="Minimum upload speed in Mbps">
+              <label for="speed-librespeed-id">LibreSpeed server ID</label>
+              <input type="text" id="speed-librespeed-id" name="speed_librespeed_server_id" value="{{ cfg.speed.librespeed_server_id or '' }}" placeholder="blank = auto…" autocomplete="off" spellcheck="false" aria-label="LibreSpeed server ID">
+              <label for="speed-ookla-id">Ookla server ID</label>
+              <input type="text" id="speed-ookla-id" name="speed_ookla_server_id" value="{{ cfg.speed.ookla_server_id or '' }}" placeholder="blank = auto…" autocomplete="off" spellcheck="false" aria-label="Ookla server ID">
+              <label for="speed-local-port">Local LibreSpeed port</label>
+              <input type="number" id="speed-local-port" name="speed_local_librespeed_port" value="{{ cfg.speed.local_librespeed_port or 8077 }}" min="1" max="65535" step="1" autocomplete="off" aria-label="Local LibreSpeed port">
+              <label for="speed-hist-size">History page size</label>
+              <input type="number" id="speed-hist-size" name="speed_history_page_size" value="{{ cfg.speed.history_page_size or 25 }}" min="5" max="100" step="5" autocomplete="off" aria-label="History rows per page">
+              <label for="speed-iperf-port">iperf port</label>
+              <input type="number" id="speed-iperf-port" name="speed_iperf_port" value="{{ cfg.speed.iperf_port or 5201 }}" min="1" max="65535" step="1" autocomplete="off" aria-label="iperf listening port">
             </div>
           </div>
         </div>
@@ -433,12 +433,12 @@
               <span class="status-chip" id="tg-last-status">untested</span>
             </div>
             <div class="notif-field-grid">
-              <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %}> Enabled</label>
+              <label><input type="checkbox" class="checkbox" name="telegram_enabled" {% if cfg.telegram.enabled %}checked{% endif %} aria-label="Enable Telegram notifications"> Enabled</label>
               <div class="inline-help">Leave token blank to keep the saved one. If the saved token was a masked placeholder, Telegram cannot work until you paste the full real bot token.</div>
               <label for="tg-bot-token">Bot token</label>
-              <input type="password" id="tg-bot-token" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF…{% endif %}" autocomplete="off">
+              <input type="password" id="tg-bot-token" name="telegram_bot_token" value="" placeholder="{% if cfg.telegram.bot_token %}saved — leave blank to keep{% else %}123456:ABC-DEF…{% endif %}" autocomplete="off" spellcheck="false" aria-label="Telegram bot token">
               <label for="tg-chat-id">Chat ID</label>
-              <input type="text" id="tg-chat-id" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username">
+              <input type="text" id="tg-chat-id" name="telegram_chat_id" value="{{ cfg.telegram.chat_id or '' }}" placeholder="123456789 or @username…" autocomplete="off" spellcheck="false" aria-label="Telegram chat ID">
             </div>
             <div class="kv-mini-grid">
               <div><span>Last error</span><code id="tg-last-error">—</code></div>
@@ -458,10 +458,10 @@
               <span class="status-chip" id="dc-last-status">untested</span>
             </div>
             <div class="notif-field-grid">
-              <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %}> Enabled</label>
+              <label><input type="checkbox" class="checkbox" name="discord_enabled" {% if cfg.discord.enabled %}checked{% endif %} aria-label="Enable Discord notifications"> Enabled</label>
               <div class="inline-help">Leave webhook blank to keep the saved one.</div>
               <label for="dc-webhook-url">Webhook URL</label>
-              <input type="password" id="dc-webhook-url" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/…{% endif %}" autocomplete="off">
+              <input type="password" id="dc-webhook-url" name="discord_webhook_url" value="" placeholder="{% if cfg.discord.webhook_url %}saved — leave blank to keep{% else %}https://discord.com/api/webhooks/…{% endif %}" autocomplete="off" spellcheck="false" aria-label="Discord webhook URL">
             </div>
             <div class="kv-mini-grid">
               <div><span>Last error</span><code id="dc-last-error">—</code></div>
@@ -500,17 +500,17 @@
               <span class="status-chip">cooldown {{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}s</span>
             </div>
             <div class="auth-mini-grid compact-top">
-              <label>Login</label>
-              <label><input type="checkbox" class="checkbox" name="auth_enabled" {% if cfg.auth and cfg.auth.enabled %}checked{% endif %}> require username + password</label>
+              <label for="auth-enabled">Login</label>
+              <label><input type="checkbox" id="auth-enabled" class="checkbox" name="auth_enabled" {% if cfg.auth and cfg.auth.enabled %}checked{% endif %} aria-label="Require username and password login"> require username + password</label>
 
-              <label>Scope</label>
-              <select name="auth_mode">
+              <label for="auth-mode">Scope</label>
+              <select id="auth-mode" name="auth_mode" aria-label="Authentication enforcement scope">
                 <option value="admin_only" {% if (cfg.auth.mode if cfg.auth else 'admin_only') == 'admin_only' %}selected{% endif %}>admin only</option>
                 <option value="full_app" {% if cfg.auth and cfg.auth.mode == 'full_app' %}selected{% endif %}>whole app</option>
               </select>
 
-              <label>Username</label>
-              <input type="text" name="auth_username" value="{{ (cfg.auth.username if cfg.auth else 'admin') or 'admin' }}" placeholder="admin" autocomplete="username">
+              <label for="auth-username">Username</label>
+              <input type="text" id="auth-username" name="auth_username" value="{{ (cfg.auth.username if cfg.auth else 'admin') or 'admin' }}" placeholder="admin" autocomplete="username" spellcheck="false" aria-label="Admin username">
             </div>
           </div>
 
@@ -518,14 +518,14 @@
             <h3>Password</h3>
             <div class="card-subtle">Set or rotate the admin password. Leave blank to keep the current one.</div>
             <div class="auth-mini-grid compact-top">
-              <label>New password</label>
-              <input type="password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it{% else %}set admin password{% endif %}" autocomplete="new-password">
+              <label for="auth-password">New password</label>
+              <input type="password" id="auth-password" name="auth_password" value="" placeholder="{% if cfg.auth and cfg.auth.password_hash %}enter new password to change it…{% else %}set admin password…{% endif %}" autocomplete="new-password" spellcheck="false" aria-label="New admin password">
 
-              <label>Confirm</label>
-              <input type="password" name="auth_password_confirm" value="" placeholder="repeat new password" autocomplete="new-password">
+              <label for="auth-password-confirm">Confirm</label>
+              <input type="password" id="auth-password-confirm" name="auth_password_confirm" value="" placeholder="repeat new password…" autocomplete="new-password" spellcheck="false" aria-label="Confirm new password">
 
-              <label>Clear saved</label>
-              <label><input type="checkbox" class="checkbox" name="auth_clear_password"> clear saved password</label>
+              <label for="auth-clear-password">Clear saved</label>
+              <label><input type="checkbox" id="auth-clear-password" class="checkbox" name="auth_clear_password" aria-label="Clear saved admin password"> clear saved password</label>
             </div>
           </div>
         </div>
@@ -534,14 +534,14 @@
             <h3>Session & lockout</h3>
             <div class="card-subtle">Idle logout and brute-force protection for the admin login.</div>
             <div class="auth-mini-grid compact-top">
-              <label>Idle auto-logout</label>
-              <input type="number" name="auth_idle_timeout_min" value="{{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}" min="0" max="1440" step="1" placeholder="0 = off">
+              <label for="auth-idle-timeout">Idle auto-logout</label>
+              <input type="number" id="auth-idle-timeout" name="auth_idle_timeout_min" value="{{ (cfg.auth.idle_timeout_min if cfg.auth else 0) or 0 }}" min="0" max="1440" step="1" placeholder="0 = off…" autocomplete="off" aria-label="Idle auto-logout timeout in minutes">
 
-              <label>Fail limit</label>
-              <input type="number" name="auth_max_fails" value="{{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}" min="2" max="20" step="1">
+              <label for="auth-max-fails">Fail limit</label>
+              <input type="number" id="auth-max-fails" name="auth_max_fails" value="{{ (cfg.auth.max_fails if cfg.auth else 5) or 5 }}" min="2" max="20" step="1" autocomplete="off" aria-label="Maximum login failure limit">
 
-              <label>Cooldown</label>
-              <input type="number" name="auth_cooldown_sec" value="{{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}" min="10" max="3600" step="10">
+              <label for="auth-cooldown">Cooldown</label>
+              <input type="number" id="auth-cooldown" name="auth_cooldown_sec" value="{{ (cfg.auth.cooldown_sec if cfg.auth else 60) or 60 }}" min="10" max="3600" step="10" autocomplete="off" aria-label="Lockout cooldown in seconds">
             </div>
             <div class="notif-actions">
               <span class="inline-help full">Per-IP and per-username brute-force tracking is enabled. Use idle timeout <code>0</code> to disable auto-logout.</span>
@@ -566,9 +566,9 @@
             <h3>Public surface</h3>
             <div class="card-subtle">Safe read-only pages for the public tunnel. Admin and write pages stay private.</div>
             <div class="notif-field-grid compact-top">
-              <label><input type="checkbox" class="checkbox" name="public_dashboard" {% if cfg.public and cfg.public.dashboard %}checked{% endif %}> Public dashboard</label>
+              <label><input type="checkbox" class="checkbox" name="public_dashboard" {% if cfg.public and cfg.public.dashboard %}checked{% endif %} aria-label="Enable public dashboard access"> Public dashboard</label>
               <div class="inline-help">Keeps <code>/</code> readable from the public tunnel.</div>
-              <label><input type="checkbox" class="checkbox" name="public_alerts" {% if cfg.public and cfg.public.alerts %}checked{% endif %}> Public alerts</label>
+              <label><input type="checkbox" class="checkbox" name="public_alerts" {% if cfg.public and cfg.public.alerts %}checked{% endif %} aria-label="Enable public alerts access"> Public alerts</label>
               <div class="inline-help">Read-only alerts page. Test buttons and delivery log stay private.</div>
             </div>
           </div>
@@ -586,12 +586,12 @@
               <span class="status-chip">uptime —</span>
             </div>
             <div class="notif-field-grid compact-top">
-              <label>Poll interval</label>
-              <input type="number" value="{{ cfg.collector.poll_interval_sec }}" min="1" step="1" disabled title="Use Dashboard defaults → Sample interval to change this">
-              <label>Web bind host</label>
-              <input type="text" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0">
-              <label>Web port</label>
-              <input type="number" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535">
+              <label for="runtime-poll-interval">Poll interval</label>
+              <input type="number" id="runtime-poll-interval" value="{{ cfg.collector.poll_interval_sec }}" min="1" step="1" disabled title="Use Dashboard defaults → Sample interval to change this" aria-label="Collector poll interval in seconds" autocomplete="off">
+              <label for="web-host">Web bind host</label>
+              <input type="text" id="web-host" name="web_host" value="{{ cfg.web.host }}" placeholder="0.0.0.0" autocomplete="off" spellcheck="false" aria-label="Web server bind host">
+              <label for="web-port">Web port</label>
+              <input type="number" id="web-port" name="web_port" value="{{ cfg.web.port }}" min="1" max="65535" autocomplete="off" aria-label="Web server port">
             </div>
             <div class="notif-actions">
               <span class="inline-help">Restart collector applies new poll interval immediately. Restart web is only needed for host/port changes.</span>
@@ -615,7 +615,7 @@
               <button type="button" class="btn secondary compact" id="import-settings-btn">Import</button>
               <button type="button" class="btn secondary compact" id="restart-collector">Restart collector</button>
               <button type="button" class="btn secondary compact" id="restart-web">Restart web</button>
-              <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden>
+              <input type="file" id="import-settings-file" accept=".json,.yaml,.yml,.txt" hidden aria-label="Select settings file to import" autocomplete="off">
             </div>
             <div class="settings-inline-file">
               <span class="inline-help" id="import-file-name">No import file selected.</span>
@@ -633,7 +633,7 @@
             <div class="card-subtle" style="margin-top:1rem;">Restore from archive:</div>
             <div class="settings-tool-row">
               <label for="restore-archive-file" class="btn secondary compact" style="cursor:pointer;">Choose archive…</label>
-              <input type="file" id="restore-archive-file" accept=".tar.gz,.tgz" style="display:none;">
+              <input type="file" id="restore-archive-file" accept=".tar.gz,.tgz" style="display:none;" aria-label="Choose disaster recovery archive file" autocomplete="off">
               <span class="inline-help" id="restore-file-name">No archive selected.</span>
               <button type="button" class="btn compact" id="restore-archive-btn" style="display:none;background:#b91c1c;border-color:#ef4444;">Restore archive</button>
             </div>

@@ -318,30 +318,30 @@
 </script>
 
 {% if client_private %}
-<div id="terminal-drawer" class="terminal-drawer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: var(--surface-0); border-top: 2px solid var(--teal, #1d9e75); z-index: 1100; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); flex-direction: column;">
+<div id="terminal-drawer" class="terminal-drawer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: var(--surface-0); border-top: 2px solid var(--teal, #1d9e75); z-index: 1100; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); flex-direction: column; overscroll-behavior: contain;" role="region" aria-label="Emergency Terminal Console">
   <div class="terminal-drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; background: var(--surface-1); border-bottom: 1px solid var(--border);">
     <div style="display: flex; align-items: center; gap: 0.5rem;">
       <span class="mono" style="font-weight: 700; color: var(--teal, #1d9e75);">&gt;_ Emergency Terminal</span>
       <span id="term-status-chip" class="status-chip neutral">Locked</span>
     </div>
     <div style="display: flex; gap: 0.5rem;">
-      <button class="btn secondary compact" id="term-clear-btn">Clear</button>
-      <button class="btn secondary compact" id="term-close-btn">Close (Esc)</button>
+      <button class="btn secondary compact" id="term-clear-btn" aria-label="Clear terminal output">Clear</button>
+      <button class="btn secondary compact" id="term-close-btn" aria-label="Close terminal drawer">Close (Esc)</button>
     </div>
   </div>
   <div id="term-lock-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 1rem;">
     <p style="margin-bottom: 0.75rem; color: var(--text-dim);">Enter admin password to unlock emergency console:</p>
     <div style="display: flex; gap: 0.5rem; max-width: 320px; width: 100%;">
-      <input type="password" id="term-password-input" class="control-input compact" placeholder="Admin password" style="flex: 1;" autocomplete="current-password">
-      <button class="btn ok compact" id="term-unlock-btn">Unlock</button>
+      <input type="password" id="term-password-input" class="control-input compact" placeholder="Admin password…" aria-label="Admin password" style="flex: 1;" autocomplete="current-password" spellcheck="false">
+      <button class="btn ok compact" id="term-unlock-btn" aria-label="Unlock console">Unlock</button>
     </div>
     <span id="term-auth-error" style="color: var(--rose, #ff4772); font-size: 0.85rem; margin-top: 0.5rem; display: none;"></span>
   </div>
   <div id="term-console-view" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
-    <div id="term-output" class="mono" style="flex: 1; overflow-y: auto; padding: 0.75rem; font-size: 0.85rem; line-height: 1.4; color: var(--text); background: var(--surface-0); white-space: pre-wrap; word-break: break-all;"></div>
+    <div id="term-output" class="mono" style="flex: 1; overflow-y: auto; padding: 0.75rem; font-size: 0.85rem; line-height: 1.4; color: var(--text); background: var(--surface-0); white-space: pre-wrap; word-break: break-all; overscroll-behavior: contain;" tabindex="0" aria-label="Terminal output log"></div>
     <div class="term-input-row" style="display: flex; align-items: center; padding: 0.4rem 0.75rem; background: var(--surface-1); border-top: 1px solid var(--border);">
-      <span class="mono" style="color: var(--teal, #1d9e75); font-weight: 700; margin-right: 0.5rem;">$</span>
-      <input type="text" id="term-command-input" class="control-input mono" placeholder="Type command (e.g. uname -a, df -h, docker ps)..." style="flex: 1; background: transparent; border: none; outline: none; box-shadow: none;" autocomplete="off" spellcheck="false">
+      <span class="mono" style="color: var(--teal, #1d9e75); font-weight: 700; margin-right: 0.5rem;" aria-hidden="true">$</span>
+      <input type="text" id="term-command-input" class="control-input mono" placeholder="Type command (e.g. uname -a, df -h, docker ps)…" aria-label="Terminal command prompt" style="flex: 1; background: transparent; border: none; box-shadow: none;" autocomplete="off" spellcheck="false">
     </div>
   </div>
 </div>
