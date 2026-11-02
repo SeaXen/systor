@@ -141,6 +141,47 @@
       </tbody>
     </table>
   </div>
+
+  <div class="table-card compact-table" style="margin-top: 1rem;" id="compose-wrap">
+    <div class="apps-card-head">
+      <h3><span>Docker Compose Stacks</span><span class="network-mini" id="compose-meta">loading stacks…</span></h3>
+      <div class="dash-controls">
+        <button class="btn secondary compact" id="compose-refresh-btn">Refresh Stacks</button>
+      </div>
+    </div>
+    <table class="apps-table aligned-table compact-apps-table">
+      <thead>
+        <tr>
+          <th>Stack / Project</th>
+          <th>Services &amp; Containers</th>
+          <th class="text-right">Composite CPU%</th>
+          <th class="text-right">Composite RAM</th>
+          <th class="text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody id="compose-stacks-body">
+        <tr><td colspan="5" class="empty-cell">Loading Docker Compose projects…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="log-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-card" style="max-width: 820px; width: 90vw; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+        <h3 style="margin: 0;"><span id="log-target-title">Live Logs</span> <span class="network-mini" id="log-status-badge">Connecting…</span></h3>
+        <button class="btn secondary compact" id="log-close-btn">Close</button>
+      </div>
+      <div class="modal-body" style="padding-top: 0.75rem;">
+        <div id="log-terminal-output" class="mono" style="background: var(--surface-0); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; height: 360px; overflow-y: auto; font-size: 0.85rem; line-height: 1.4; white-space: pre-wrap; word-break: break-all;"></div>
+      </div>
+      <div class="modal-foot" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+        <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;">
+          <input type="checkbox" id="log-autoscroll" checked> Auto-scroll
+        </label>
+        <button class="btn secondary compact" id="log-clear-btn">Clear View</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -300,7 +341,10 @@ function renderSystemdRows(){
       <td>${stateBadge}</td>
       <td class="mono">${esc(u.sub || '—')}</td>
       <td class="network-mini">${esc(u.description || '—')}</td>
-      <td class="text-right"><button class="btn secondary compact" onclick="restartService('${esc(u.unit)}')">Restart</button></td>
+      <td class="text-right" style="white-space:nowrap;">
+        <button class="btn secondary compact" style="margin-right:0.35rem;" onclick="openLogStreamer('unit','${esc(u.unit)}')">Logs</button>
+        <button class="btn secondary compact" onclick="restartService('${esc(u.unit)}')">Restart</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -318,6 +362,111 @@ document.getElementById('systemd-refresh-btn')?.addEventListener('click', loadSy
 document.getElementById('systemd-search')?.addEventListener('input', renderSystemdRows);
 document.getElementById('systemd-state-filter')?.addEventListener('change', renderSystemdRows);
 loadSystemdServices();
+
+// --- Docker Compose Stacks ---
+let composeStacks = [];
+async function loadComposeStacks(){
+  const body = document.getElementById('compose-stacks-body');
+  if(!body) return;
+  body.innerHTML = '<tr><td colspan="5" class="empty-cell">Loading Docker Compose projects…</td></tr>';
+  try {
+    const j = await fetchJSON('/api/apps/compose');
+    composeStacks = j.stacks || [];
+    document.getElementById('compose-meta').textContent = `${composeStacks.length} project stack(s)`;
+    if(!composeStacks.length){
+      body.innerHTML = '<tr><td colspan="5" class="empty-cell">No Docker Compose stacks running</td></tr>';
+      return;
+    }
+    body.innerHTML = composeStacks.map(st => {
+      const svcs = (st.containers || []).map(c => `<span class="badge default" title="${esc(c.status)}" style="margin:2px;">${esc(c.service || c.name)}</span>`).join('');
+      const isCompose = st.is_compose;
+      const actBtn = isCompose ? `<button class="btn secondary compact" onclick="restartCompose('${esc(st.project)}')">Restart Stack</button>` : '—';
+      return `<tr>
+        <td class="mono"><strong>${esc(st.project)}</strong></td>
+        <td><div style="display:flex;flex-wrap:wrap;gap:2px;">${svcs}</div></td>
+        <td class="text-right mono">${Number(st.total_cpu_pct||0).toFixed(1)}%</td>
+        <td class="text-right mono">${bytesMB(st.total_mem_mb||0)}</td>
+        <td class="text-right">${actBtn}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="5" class="empty-cell">${esc(e.message)}</td></tr>`;
+  }
+}
+async function restartCompose(project){
+  if(!confirm(`Restart all containers in stack '${project}'?`)) return;
+  try {
+    const j = await fetchJSON(`/api/apps/compose/${encodeURIComponent(project)}/restart`, {method: 'POST'});
+    alert(j.message || 'Stack restarted');
+    await loadComposeStacks();
+  } catch(e) {
+    alert('Failed to restart stack: ' + e.message);
+  }
+}
+document.getElementById('compose-refresh-btn')?.addEventListener('click', loadComposeStacks);
+loadComposeStacks();
+
+// --- Live Log Streamer (SSE) ---
+let activeLogEventSource = null;
+function openLogStreamer(kind, target){
+  const modal = document.getElementById('log-modal');
+  const title = document.getElementById('log-target-title');
+  const badge = document.getElementById('log-status-badge');
+  const out = document.getElementById('log-terminal-output');
+  if(!modal || !out) return;
+
+  if(activeLogEventSource) activeLogEventSource.close();
+  out.textContent = '';
+  modal.style.display = 'flex';
+  title.textContent = `${kind === 'unit' ? 'Service' : 'Container'}: ${target}`;
+  badge.textContent = 'Connecting…';
+  badge.className = 'network-mini';
+
+  const query = kind === 'unit' ? `unit=${encodeURIComponent(target)}` : `container=${encodeURIComponent(target)}`;
+  const es = new EventSource(`/api/apps/logs/stream?${query}&lines=60`);
+  activeLogEventSource = es;
+
+  es.onmessage = (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      if(data.status === 'connected'){
+        badge.textContent = 'Live Streaming';
+        badge.className = 'status-chip ok';
+      } else if(data.log){
+        const lineEl = document.createElement('div');
+        lineEl.textContent = data.log;
+        out.appendChild(lineEl);
+        if(document.getElementById('log-autoscroll')?.checked){
+          out.scrollTop = out.scrollHeight;
+        }
+      } else if(data.error){
+        badge.textContent = 'Error: ' + data.error;
+        badge.className = 'status-chip critical';
+      }
+    } catch(err){}
+  };
+
+  es.onerror = () => {
+    badge.textContent = 'Disconnected';
+    badge.className = 'network-mini';
+    es.close();
+  };
+}
+
+function closeLogStreamer(){
+  if(activeLogEventSource){
+    activeLogEventSource.close();
+    activeLogEventSource = null;
+  }
+  const modal = document.getElementById('log-modal');
+  if(modal) modal.style.display = 'none';
+}
+
+document.getElementById('log-close-btn')?.addEventListener('click', closeLogStreamer);
+document.getElementById('log-clear-btn')?.addEventListener('click', () => {
+  const out = document.getElementById('log-terminal-output');
+  if(out) out.textContent = '';
+});
 </script>
 {% endblock %}
 

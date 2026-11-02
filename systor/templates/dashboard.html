@@ -57,6 +57,11 @@
   </div>
 </div>
 
+<div id="rpi-warning-banner" class="alert-banner warning" style="display: none; margin-bottom: 1rem;">
+  <span class="alert-icon">⚠️</span>
+  <span id="rpi-warning-text">Raspberry Pi hardware alert: undervoltage or throttling detected.</span>
+</div>
+
 <div class="stat-grid compact-grid" id="kpis">
   <div class="stat-card" id="kpi-cpu-pct">
     <div class="label">CPU usage</div>
@@ -72,6 +77,12 @@
     <div class="label">Temp</div>
     <div class="kpi-meter temp"><i id="bar-temp"></i></div><div class="value"><span id="temp">—</span><span class="unit">°C</span></div>
     <div class="sub" id="temp-sub">CPU sensor</div>
+  </div>
+  <div class="stat-card" id="kpi-gpu" style="display: none;">
+    <div class="label" id="gpu-label">GPU usage</div>
+    <div class="kpi-meter gpu"><i id="bar-gpu"></i></div>
+    <div class="value"><span id="gpu-pct">—</span><span class="unit">%</span></div>
+    <div class="sub" id="gpu-sub"><span id="gpu-vram">—</span> · <span id="gpu-temp">—</span>°C</div>
   </div>
   <div class="stat-card" id="kpi-mem">
     <div class="label">Memory</div>
@@ -94,6 +105,12 @@
     <div class="kpi-meter net"><i id="bar-net"></i></div>
     <div class="value small-value compact-kpi-lines"><div><span class="dl-text">DL</span> <span id="net-rx">—</span></div><div><span class="ul-text">UL</span> <span id="net-tx">—</span></div></div>
     <div class="sub card-sub-empty" id="net-sub"></div>
+  </div>
+  <div class="stat-card" id="kpi-ups" style="display: none;">
+    <div class="label">UPS Battery</div>
+    <div class="kpi-meter ups"><i id="bar-ups"></i></div>
+    <div class="value"><span id="ups-pct">—</span><span class="unit">%</span></div>
+    <div class="sub" id="ups-sub"><span id="ups-status">Online</span> · <span id="ups-load">0</span>% load</div>
   </div>
 </div>
 
@@ -246,6 +263,7 @@ async function refresh(){
       document.getElementById('meta-load').innerHTML=`1m ${fmt(lastVal(load1))} avg ${fmt(avgVal(load1))} · 5m ${fmt(lastVal(load5))} avg ${fmt(avgVal(load5))} · 15m ${fmt(lastVal(load15))} avg ${fmt(avgVal(load15))}`;
       const lastDl=lastVal(netRx), lastUl=lastVal(netTx), maxDl=maxVal(netRx), maxUl=maxVal(netTx); document.getElementById('net-rx').textContent=fmt(lastDl,'MB/s'); document.getElementById('net-tx').textContent=fmt(lastUl,'MB/s'); document.getElementById('kpi-net').className='stat-card '+statusClass(Math.max(lastDl||0,lastUl||0),10,40); document.getElementById('meta-net-chart').innerHTML=`<span class="dl-text"><strong>DL ${fmt(lastDl,'MB/s')}</strong></span> · avg ${fmt(avgVal(netRx),'MB/s')} · <span class="ul-text"><strong>UL ${fmt(lastUl,'MB/s')}</strong></span> · avg ${fmt(avgVal(netTx),'MB/s')}`; document.getElementById('bar-net').style.width=((Math.max(lastDl||0,lastUl||0)/Math.max(1,Math.max(maxDl||0,maxUl||0)))*100).toFixed(1)+'%';
       document.getElementById('net-sub').textContent='current speed';
+      updateSensors(snap);
       setGlobalHeader(snap,runtime);
       setLoadState('public '+new Date().toLocaleTimeString());
       return;
@@ -287,11 +305,50 @@ async function refresh(){
 
     const net=snap.network||{};
     document.getElementById('net-sub').textContent='current speed';
-
+    updateSensors(snap);
     setGlobalHeader(snap,runtime);
     setLoadState('snapshot '+new Date().toLocaleTimeString());
   }catch(e){ console.error(e); setLoadState('snapshot error'); }
   finally{ inflight.snap=false; }
+}
+
+function updateSensors(snap){
+  const sensors=snap.sensors||{};
+  const gpuCard=document.getElementById('kpi-gpu');
+  if(gpuCard){
+    if(sensors.gpu && sensors.gpu.length>0){
+      const g=sensors.gpu[0];
+      gpuCard.style.display='';
+      document.getElementById('gpu-pct').textContent=fmt(g.gpu_util_pct);
+      document.getElementById('gpu-vram').textContent=Math.round(g.mem_used_mb)+'/'+Math.round(g.mem_total_mb)+' MB';
+      document.getElementById('gpu-temp').textContent=fmt(g.temp_c);
+      document.getElementById('bar-gpu').style.width=Math.max(0,Math.min(100,Number(g.gpu_util_pct||0)))+'%';
+      gpuCard.className='stat-card has-meter '+statusClass(g.gpu_util_pct,60,85);
+    }else{
+      gpuCard.style.display='none';
+    }
+  }
+  const upsCard=document.getElementById('kpi-ups');
+  if(upsCard){
+    if(sensors.ups && sensors.ups.present){
+      upsCard.style.display='';
+      document.getElementById('ups-pct').textContent=sensors.ups.battery_pct!==null?sensors.ups.battery_pct:'—';
+      document.getElementById('ups-status').textContent=sensors.ups.status||'Online';
+      document.getElementById('ups-load').textContent=sensors.ups.load_pct!==null?sensors.ups.load_pct:'0';
+      document.getElementById('bar-ups').style.width=Math.max(0,Math.min(100,Number(sensors.ups.battery_pct||0)))+'%';
+    }else{
+      upsCard.style.display='none';
+    }
+  }
+  const rpiBanner=document.getElementById('rpi-warning-banner');
+  if(rpiBanner){
+    if(sensors.rpi && (sensors.rpi.undervoltage || sensors.rpi.throttled)){
+      rpiBanner.style.display='flex';
+      document.getElementById('rpi-warning-text').textContent='Raspberry Pi alert: '+(sensors.rpi.undervoltage?'Under-voltage detected! ':'')+(sensors.rpi.throttled?'CPU frequency throttling active!':'');
+    }else{
+      rpiBanner.style.display='none';
+    }
+  }
 }
 
 async function getSeries(metric){ const d=await fetchJSON('/api/series?metric='+metric+'&hours='+settings.rangeHours); return d.data||[]; }

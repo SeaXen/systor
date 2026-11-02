@@ -191,6 +191,31 @@
       </tbody>
     </table>
   </div>
+
+  <div class="table-card compact-table" style="margin-top: 1rem;" id="security-audit-wrap">
+    <div class="apps-card-head">
+      <h3><span>Security & Network Audit</span><span class="network-mini" id="sec-meta">listening ports · firewall · fail2ban</span></h3>
+      <div class="dash-controls">
+        <span id="sec-fw-badge" class="badge default">Firewall: checking…</span>
+        <span id="sec-f2b-badge" class="badge default">Fail2ban: checking…</span>
+        <button class="btn secondary compact" id="sec-refresh-btn">Audit Now</button>
+      </div>
+    </div>
+    <table class="network-table aligned-table compact-apps-table">
+      <thead>
+        <tr>
+          <th>Port</th>
+          <th>Protocol</th>
+          <th>Bind Address</th>
+          <th>Process / Service</th>
+          <th class="text-right">PID</th>
+        </tr>
+      </thead>
+      <tbody id="sec-ports-body">
+        <tr><td colspan="5" class="empty-cell">Auditing listening sockets…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
 
@@ -448,9 +473,65 @@ if(sslBtn){
   });
 }
 
+// --- Security & Network Audit ---
+async function loadSecurityAudit(force){
+  try {
+    const j = await fetchJSON('/api/network/security' + (force ? '?refresh=1' : ''));
+    const fw = j.firewall || {};
+    const f2b = j.fail2ban || {};
+    const ports = j.listening_ports || [];
+
+    const fwBadge = document.getElementById('sec-fw-badge');
+    if(fwBadge){
+      if(fw.active){
+        fwBadge.className = 'status-chip ok';
+        fwBadge.textContent = `UFW Active (${fw.rules_count} rules)`;
+      } else {
+        fwBadge.className = 'status-chip neutral';
+        fwBadge.textContent = fw.available ? 'UFW Inactive' : 'UFW N/A';
+      }
+    }
+
+    const f2bBadge = document.getElementById('sec-f2b-badge');
+    if(f2bBadge){
+      if(f2b.active && f2b.jails_count > 0){
+        f2bBadge.className = 'status-chip ok';
+        f2bBadge.textContent = `Fail2ban (${f2b.jails_count} jails, ${f2b.banned_total} banned)`;
+      } else {
+        f2bBadge.className = 'status-chip neutral';
+        f2bBadge.textContent = f2b.available ? 'Fail2ban Inactive' : 'Fail2ban N/A';
+      }
+    }
+
+    const body = document.getElementById('sec-ports-body');
+    if(!body) return;
+    if(!ports.length){
+      body.innerHTML = '<tr><td colspan="5" class="empty-cell">No open listening ports detected (or restricted permissions).</td></tr>';
+      return;
+    }
+
+    body.innerHTML = ports.map(p => `<tr>
+      <td class="mono"><strong>:${p.port}</strong></td>
+      <td><span class="badge ${p.proto === 'TCP' ? 'ok' : 'info'}">${esc(p.proto)}</span></td>
+      <td class="mono">${esc(p.address)}</td>
+      <td><strong>${esc(p.process)}</strong></td>
+      <td class="text-right mono text-muted">${p.pid ? p.pid : '—'}</td>
+    </tr>`).join('');
+
+    const meta = document.getElementById('sec-meta');
+    if(meta) meta.textContent = `${ports.length} open ports detected`;
+  } catch(e){
+    const body = document.getElementById('sec-ports-body');
+    if(body) body.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:#ef4444;">Audit failed: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+document.getElementById('sec-refresh-btn')?.addEventListener('click', () => loadSecurityAudit(true));
+
 refreshAll();
 loadUptimeTargets();
 loadSslCerts();
+loadSecurityAudit();
 resetRefreshTimer();
 window.addEventListener('resize', ()=>{ const nextDefault = window.innerWidth <= 760 ? '30' : '90'; if(['30','60','90','180','365','all'].includes(document.getElementById('net-bar-days').value) === false) document.getElementById('net-bar-days').value=nextDefault; });
 </script>

@@ -52,6 +52,11 @@
       <span class="theme-toggle-icon" id="theme-toggle-icon" aria-hidden="true">🌙</span>
       <span class="theme-toggle-label" id="theme-toggle-label">Warm Dark</span>
     </button>
+    {% if client_private %}
+    <button type="button" class="btn secondary compact mono" id="terminal-drawer-toggle" aria-label="Open emergency console" title="Emergency Console (LAN only)" style="padding:0 8px;font-size:0.75rem;">
+      &gt;_ Console
+    </button>
+    {% endif %}
     {% if client_private_raw and auth_enabled %}
       <span class="status-chip ok" title="Single-admin login protection enabled">auth on</span>
       {% if auth_logged_in %}
@@ -157,6 +162,189 @@
     });
   }
 })();
+
+{% if client_private %}
+(function(){
+  const toggle = document.getElementById('terminal-drawer-toggle');
+  const drawer = document.getElementById('terminal-drawer');
+  if(!toggle || !drawer) return;
+
+  const unlockBtn = document.getElementById('term-unlock-btn');
+  const passInput = document.getElementById('term-password-input');
+  const authErr = document.getElementById('term-auth-error');
+  const lockView = document.getElementById('term-lock-view');
+  const consoleView = document.getElementById('term-console-view');
+  const statusChip = document.getElementById('term-status-chip');
+  const output = document.getElementById('term-output');
+  const cmdInput = document.getElementById('term-command-input');
+  const closeBtn = document.getElementById('term-close-btn');
+  const clearBtn = document.getElementById('term-clear-btn');
+
+  let termToken = sessionStorage.getItem('systor_term_token') || null;
+  const history = [];
+  let historyIdx = -1;
+
+  function setUnlocked(){
+    lockView.style.display = 'none';
+    consoleView.style.display = 'flex';
+    statusChip.textContent = 'Unlocked';
+    statusChip.className = 'status-chip ok';
+    cmdInput.focus();
+  }
+
+  function setLocked(){
+    lockView.style.display = 'flex';
+    consoleView.style.display = 'none';
+    statusChip.textContent = 'Locked';
+    statusChip.className = 'status-chip neutral';
+    sessionStorage.removeItem('systor_term_token');
+    termToken = null;
+  }
+
+  function openDrawer(){
+    drawer.style.display = 'flex';
+    if(termToken){
+      setUnlocked();
+    } else {
+      setLocked();
+      passInput.focus();
+    }
+  }
+
+  function closeDrawer(){
+    drawer.style.display = 'none';
+  }
+
+  toggle.addEventListener('click', () => {
+    if(drawer.style.display === 'flex') closeDrawer();
+    else openDrawer();
+  });
+
+  closeBtn?.addEventListener('click', closeDrawer);
+  clearBtn?.addEventListener('click', () => { output.textContent = ''; });
+
+  window.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Escape' && drawer.style.display === 'flex'){
+      closeDrawer();
+    }
+  });
+
+  unlockBtn?.addEventListener('click', async () => {
+    const pw = passInput.value.trim();
+    if(!pw) return;
+    authErr.style.display = 'none';
+    unlockBtn.disabled = true;
+    unlockBtn.textContent = 'Unlocking…';
+    try {
+      const res = await fetch('/api/terminal/auth', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: pw}),
+      });
+      const data = await res.json();
+      if(!res.ok || !data.ok){
+        throw new Error(data.error || 'Authentication failed');
+      }
+      termToken = data.token;
+      sessionStorage.setItem('systor_term_token', termToken);
+      passInput.value = '';
+      setUnlocked();
+      output.textContent = '--- Emergency Terminal Console Initialized ---\nType commands below.\n\n';
+    } catch(err){
+      authErr.textContent = err.message;
+      authErr.style.display = 'block';
+    } finally {
+      unlockBtn.disabled = false;
+      unlockBtn.textContent = 'Unlock';
+    }
+  });
+
+  passInput?.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Enter') unlockBtn?.click();
+  });
+
+  cmdInput?.addEventListener('keydown', async (ev) => {
+    if(ev.key === 'ArrowUp'){
+      if(history.length && historyIdx < history.length - 1){
+        historyIdx++;
+        cmdInput.value = history[history.length - 1 - historyIdx];
+      }
+      ev.preventDefault();
+      return;
+    }
+    if(ev.key === 'ArrowDown'){
+      if(historyIdx > 0){
+        historyIdx--;
+        cmdInput.value = history[history.length - 1 - historyIdx];
+      } else if(historyIdx === 0){
+        historyIdx = -1;
+        cmdInput.value = '';
+      }
+      ev.preventDefault();
+      return;
+    }
+    if(ev.key === 'Enter'){
+      const cmd = cmdInput.value.trim();
+      if(!cmd) return;
+      history.push(cmd);
+      historyIdx = -1;
+      cmdInput.value = '';
+
+      output.textContent += `$ ${cmd}\n`;
+      output.scrollTop = output.scrollHeight;
+
+      try {
+        const res = await fetch('/api/terminal/exec', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({token: termToken, command: cmd}),
+        });
+        const data = await res.json();
+        if(res.status === 401 || (data.error && data.error.includes('expired'))){
+          setLocked();
+          authErr.textContent = 'Session expired. Please re-authenticate.';
+          authErr.style.display = 'block';
+          return;
+        }
+        output.textContent += (data.output || data.error || '') + '\n\n';
+      } catch(err){
+        output.textContent += `[Error: ${err.message}]\n\n`;
+      }
+      output.scrollTop = output.scrollHeight;
+    }
+  });
+})();
+{% endif %}
 </script>
+
+{% if client_private %}
+<div id="terminal-drawer" class="terminal-drawer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: var(--surface-0); border-top: 2px solid var(--teal, #1d9e75); z-index: 1100; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); flex-direction: column;">
+  <div class="terminal-drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; background: var(--surface-1); border-bottom: 1px solid var(--border);">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span class="mono" style="font-weight: 700; color: var(--teal, #1d9e75);">&gt;_ Emergency Terminal</span>
+      <span id="term-status-chip" class="status-chip neutral">Locked</span>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="btn secondary compact" id="term-clear-btn">Clear</button>
+      <button class="btn secondary compact" id="term-close-btn">Close (Esc)</button>
+    </div>
+  </div>
+  <div id="term-lock-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 1rem;">
+    <p style="margin-bottom: 0.75rem; color: var(--text-dim);">Enter admin password to unlock emergency console:</p>
+    <div style="display: flex; gap: 0.5rem; max-width: 320px; width: 100%;">
+      <input type="password" id="term-password-input" class="control-input compact" placeholder="Admin password" style="flex: 1;" autocomplete="current-password">
+      <button class="btn ok compact" id="term-unlock-btn">Unlock</button>
+    </div>
+    <span id="term-auth-error" style="color: var(--rose, #ff4772); font-size: 0.85rem; margin-top: 0.5rem; display: none;"></span>
+  </div>
+  <div id="term-console-view" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+    <div id="term-output" class="mono" style="flex: 1; overflow-y: auto; padding: 0.75rem; font-size: 0.85rem; line-height: 1.4; color: var(--text); background: var(--surface-0); white-space: pre-wrap; word-break: break-all;"></div>
+    <div class="term-input-row" style="display: flex; align-items: center; padding: 0.4rem 0.75rem; background: var(--surface-1); border-top: 1px solid var(--border);">
+      <span class="mono" style="color: var(--teal, #1d9e75); font-weight: 700; margin-right: 0.5rem;">$</span>
+      <input type="text" id="term-command-input" class="control-input mono" placeholder="Type command (e.g. uname -a, df -h, docker ps)..." style="flex: 1; background: transparent; border: none; outline: none; box-shadow: none;" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+</div>
+{% endif %}
 </body>
 </html>

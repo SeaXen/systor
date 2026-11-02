@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on Keep a Changelog.
 
+## [1.1.0] - 2026-11-02
+ 
+### Added
+- **Hardware Telemetry & Sensor Integration**: Native non-blocking telemetry for NVIDIA GPUs (GPU util %, VRAM used/total, temperature, power draw via `nvidia-smi`), Raspberry Pi SoC diagnostics (undervoltage and CPU throttling flags via `vcgencmd`), and Network UPS Tools (NUT) battery/load metrics. Built with dynamic auto-hiding to keep the dashboard clean when hardware is absent.
+- **Docker Compose Stacks & Container Telemetry**: Automatic project grouping of running containers by `com.docker.compose.project` label with composite CPU %, aggregate RAM footprint, individual service status badges, and stack restart actions.
+- **Security & Network Audit Engine**: Live inspection of open TCP/UDP listening ports, socket binding addresses, UFW firewall rules count/status, and Fail2ban active jails and banned threat counts.
+- **Server-Sent Events (SSE) Live Log Streaming**: Real-time log streaming for host Systemd services (`journalctl -u`) and Docker containers (`docker logs -f`) with auto-scroll and terminal output formatting.
+- **Two-Way Interactive Telegram Bot Daemon**: Long-polling bot responding directly to mobile commands: `/status` (live host summary), `/speed` (instant network speedtest), `/alerts` (recent incidents), and `/ping`.
+- **Secure In-Browser Emergency Terminal**: Slide-up diagnostic console guarded strictly by private LAN/Tailscale verification, admin password re-authentication, and client-bound session tokens.
+
 ## [1.0.0] - 2026-11-02
 
 ### Added

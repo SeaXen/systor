@@ -260,3 +260,94 @@ def get_runtime_status() -> dict:
         "tailscaled": tailscaled,
         "storage": systor_storage_state(),
     }
+
+
+def get_compose_stacks() -> list[dict]:
+    """Inspect and group Docker containers by compose project."""
+    import shutil
+    docker = shutil.which("docker")
+    if not docker:
+        return []
+
+    try:
+        out = subprocess.run(
+            [docker, "ps", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}\t{{.Label \"com.docker.compose.project\"}}\t{{.Label \"com.docker.compose.service\"}}\t{{.Status}}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.splitlines()
+
+        stats_rows = {r["name"]: r for r in get_docker_apps(limit=100)}
+
+        projects: dict[str, dict] = {}
+        for line in out:
+            parts = line.split("\t")
+            if len(parts) < 5:
+                continue
+            cid, name, proj, svc, status = parts[:5]
+            proj_name = proj.strip() or "standalone"
+            svc_name = svc.strip() or name
+
+            st = stats_rows.get(name, {})
+            cpu = float(st.get("cpu_percent") or 0.0)
+            mem = float(st.get("mem_mb") or 0.0)
+
+            if proj_name not in projects:
+                projects[proj_name] = {
+                    "project": proj_name,
+                    "is_compose": bool(proj.strip()),
+                    "containers": [],
+                    "total_cpu_pct": 0.0,
+                    "total_mem_mb": 0.0,
+                }
+
+            projects[proj_name]["containers"].append({
+                "id": cid[:12],
+                "name": name,
+                "service": svc_name,
+                "status": status,
+                "cpu_percent": cpu,
+                "mem_mb": mem,
+            })
+            projects[proj_name]["total_cpu_pct"] = round(projects[proj_name]["total_cpu_pct"] + cpu, 2)
+            projects[proj_name]["total_mem_mb"] = round(projects[proj_name]["total_mem_mb"] + mem, 2)
+
+        return sorted(list(projects.values()), key=lambda x: (not x["is_compose"], x["project"]))
+    except Exception as e:
+        log.debug("get_compose_stacks error: %s", e)
+        return []
+
+
+def restart_compose_project(project: str) -> tuple[bool, str]:
+    """Safely restart all containers associated with a compose project."""
+    import shutil
+    clean = project.strip()
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", clean):
+        return False, f"Invalid project name: '{clean}'"
+
+    docker = shutil.which("docker")
+    if not docker:
+        return False, "Docker CLI not found on host"
+
+    try:
+        p = subprocess.run(
+            [docker, "ps", "-q", "--filter", f"label=com.docker.compose.project={clean}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        cids = [c.strip() for c in p.stdout.splitlines() if c.strip()]
+        if not cids:
+            return False, f"No running containers found for project '{clean}'"
+
+        restart_proc = subprocess.run(
+            [docker, "restart"] + cids,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if restart_proc.returncode == 0:
+            return True, f"Successfully restarted {len(cids)} container(s) in stack '{clean}'"
+        return False, restart_proc.stderr or "Docker restart failed"
+    except Exception as e:
+        return False, str(e)

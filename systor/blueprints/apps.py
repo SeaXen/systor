@@ -138,3 +138,131 @@ def api_systemd_audit():
     rows = get_storage().recent_systemd_actions(limit=limit)
     return jsonify({"ok": True, "actions": rows, "count": len(rows)})
 
+
+# --- Docker Compose Stacks Endpoints ---
+@apps_bp.route("/api/apps/compose", methods=["GET"])
+def api_apps_compose():
+    from ..services.runtime_service import get_compose_stacks
+    stacks = get_compose_stacks()
+    return jsonify({"ok": True, "stacks": stacks, "count": len(stacks)})
+
+
+@apps_bp.route("/api/apps/compose/<project>/restart", methods=["POST"])
+def api_apps_compose_restart(project: str):
+    from .common import client_private, auth_enabled, auth_logged_in
+    if not client_private():
+        return jsonify({"ok": False, "error": "Docker Compose control is private LAN only"}), 403
+    if auth_enabled() and not auth_logged_in():
+        return jsonify({"ok": False, "error": "Admin login required"}), 401
+
+    from ..services.runtime_service import restart_compose_project
+    ok, msg = restart_compose_project(project)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": msg, "project": project}), status
+
+
+# --- Live Service & Container Log Streamer (SSE) ---
+@apps_bp.route("/api/apps/logs/stream")
+def api_apps_logs_stream():
+    import json
+    import re
+    import shutil
+    import subprocess
+    from flask import Response, stream_with_context
+    from .common import client_private
+    if not client_private():
+        return jsonify({"ok": False, "error": "Log streaming is private LAN only"}), 403
+
+    unit = request.args.get("unit", "").strip()
+    container_id = request.args.get("container", "").strip()
+    try:
+        lines = min(200, max(10, int(request.args.get("lines", 50))))
+    except (ValueError, TypeError):
+        lines = 50
+
+    if unit:
+        if not re.match(r"^[a-zA-Z0-9_\-\.@]+(\.service)?$", unit):
+            return jsonify({"ok": False, "error": "Invalid service unit name"}), 400
+        cmd = ["journalctl", "-u", unit, "-f", f"-n{lines}", "--no-pager"]
+    elif container_id:
+        if not re.match(r"^[a-zA-Z0-9_\-\.]+$", container_id):
+            return jsonify({"ok": False, "error": "Invalid container ID"}), 400
+        cmd = ["docker", "logs", "-f", f"--tail={lines}", container_id]
+    else:
+        cmd = ["journalctl", "-f", f"-n{lines}", "--no-pager"]
+
+    def generate():
+        bin_path = shutil.which(cmd[0])
+        if not bin_path:
+            yield f"data: {json.dumps({'error': f'{cmd[0]} not found on host system'})}\n\n"
+            return
+        cmd[0] = bin_path
+        proc = None
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            yield f"data: {json.dumps({'status': 'connected', 'target': unit or container_id or 'system'})}\n\n"
+            for line in proc.stdout:
+                line_str = line.rstrip("\r\n")
+                if line_str:
+                    yield f"data: {json.dumps({'log': line_str})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            if proc:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=1)
+                except Exception:
+                    pass
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "Connection": "keep-alive",
+    })
+
+
+# --- Secure Web Terminal Endpoints ---
+@apps_bp.route("/api/terminal/auth", methods=["POST"])
+def api_terminal_auth():
+    from .common import client_private
+    if not client_private():
+        return jsonify({"ok": False, "error": "Terminal console is private LAN / Tailscale only"}), 403
+
+    body = request.get_json(silent=True) or {}
+    password = str(body.get("password") or "").strip()
+    from ..config import load_config
+    from ..security import parse_trusted_proxies, get_client_ip
+    cfg = load_config()
+    trusted = parse_trusted_proxies(cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1"))
+    client_ip = get_client_ip(request, trusted)
+    stored_hash = cfg.get("auth", {}).get("password_hash", "")
+
+    from ..terminal import authenticate_terminal_session
+    ok, msg, token = authenticate_terminal_session(password, client_ip, stored_hash)
+    if not ok:
+        return jsonify({"ok": False, "error": msg}), 401
+    return jsonify({"ok": True, "token": token, "message": "Console unlocked"})
+
+
+@apps_bp.route("/api/terminal/exec", methods=["POST"])
+def api_terminal_exec():
+    from .common import client_private
+    if not client_private():
+        return jsonify({"ok": False, "error": "Terminal console is private LAN / Tailscale only"}), 403
+
+    body = request.get_json(silent=True) or {}
+    token = str(body.get("token") or request.headers.get("X-Terminal-Token") or "").strip()
+    command = str(body.get("command") or "").strip()
+
+    from ..config import load_config
+    from ..security import parse_trusted_proxies, get_client_ip
+    cfg = load_config()
+    trusted = parse_trusted_proxies(cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1"))
+    client_ip = get_client_ip(request, trusted)
+
+    from ..terminal import execute_console_command
+    res = execute_console_command(token, client_ip, command)
+    status = 200 if res.get("ok") else 400
+    return jsonify(res), status
+

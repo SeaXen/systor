@@ -173,3 +173,12 @@ def api_ssl_certs():
     return jsonify({"ok": True, "certs": certs, "certificates": certs, "count": len(certs)})
 
 
+# --- Security & Port Audit Endpoints ---
+@network_bp.route("/api/network/security", methods=["GET"])
+def api_network_security():
+    from ..services.security_audit_service import get_security_audit
+    force = bool(request.args.get("refresh"))
+    audit = get_security_audit(force_refresh=force)
+    return jsonify({"ok": True, **audit})
+
+

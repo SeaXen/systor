@@ -173,3 +173,13 @@ def test_security_headers_present(test_client):
     assert res.headers.get("X-Content-Type-Options") == "nosniff"
     assert res.headers.get("X-Frame-Options") == "SAMEORIGIN"
     assert "default-src 'self'" in res.headers.get("Content-Security-Policy", "")
+
+
+def test_network_security_audit(test_client):
+    res = test_client.get("/api/network/security")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["ok"] is True
+    assert "listening_ports" in data
+    assert "firewall" in data
+    assert "fail2ban" in data

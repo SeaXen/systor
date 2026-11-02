@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="systor",
-    version="1.0.0",
+    version="1.1.0",
     description="Lightweight Linux system monitor with web dashboard, sustained-threshold alerts, and Telegram/Discord notifications.",
     long_description=open("README.md").read() if __import__("os").path.exists("README.md") else "",
     long_description_content_type="text/markdown",

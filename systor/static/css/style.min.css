@@ -929,6 +929,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible, .control-sele
 .kpi-meter.temp i{background:linear-gradient(90deg,#22c55e,#f59e0b,#ef4444);}
 .kpi-meter.disk i{background:linear-gradient(90deg,#22d3ee,#f59e0b);}
 .kpi-meter.net i{background:linear-gradient(90deg,#22d3ee,#ff6b8a);}
+.kpi-meter.gpu i{background:linear-gradient(90deg,#10b981,#0284c7);}
+.kpi-meter.ups i{background:linear-gradient(90deg,#0d9488,#10b981);}
 #kpis .stat-card.has-meter .label{margin-top:14px;}
 .speed-layout{display:grid;gap:8px;}
 .speed-kpis{grid-template-columns:repeat(4,minmax(0,1fr));}

@@ -228,6 +228,11 @@ def run():
         rollup_retention_days=cfg["collector"]["rollup_retention_days"],
     )
     notifier = Notifier(cfg)
+    try:
+        from .bot import start_bot_daemon
+        start_bot_daemon(cfg, storage=storage)
+    except Exception as e:
+        log.warning("Could not start bot daemon: %s", e)
 
     log.info("collector: starting (poll=%ds)", cfg["collector"]["poll_interval_sec"])
     while _running:

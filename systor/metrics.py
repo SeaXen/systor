@@ -459,6 +459,11 @@ def collect_snapshot() -> dict[str, Any]:
     net_ifaces = read_network_interfaces()
     disk_io = read_disk_io_mbps()
     updates = read_system_updates()
+    try:
+        from .sensors import get_all_sensors
+        sensors = get_all_sensors()
+    except Exception:
+        sensors = {"present": False, "gpu": [], "rpi": {"present": False}, "ups": {"present": False}}
     return {
         "ts": int(time.time()),
         "hostname": read_hostname(),
@@ -476,6 +481,7 @@ def collect_snapshot() -> dict[str, Any]:
         "network_interfaces": net_ifaces,
         "network": net,
         "system_updates": updates,
+        "sensors": sensors,
     }
 
 
