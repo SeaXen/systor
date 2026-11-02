@@ -5,7 +5,7 @@
   <div class="dash-toolbar storage-toolbar">
     <div class="dash-status">
       <span class="dot green"></span>
-      <strong>Storage</strong>
+      <h2 class="dash-title" aria-label="Storage &amp; Drive Management">Storage</h2>
       <span id="storage-access">checking access…</span>
       <span id="storage-meta">LAN/Tailscale only · public hidden</span>
     </div>
@@ -16,13 +16,6 @@
     </div>
   </div>
 
-  <div class="storage-pathbar">
-    <input id="storage-path" class="storage-path-input mono" placeholder="/mnt/tb" autocomplete="off" aria-label="Storage directory path">
-    <button class="btn compact" id="storage-go">Open</button>
-  </div>
-  <div id="storage-breadcrumbs" class="storage-breadcrumbs"></div>
-
-  <h2 class="sr-only">Storage &amp; Drive Management</h2>
   <div class="storage-tabs" role="tablist" aria-label="Storage sections">
     <button class="storage-tab active" data-tab="overview" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
     <button class="storage-tab" data-tab="smart" role="tab" id="tab-smart" aria-controls="panel-smart" aria-selected="false">Drive Health (SMART)</button>
@@ -31,6 +24,12 @@
     <button class="storage-tab" data-tab="settings" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false">Settings</button>
     <button class="storage-tab" data-tab="ops" role="tab" id="tab-ops" aria-controls="panel-ops" aria-selected="false">Ops Log</button>
   </div>
+
+  <div class="storage-pathbar">
+    <input id="storage-path" class="storage-path-input mono" placeholder="/mnt/tb" autocomplete="off" aria-label="Storage directory path">
+    <button class="btn compact" id="storage-go">Open</button>
+  </div>
+  <div id="storage-breadcrumbs" class="storage-breadcrumbs"></div>
 
   <section class="storage-panel active" id="panel-overview" data-panel="overview" role="tabpanel" aria-labelledby="tab-overview">
     <div class="stat-grid storage-kpis">

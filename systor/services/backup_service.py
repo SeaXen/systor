@@ -119,21 +119,48 @@ def restore_backup_archive(archive_bytes: bytes, storage) -> tuple[bool, str]:
         except Exception as e:
             return False, f"Corrupted database in archive: {e}"
 
-        # Safe swap
+        # ------------------------------------------------------------------
+        # Safe swap.
+        #
+        # Why this order matters: in WAL mode the -wal file belongs to the
+        # main DB file. Replacing systor.db while a non-empty -wal is still
+        # on disk makes SQLite replay those frames into the *new* database,
+        # which corrupts it. The collector is a separate process with its own
+        # short-lived connections, so a threading.Lock cannot protect us here.
+        #
+        # Correct sequence:
+        #   1. checkpoint(TRUNCATE)  -> flushes WAL into systor.db, WAL = 0 bytes
+        #   2. keep a .pre-restore.bak of the old database
+        #   3. os.replace()          -> atomic; any connection opened after
+        #                                this point sees the new file
+        #   4. unlink -wal / -shm    -> safe now (they are empty); prevents a
+        #                                stale WAL being replayed
+        #   5. checkpoint()          -> establishes a clean WAL for the new DB
+        #
+        # Residual, by design: samples the collector commits in the sub-second
+        # window between (1) and (3) are discarded. That is the correct
+        # trade-off for a disaster-recovery restore -- the operator is
+        # explicitly choosing to roll the database back.
+        # ------------------------------------------------------------------
         active_db = Path(storage.db_path)
         backup_path = active_db.with_suffix(".pre-restore.bak")
 
-        with storage._lock:
-            try:
-                if hasattr(storage, "checkpoint"):
-                    storage.checkpoint()
-                if active_db.exists():
-                    shutil.copy2(active_db, backup_path)
-                shutil.copy2(restored_db, active_db)
-                if hasattr(storage, "checkpoint"):
-                    storage.checkpoint()
-            except Exception as e:
-                return False, f"Error swapping database file: {e}"
+        try:
+            if hasattr(storage, "checkpoint"):
+                storage.checkpoint()
+            if active_db.exists():
+                shutil.copy2(active_db, backup_path)
+            os.replace(str(restored_db), str(active_db))
+            for suffix in ("-wal", "-shm"):
+                stale = active_db.with_name(active_db.name + suffix)
+                try:
+                    stale.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            if hasattr(storage, "checkpoint"):
+                storage.checkpoint()
+        except Exception as e:
+            return False, f"Error swapping database file: {e}"
 
         # If config was included in backup, load and merge safely
         restored_cfg = temp_dir / "config.json"

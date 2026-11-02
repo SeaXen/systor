@@ -5,9 +5,9 @@
    - Navigation: Network-First with cache fallback
 */
 
-const CACHE_NAME = 'systor-shell-v1.0.0';
+const CACHE_NAME = 'systor-shell-v1.1.1';
 const STATIC_ASSETS = [
-  '/static/css/style.min.css?v=3.0',
+  '/static/css/style.css?v=4.0',
   '/static/js/app.js',
   '/static/img/systor-logo-header.png?v=2',
   '/static/img/icon-192.png',

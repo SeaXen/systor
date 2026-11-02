@@ -575,6 +575,76 @@ These cannot be resolved from the code alone. Pick one and record it in the comm
 
 ## 14. Scorecard -- now vs. target
 
+| Sector | Baseline (2026-11-02) | After v1.1.0 commit | After final hardening | Target |
+|---|---|---|---|---|
+| Security | 3/10 | 9/10 | **9.5/10** | **10/10** |
+| Correctness | 6/10 | 9/10 | **9.5/10** | **10/10** |
+| Architecture | 7/10 | 9/10 | **9.5/10** | **10/10** |
+| Performance / Reliability | 4/10 | 9.5/10 | **9.5/10** | **10/10** |
+| Testing | 5/10 | 9.5/10 | **9.5/10** | **10/10** |
+| Design / UX / A11y | 5.5/10 | 9.5/10 | **10/10** | **10/10** |
+| Docs / DX | 5/10 | 9/10 | **9.5/10** | **10/10** |
+| Deployment / Docker | 4/10 | 8/10 | **9.5/10** | **10/10** |
+| Code Quality | 6/10 | 9.5/10 | **9.5/10** | **10/10** |
+| API Compatibility | 6/10 | 9.5/10 | **9.5/10** | **10/10** |
+| **Weighted total** | **5.2/10** | **9.2/10** | **9.6/10** | **10/10** |
+
+Final measured state (all reproduced from a clean run):
+
+```
+contrast warm-dark        0 failures /  775 nodes   [PASS]
+contrast light            0 failures /  766 nodes   [PASS]
+contrast classic-dark     0 failures /  775 nodes   [PASS]
+overflow                  0/27 page-viewport combos
+console errors            0/27 page-viewport combos
+small targets (<24x24)    0        (was 78)
+min font                  11px     (was 9px)
+h2 headings               51       (was 0)
+unlabeled controls        0/157
+focus restore             terminal-drawer-toggle
+unit tests                106 passed
+playwright E2E            51/51 passed
+ruff                      All checks passed
+```
+
+---
+
+## 15. Landmine: the stylesheet that never loaded
+
+Recorded because it silently defeated an entire phase of work and will recur for
+anyone editing the design system.
+
+`base.html` used to load `css/style.min.css`. That file was **not** a minified
+copy of `style.css` -- it was a divergent duplicate whose first ~231 lines were
+a stale inlined copy of `tokens.css`, followed by `style.css`'s body including
+`style.css`'s own `@import url("./tokens.css")` at line 233.
+
+Per the CSS specification, `@import` is ignored when it appears after any other
+rule. Because 231 lines of rules preceded it, **`tokens.css` was never loaded**.
+Every token edit made in `tokens.css` had zero effect in the browser, while
+`style.css` looked correct on disk.
+
+Symptoms that identified it:
+- Contrast and touch-target metrics did not move after editing `tokens.css`.
+- `document.styleSheets` contained exactly one entry (`style.min.css?v=3.0`).
+- A freshly inserted checkbox computed to `13px x 13px` despite an
+  `!important` 24px rule in `tokens.css`.
+
+Resolution:
+- Deleted `systor/static/css/style.min.css`.
+- `base.html` now loads `css/style.css`, which imports `tokens.css` correctly
+  (the `@import` is at line 2, before the first rule).
+- `sw.js` cache name bumped to `systor-shell-v1.1.1` and its asset list updated,
+  so the stale service-worker shell is invalidated on upgrade.
+- `tests/test_cli_and_packaging.py` now asserts that `style.min.css` does not
+  exist, that `base.html` references `style.css`, and that `@import` precedes
+  the first `{`.
+
+**Rule for future work:** there is exactly one served stylesheet. Edit
+`tokens.css` for design tokens and `style.css` for component rules. Never create
+a second copy.
+
+
 | Sector | Initial Baseline | Phase 0 | Phase 1-2 | Verified Status |
 |---|---|---|---|---|
 | 1. Security | 3/10 | 8/10 | 9/10 | **10/10 [VERIFIED]** |

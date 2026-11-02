@@ -7,7 +7,7 @@
 .settings-tab-btn{appearance:none;background:var(--bg-elev);border:1px solid var(--border-2);color:var(--text);border-radius:var(--radius,8px);padding:7px 13px;font-size:12px;font-weight:600;letter-spacing:.2px;cursor:pointer;line-height:1;white-space:nowrap;transition:all .15s ease}
 .settings-tab-btn:hover{border-color:var(--teal);color:var(--text-bright);background:var(--bg-hover)}
 .settings-tab-btn.active{background:var(--teal-strong);border-color:var(--teal);color:#fff;box-shadow:0 4px 14px rgba(29,158,117,.25)}
-.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(240px,1fr) auto;gap:8px;align-items:center}
+.settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(240px,1fr) auto;gap:var(--gap-grid, 10px);align-items:center}
 .settings-toolbar-top,.settings-toolbar-bottom{display:contents}
 .settings-page .sticky-actions .meta{display:flex;flex-wrap:nowrap;gap:7px;align-items:center;min-width:0;flex:1 1 auto}
 .settings-page .sticky-actions .meta > *{flex:0 0 auto}
@@ -16,10 +16,10 @@
 .settings-page .sticky-actions .actions{display:flex;justify-content:flex-end;flex-wrap:nowrap;gap:7px}
 .settings-action-group{display:flex;flex-wrap:nowrap;gap:7px;align-items:center}
 .mobile-only{display:none !important}
-.settings-panel{display:none;gap:8px}
+.settings-panel{display:none;gap:var(--gap-grid, 10px)}
 .settings-panel.active{display:block}
-.settings-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}
-.settings-panel-col{display:flex;flex-direction:column;gap:8px;min-width:0}
+.settings-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-grid, 10px);align-items:start}
+.settings-panel-col{display:flex;flex-direction:column;gap:var(--gap-grid, 10px);min-width:0}
 .settings-card h3 .mini-chip{margin-left:8px}
 .auth-mini-grid{display:grid;grid-template-columns:128px minmax(0,1fr);gap:7px 10px;align-items:center}
 .auth-mini-grid .full{grid-column:1 / -1}
@@ -66,7 +66,6 @@
 </style>
 
 <div class="settings-page">
-  <h2 class="sr-only">Configuration Settings</h2>
   <div id="flash"></div>
   <div class="import-modal-backdrop" id="import-modal-backdrop" aria-hidden="true">
     <div class="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
@@ -84,7 +83,7 @@
     <div class="sticky-actions">
       <div class="settings-toolbar-top">
         <div class="meta">
-          <strong>Settings</strong>
+          <h2 class="dash-title" aria-label="Configuration Settings">Settings</h2>
           <span class="status-chip settings-meta-chip" id="last-saved-summary" title="{{ settings_saved_at or '' }}">saved {{ settings_saved_at or '—' }}</span>
           <span class="status-chip settings-meta-chip" id="svc-summary">svc · loading…</span>
           <span class="status-chip settings-meta-chip {% if cfg.telegram.enabled %}warn{% endif %}" id="tg-summary"><span class="ico">✈</span><span>{% if cfg.telegram.enabled %}on{% else %}off{% endif %}</span></span>

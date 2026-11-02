@@ -1,5 +1,26 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim
+
+# ---------------------------------------------------------------------------
+# Stage 1: build the wheel. Keeps pip/setuptools/build tooling out of the final
+# image so the runtime layer carries no compiler and no pip cache.
+# ---------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS build
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /build
+
+RUN pip install --no-cache-dir --upgrade pip build
+
+COPY pyproject.toml README.md ./
+COPY systor/ ./systor/
+RUN python -m build --wheel --outdir /wheels
+
+# ---------------------------------------------------------------------------
+# Stage 2: runtime. Runs as a dedicated non-root system user.
+# ---------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm
 
 LABEL maintainer="Dr. Sagar (SeaXen) <https://github.com/SeaXen/systor>"
 LABEL org.opencontainers.image.title="Systor"
@@ -17,32 +38,36 @@ ENV PYTHONUNBUFFERED=1 \
 # - smartmontools: provides smartctl for Drive Health & SMART Insights
 # - curl: provides container healthcheck and network probes
 # - ca-certificates: enables TLS/SSL certificate trust
-# - tini: lightweight init process to forward signals and reap zombie child processes
+# - tini: lightweight init process to forward signals and reap zombie children
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    smartmontools \
-    curl \
-    ca-certificates \
-    tini \
-    && rm -rf /var/lib/apt/lists/*
+      smartmontools \
+      curl \
+      ca-certificates \
+      tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 systor \
+    && useradd --system --uid 10001 --gid 10001 \
+               --no-create-home --shell /usr/sbin/nologin systor
 
 WORKDIR /opt/systor
 
-# Create standard directories with full path parity to bare-metal Linux
-RUN mkdir -p /etc/systor /var/lib/systor /var/log/systor
+# Standard directories with full path parity to bare-metal Linux.
+# Owned by the runtime user so fresh named volumes inherit the right ownership.
+RUN mkdir -p /etc/systor /var/lib/systor /var/log/systor /var/run/systor \
+    && chown -R systor:systor /etc/systor /var/lib/systor /var/log/systor /var/run/systor
 
-# Install Python requirements first for optimal layer caching
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the prebuilt wheel; no source tree, no compiler, no pip cache.
+COPY --from=build /wheels /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels systor \
+    && rm -rf /wheels
 
-# Copy source tree and install package
-COPY pyproject.toml setup.py README.md ./
-COPY systor/ ./systor/
-RUN pip install --no-cache-dir .
+# Drop privileges. Everything below runs as uid/gid 10001.
+USER systor
 
 EXPOSE 6677
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:6677/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:6677/health || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["systor", "serve", "all"]

@@ -29,7 +29,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Auto-detect remote execution (e.g. curl ... | bash) vs local repository
-if [[ ! -d "$SRC_DIR/systor" || ! -f "$SRC_DIR/setup.py" ]]; then
+if [[ ! -d "$SRC_DIR/systor" || ! -f "$SRC_DIR/pyproject.toml" ]]; then
   echo "==> Remote execution detected. Bootstrapping Systor from GitHub (SeaXen/systor)..."
   TEMP_DIR="$(mktemp -d /tmp/systor-bootstrap-XXXXXX)"
 
@@ -75,7 +75,7 @@ fi
 
 echo "==> Copying app to $DST_DIR"
 cp -r "$SRC_DIR/systor" "$DST_DIR/"
-cp "$SRC_DIR/setup.py" "$DST_DIR/" 2>/dev/null || true
+cp "$SRC_DIR/pyproject.toml" "$DST_DIR/" 2>/dev/null || true
 cp "$SRC_DIR/requirements.txt" "$DST_DIR/" 2>/dev/null || true
 cp "$SRC_DIR/README.md" "$DST_DIR/" 2>/dev/null || true
 

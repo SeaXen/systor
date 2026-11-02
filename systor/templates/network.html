@@ -6,7 +6,7 @@
   <div class="dash-toolbar">
     <div class="dash-status">
       <span class="dot green"></span>
-      <strong>Network</strong>
+      <h2 class="dash-title">Network</h2>
       <span id="net-updated">loading…</span>
       <span id="net-coverage">usage history</span>
     </div>
@@ -56,7 +56,6 @@
     </div>
   </div>
 
-  <h2 class="sr-only">Network Activity Overview</h2>
   <div class="network-grid network-kpis network-kpis-6">
     <div class="stat-card compact-stat compact-row-card rx-card"><div class="label">DL total</div><div class="value rx-text" id="cur-rx">—</div></div>
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">UL total</div><div class="value tx-text" id="cur-tx">—</div></div>
@@ -66,7 +65,6 @@
     <div class="stat-card compact-stat compact-row-card tx-card"><div class="label">This month use</div><div class="value" id="month-use">—</div></div>
   </div>
 
-  <h2 class="sr-only">Network Usage and Rate Charts</h2>
   <div class="chart-card">
     <div class="chart-head"><h3><strong>Usage Totals by Period</strong></h3><div class="chart-meta" id="meta-usage-bars"><span class="rx-text"><strong>DL —</strong></span> · <span class="tx-text"><strong>UL —</strong></span> · avg — · total —</div></div>
     <canvas id="net-usage-chart" role="img" aria-label="Network usage totals by period chart"></canvas>

@@ -110,7 +110,14 @@ JS_STRUCTURE = r"""
   const small = q('a, button, input, select, [role="button"]').filter(e => {
     const r = e.getBoundingClientRect();
     return r.width > 1 && r.height > 1 && (r.height < 24 || r.width < 24);
-  }).length;
+  });
+  const smallSamples = small.slice(0, 12).map(e => {
+    const r = e.getBoundingClientRect();
+    return e.tagName.toLowerCase()
+      + (typeof e.className === 'string' && e.className.trim()
+         ? '.' + e.className.trim().split(/\s+/)[0] : '')
+      + ' ' + Math.round(r.width) + 'x' + Math.round(r.height);
+  });
   return {
     h1: q('h1').length, h2: q('h2').length,
     main: !!document.querySelector('#main-content'),
@@ -120,7 +127,7 @@ JS_STRUCTURE = r"""
     imgsNoAlt: q('img').filter(i => !i.hasAttribute('alt')).length,
     btnsNoName: q('button, a').filter(b => !(b.textContent || '').trim()
       && !b.getAttribute('aria-label') && !b.getAttribute('title')).length,
-    smallTargets: small,
+    smallTargets: small.length,
     minFont: (() => {
       let m = Infinity;
       q('body *').forEach(e => {
@@ -130,7 +137,8 @@ JS_STRUCTURE = r"""
         }
       });
       return isFinite(m) ? Math.round(m * 10) / 10 : null;
-    })()
+    })(),
+    smallTargetSamples: smallSamples
   };
 }
 """
@@ -321,9 +329,17 @@ def main():
                     "structure": st, "charts": page.evaluate(JS_CHART)}
                 overflow_hits += 1 if ov > 0 else 0
                 console_hits += 1 if (errs or reqfail) else 0
-                for k, v in st.items():
-                    if isinstance(v, int):
-                        struct_totals[k] = struct_totals.get(k, 0) + v
+                # minFont / smallTargetSamples are per-page extremes, not additive
+                for k in ("h1", "h2", "main", "skipLink", "ariaCurrent",
+                          "inputs", "imgsNoAlt", "btnsNoName", "smallTargets"):
+                    if isinstance(st.get(k), int):
+                        struct_totals[k] = struct_totals.get(k, 0) + st[k]
+                if isinstance(st.get("minFont"), (int, float)):
+                    struct_totals["minFont"] = min(
+                        struct_totals.get("minFont", 1e9), st["minFont"])
+                struct_totals["smallTargetSamples"] = (
+                    struct_totals.get("smallTargetSamples", [])
+                    + (st.get("smallTargetSamples") or []))[:12]
             ctx.close()
 
         for theme in THEMES:

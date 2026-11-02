@@ -86,16 +86,37 @@ class TestCliAndPackaging(unittest.TestCase):
     def test_theme_tokens_and_switcher_assets(self):
         """Verify 3-way theme tokens (classic-dark, warm-dark, light) and template hooks."""
         repo_root = Path(__file__).resolve().parent.parent
-        css_file = repo_root / "systor" / "static" / "css" / "style.min.css"
+        # style.css is the single served stylesheet; it @imports tokens.css.
+        css_file = repo_root / "systor" / "static" / "css" / "style.css"
+        tokens_file = repo_root / "systor" / "static" / "css" / "tokens.css"
         base_html = repo_root / "systor" / "templates" / "base.html"
         settings_html = repo_root / "systor" / "templates" / "settings.html"
         app_js = repo_root / "systor" / "static" / "js" / "app.js"
 
+        # The divergent style.min.css duplicate was removed: base.html must
+        # reference style.css, and style.css must import the token source.
+        self.assertFalse(
+            (repo_root / "systor" / "static" / "css" / "style.min.css").exists(),
+            "style.min.css must not exist -- it diverged from tokens.css and its "
+            "@import sat after other rules, so browsers silently ignored it",
+        )
+        base_for_css = base_html.read_text(encoding="utf-8")
+        self.assertIn("css/style.css", base_for_css)
+        self.assertNotIn("style.min.css", base_for_css)
+
         css_text = css_file.read_text(encoding="utf-8")
-        self.assertIn('data-theme="warm-dark"', css_text)
-        self.assertIn('data-theme="light"', css_text)
-        self.assertIn('data-theme="classic-dark"', css_text)
-        self.assertIn('--teal:            #1d9e75', css_text)
+        self.assertIn('@import url("./tokens.css")', css_text)
+        self.assertLess(
+            css_text.index("@import"), css_text.index("{"),
+            "@import must precede the first CSS rule or browsers drop it",
+        )
+
+        tokens_text = tokens_file.read_text(encoding="utf-8")
+        self.assertIn('data-theme="warm-dark"', tokens_text)
+        self.assertIn('data-theme="light"', tokens_text)
+        self.assertIn('data-theme="classic-dark"', tokens_text)
+        self.assertIn('--teal:', tokens_text)
+        # Component rules live in style.css; the theme picker grid is one of them.
         self.assertIn('theme-picker-grid', css_text)
 
         base_text = base_html.read_text(encoding="utf-8")
@@ -132,7 +153,11 @@ class TestCliAndPackaging(unittest.TestCase):
         self.assertIn('serviceWorker.register', base_text)
 
         sw_text = sw.read_text(encoding="utf-8")
-        self.assertIn("systor-shell-v1.0.0", sw_text)
+        self.assertIn("systor-shell-v", sw_text)
+        # The cached shell must reference the stylesheet that is actually served,
+        # otherwise an upgrade pins users to a stale stylesheet.
+        self.assertIn("/static/css/style.css", sw_text)
+        self.assertNotIn("style.min.css", sw_text)
         self.assertIn("/api/", sw_text)
 
 

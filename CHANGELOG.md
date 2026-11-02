@@ -16,6 +16,23 @@ The format is loosely based on Keep a Changelog.
 
 ## [1.0.0] - 2026-11-02
 
+> **Corrections applied 2026-11-02 (v1.1.0).** Four statements in this entry
+> described intent rather than the shipped code. They are left in place below
+> because a changelog is a historical record; the accurate current behaviour is:
+>
+> - **"real-time Chart.js palette adaptation"** — Chart.js is not a dependency
+>   and is not used. Charts are drawn with a small hand-rolled canvas renderer
+>   (`systor/static/js/app.js`). There is no CDN dependency by design.
+> - **"HTTP, HTTPS, TCP, Ping, and DNS endpoints"** — the uptime monitor
+>   implements `http://`, `https://` and `tcp://host:port` only. ICMP ping and
+>   DNS resolution are not implemented.
+> - **"start/stop/restart"** — `systor/services/systemd_service.py` implements
+>   `systemctl restart` only. There is no start or stop action.
+> - **"zero-downtime database restore"** — restore is safe but not zero-loss:
+>   samples the collector commits during the restore window are discarded.
+>   See `systor/services/backup_service.py` for the exact sequence.
+
+
 ### Added
 - **ExamForge Design System & 3-Way Theme Switcher**: Added Warm Dark (`#0b0b0b` neutral slate + signature teal `#1d9e75`), Paper Light (`#f9f9f7` warm paper), and Classic Dark (`#0f1117` GitHub dark + blue `#58a6ff`) with zero-flash preload, persistent local storage, and real-time Chart.js palette adaptation.
 - **Progressive Web App (PWA) Support**: Native standalone web application capabilities, Web App Manifest (`manifest.json`), high-resolution app icons (192x192, 512x512 maskable), and Service Worker (`sw.js`) with Cache-First static asset caching and Network-Only live telemetry.

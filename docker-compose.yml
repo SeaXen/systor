@@ -7,16 +7,38 @@ services:
     container_name: systor
     restart: unless-stopped
 
-    # Host PID and Network namespaces for direct access to host processes, /proc, and network adapters
+    # Host PID and Network namespaces for direct access to host processes,
+    # /proc, and network adapters. Required for accurate per-process CPU%.
     pid: host
     network_mode: host
 
-    # Note: On macOS/Windows Docker Desktop where network_mode: host is unsupported,
-    # comment out 'network_mode: host' and uncomment ports below:
+    # Note: On macOS/Windows Docker Desktop where network_mode: host is
+    # unsupported, comment out 'network_mode: host' and uncomment ports below.
+    # Note that with the ports mapping you must also expose the D-Bus socket
+    # path below, otherwise systemd service management silently stops working.
     # ports:
     #   - "${SYSTOR_PORT:-6677}:6677"
 
-    # Least-privilege volume mounts for metrics, SMART disk telemetry, and services
+    # ------------------------------------------------------------------
+    # Least privilege. The image runs as uid/gid 10001 (see Dockerfile).
+    # All capabilities are dropped; add back only what a feature needs.
+    # ------------------------------------------------------------------
+    user: "10001:10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Uncomment ONLY if you need ICMP ping from the uptime monitor:
+    # cap_add:
+    #   - NET_RAW
+
+    # Read-only root filesystem. The app writes only to the named volumes
+    # below plus these two tmpfs mounts (PID files, temp uploads, WAL/SHM).
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1770,uid=10001,gid=10001
+      - /var/run:mode=1770,uid=10001,gid=10001
+
     volumes:
       # Persistent application data and configuration
       - systor_config:/etc/systor
@@ -26,16 +48,24 @@ services:
       # Host metrics and hardware sensors (read-only)
       - /proc:/proc:ro
       - /sys:/sys:ro
-      - /dev:/dev:ro
       - /etc/os-release:/etc/os-release:ro
 
-      # Host systemd management via D-Bus and container inspect
+      # Host systemd management via D-Bus. The systor user must be in the
+      # 'systemd-journal' group on the host for log streaming to work.
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
-      # Docker socket is opt-in for container inspect/management:
+
+      # ------------------------------------------------------------------
+      # OPT-IN mounts. Both are commented out by default because each one
+      # widens the blast radius. Uncomment deliberately, not by default.
+      # ------------------------------------------------------------------
+
+      # Docker socket = full host root. Prefer a read-only socket proxy:
+      #   tecnativa/docker-socket-proxy  (CONTAINERS=1, POST=0)
       # - /var/run/docker.sock:/var/run/docker.sock:ro
 
-    security_opt:
-      - no-new-privileges:true
+      # Block devices for SMART data. Requires cap_add: [SYS_RAWIO] above.
+      # Without it the sysfs fallback still reports capacity, not attributes.
+      # - /dev:/dev:ro
 
     environment:
       - SYSTOR_WEB_HOST=0.0.0.0
@@ -46,11 +76,25 @@ services:
       # - SYSTOR_DISCORD_WEBHOOK=
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6677/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:6677/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+    # Bound the blast radius of a runaway collector or speedtest.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+    # Keep container logs from filling the host disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   systor_config:

@@ -1,5 +1,13 @@
 # Systor 10/10 Architecture & Production Hardening Plan
 
+> **SUPERSEDED — do not use.** This plan is retained for historical reference
+> only. It was completed for v1.0.0 and claims "52/52 tests passing"; the
+> repository now contains 106 unit tests plus 51 Playwright E2E checks.
+>
+> The current, evidence-based plan is **[`SYSTOR-10x10-PLAN.md`](SYSTOR-10x10-PLAN.md)**,
+> which supersedes this file and is verified against a live browser audit.
+
+
 > Target: Bring `systor` to a 10/10 standard across all 11 engineering sectors.
 > Status: **COMPLETE** (All 6 Phases Finished & 52/52 Tests Passing)
 

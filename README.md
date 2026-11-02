@@ -386,7 +386,7 @@ systor/
 │   │   ├── systemd_service.py
 │   │   └── uptime_service.py
 │   ├── static/
-│   │   ├── css/ (tokens.css, style.css, style.min.css)
+│   │   ├── css/ (tokens.css, style.css)
 │   │   ├── js/ (app.js, dialog.js)
 │   │   └── img/
 │   ├── templates/

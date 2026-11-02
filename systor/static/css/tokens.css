@@ -83,6 +83,14 @@
 
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border);
 
+  /* Universal Layout Rhythm & Spacing Tokens */
+  --gap-page:        10px;    /* Spacing between major page blocks & toolbars */
+  --gap-grid:        10px;    /* Consistent universal gap between all major cards & grids */
+  --gap-card-inner:  8px;     /* Gap between sub-elements inside cards */
+  --gap-controls:    6px;     /* Gap between buttons, inputs, pills */
+  --card-pad-y:      12px;    /* Card vertical padding */
+  --card-pad-x:      14px;    /* Card horizontal padding */
+
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -228,3 +236,152 @@
 
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
 }
+
+/* ==========================================================================
+   WCAG 2.2 AA — 2.5.8 Target Size (Minimum)
+   --------------------------------------------------------------------------
+   Every interactive element must present a target of at least 24x24 CSS px.
+   This is an accessibility invariant, so the dimensions use !important to
+   stop component rules (e.g. the compact speed-schedule form) from shrinking
+   a control below the floor.
+
+   Checkboxes are set to the full 24x24 rather than a padded 16x16 box:
+   with appearance:auto the padding trick does not produce a reliable hit
+   area across engines, and a 24px checkbox is unremarkable in a dense
+   admin table.
+   ========================================================================== */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+  accent-color: var(--teal-strong, #1d9e75);
+  vertical-align: middle;
+  cursor: pointer;
+  flex: none;
+}
+
+/* Text, icon and inline buttons that render shorter than the floor.
+   Both axes get a floor: min-height catches short buttons and text inputs,
+   min-width catches narrow icon-only buttons. min-* only sets a floor, so
+   existing widths, padding and flex layout are preserved. */
+button,
+.btn,
+[role="button"],
+summary,
+.storage-name-btn,
+.storage-tab,
+select,
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]) {
+  min-height: 24px;
+}
+
+button,
+.btn,
+[role="button"] {
+  min-width: 24px;
+}
+
+/* The storage file-name buttons are inline-flex text triggers inside a
+   table row; give them vertical breathing room without changing layout. */
+.storage-name-btn {
+  padding-block: 4px;
+  min-height: 24px;
+}
+
+/* ==========================================================================
+   Range sliders
+   --------------------------------------------------------------------------
+   Excluded from the generic input floor above because a 16px track is the
+   intended visual. WCAG 2.2 AA 2.5.8 still applies, so the *draggable thumb*
+   is sized to the full 24px floor and the control itself is given a
+   24px min-height, which makes the whole slider a valid target.
+   ========================================================================== */
+input[type="range"] {
+  min-height: 24px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--teal-strong, #1d9e75);
+  border: 2px solid var(--surface-0, #0b0b0b);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--teal-strong, #1d9e75);
+  border: 2px solid var(--surface-0, #0b0b0b);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Universal Sleek Scrollbars
+   --------------------------------------------------------------------------
+   Replaces Windows/Chrome bulky 17px grey scrollbars with clean, subtle bars.
+   ========================================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2, rgba(255, 255, 255, 0.18)) transparent;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-2, rgba(255, 255, 255, 0.2));
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--teal, #1d9e75);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ==========================================================================
+   Unified Page & Toolbar Headings (WCAG & Visual Parity)
+   --------------------------------------------------------------------------
+   Integrates semantic <h2> titles directly into operator toolbars with zero
+   wasted vertical space, while styling standalone titles consistently.
+   ========================================================================== */
+.dash-title,
+.dash-status h2,
+.sticky-actions .meta h2,
+.page-title {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+  color: var(--text-bright, #f0efec);
+}
+
+/* Standalone .page-title when placed outside a toolbar */
+h2.page-title:not(.dash-title) {
+  display: block;
+  margin: 0 0 var(--gap-page, 10px);
+  font-size: 14px;
+}
+
+/* Empty helper containers produce zero layout gap */
+#flash:empty,
+#alert-flash:empty,
+.storage-breadcrumbs:empty,
+.storage-preview:empty {
+  display: none !important;
+}
+
