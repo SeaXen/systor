@@ -4,9 +4,9 @@
 <style>
 .settings-tabs{display:flex;gap:8px;flex-wrap:nowrap;padding:0;align-items:center}
 .settings-tab-item{display:inline-flex;align-items:center;gap:5px}
-.settings-tab-btn{appearance:none;background:rgba(13,17,23,.72);border:1px solid #2c3440;color:var(--text);border-radius:999px;padding:7px 11px;font-size:11px;font-weight:700;letter-spacing:.28px;cursor:pointer;line-height:1;white-space:nowrap}
-.settings-tab-btn:hover{border-color:rgba(88,166,255,.5);color:var(--text-bright)}
-.settings-tab-btn.active{background:linear-gradient(180deg,var(--blue-2) 0%,#1a4f9c 100%);border-color:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(31,111,235,.22)}
+.settings-tab-btn{appearance:none;background:var(--bg-elev);border:1px solid var(--border-2);color:var(--text);border-radius:var(--radius,8px);padding:7px 13px;font-size:12px;font-weight:600;letter-spacing:.2px;cursor:pointer;line-height:1;white-space:nowrap;transition:all .15s ease}
+.settings-tab-btn:hover{border-color:var(--teal);color:var(--text-bright);background:var(--bg-hover)}
+.settings-tab-btn.active{background:var(--teal-strong);border-color:var(--teal);color:#fff;box-shadow:0 4px 14px rgba(29,158,117,.25)}
 .settings-page .sticky-actions{display:grid;grid-template-columns:auto minmax(240px,1fr) auto;gap:8px;align-items:center}
 .settings-toolbar-top,.settings-toolbar-bottom{display:contents}
 .settings-page .sticky-actions .meta{display:flex;flex-wrap:nowrap;gap:7px;align-items:center;min-width:0;flex:1 1 auto}
@@ -24,7 +24,7 @@
 .auth-mini-grid{display:grid;grid-template-columns:128px minmax(0,1fr);gap:7px 10px;align-items:center}
 .auth-mini-grid .full{grid-column:1 / -1}
 .auth-stat-row{display:flex;gap:7px;flex-wrap:wrap}
-.settings-meta-chip{font-size:11px;padding:3px 8px;gap:4px;border-color:rgba(88,166,255,.28);background:rgba(23,32,45,.92)}
+.settings-meta-chip{font-size:11px;padding:3px 8px;gap:4px;border-color:var(--border-2);background:var(--bg-elev)}
 .settings-meta-chip .ico{font-size:11px;line-height:1}
 .settings-card .card-subtle{margin-top:-2px}
 .status-chip.mini-chip{padding:3px 8px;font-size:11px}
@@ -38,10 +38,10 @@
 .settings-inline-file input[type=file]{max-width:230px}
 .import-modal-backdrop{position:fixed;inset:0;background:rgba(5,8,13,.72);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:2000;padding:18px}
 .import-modal-backdrop.open{display:flex}
-.import-modal{width:min(520px,100%);background:#121822;color:var(--text-bright);border:1px solid rgba(88,166,255,.28);border-radius:18px;box-shadow:0 18px 60px rgba(0,0,0,.45);padding:18px}
+.import-modal{width:min(520px,100%);background:var(--bg-elev);color:var(--text-bright);border:1px solid var(--border-2);border-radius:var(--radius-card,12px);box-shadow:0 18px 60px rgba(0,0,0,.45);padding:18px}
 .import-modal h3{margin:0 0 8px;color:var(--text-bright)}
 .settings-page{color:var(--text)}
-.import-modal .modal-file{display:inline-flex;max-width:100%;padding:6px 10px;border-radius:999px;background:rgba(23,32,45,.92);border:1px solid rgba(88,166,255,.24);font-size:12px;color:var(--text-bright)}
+.import-modal .modal-file{display:inline-flex;max-width:100%;padding:6px 10px;border-radius:var(--radius,8px);background:var(--bg-card);border:1px solid var(--border-2);font-size:12px;color:var(--text-bright)}
 .import-modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
 @media (max-width:1100px){
   .settings-page .sticky-actions{grid-template-columns:1fr;align-items:start}
@@ -113,6 +113,54 @@
     <section class="settings-panel active" data-settings-panel="general">
       <div class="settings-panel-grid">
         <div class="settings-panel-col">
+          <div class="settings-card">
+            <h3>Appearance &amp; Theme</h3>
+            <div class="card-subtle">Choose your active color scheme and surface styling. Changes apply immediately and save across sessions.</div>
+            <div class="theme-picker-grid">
+              <div class="theme-picker-card" data-theme-choice="warm-dark" onclick="window.setSystorTheme('warm-dark')">
+                <div class="theme-picker-head">
+                  <span class="theme-picker-title">🌙 Warm Dark</span>
+                  <span class="status-chip mini-chip ok">New Design</span>
+                </div>
+                <div class="theme-picker-desc">ExamForge neutral slate background (#0b0b0b) with signature teal accents and subtle hairline borders.</div>
+                <div class="theme-preview-palette">
+                  <span class="theme-preview-chip" style="background:#0b0b0b" title="Surface 0 (#0b0b0b)"></span>
+                  <span class="theme-preview-chip" style="background:#151515" title="Surface 1 (#151515)"></span>
+                  <span class="theme-preview-chip" style="background:#1a1a19" title="Surface 2 (#1a1a19)"></span>
+                  <span class="theme-preview-chip" style="background:#1d9e75" title="Teal Accent (#1d9e75)"></span>
+                </div>
+              </div>
+
+              <div class="theme-picker-card" data-theme-choice="light" onclick="window.setSystorTheme('light')">
+                <div class="theme-picker-head">
+                  <span class="theme-picker-title">☀ Paper Light</span>
+                  <span class="status-chip mini-chip">Day Mode</span>
+                </div>
+                <div class="theme-picker-desc">Warm gray paper surfaces (#f9f9f7) with crisp contrast, clean borders, and signature teal accents.</div>
+                <div class="theme-preview-palette">
+                  <span class="theme-preview-chip" style="background:#f9f9f7" title="Surface 0 (#f9f9f7)"></span>
+                  <span class="theme-preview-chip" style="background:#fcfcfb" title="Surface 1 (#fcfcfb)"></span>
+                  <span class="theme-preview-chip" style="background:#ffffff" title="Surface 2 (#ffffff)"></span>
+                  <span class="theme-preview-chip" style="background:#1d9e75" title="Teal Accent (#1d9e75)"></span>
+                </div>
+              </div>
+
+              <div class="theme-picker-card" data-theme-choice="classic-dark" onclick="window.setSystorTheme('classic-dark')">
+                <div class="theme-picker-head">
+                  <span class="theme-picker-title">🌌 Classic Dark</span>
+                  <span class="status-chip mini-chip">Previous Dark</span>
+                </div>
+                <div class="theme-picker-desc">Original deep GitHub navy background (#0f1117) with classic accent blue (#58a6ff) highlights.</div>
+                <div class="theme-preview-palette">
+                  <span class="theme-preview-chip" style="background:#0f1117" title="Deep Navy (#0f1117)"></span>
+                  <span class="theme-preview-chip" style="background:#161b22" title="Surface (#161b22)"></span>
+                  <span class="theme-preview-chip" style="background:#21262d" title="Hover (#21262d)"></span>
+                  <span class="theme-preview-chip" style="background:#58a6ff" title="Blue Accent (#58a6ff)"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-card">
             <h3>Alert threshold presets</h3>
             <div class="card-subtle">Quick presets plus lightweight sliders for CPU, RAM, and temperature.</div>

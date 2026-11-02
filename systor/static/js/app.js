@@ -1,8 +1,36 @@
 /* systor dashboard JS — vanilla, no frameworks */
 const COLORS = {
-  green: '#2ecc71', yellow: '#f1c40f', red: '#e74c3c',
-  blue: '#3498db', purple: '#9b59b6', dim: '#6f7888', grid: '#232a36'
+  green: '#1d9e75', yellow: '#db9300', red: '#ec7e7e',
+  blue: '#1d9e75', purple: '#a78bfa', dim: '#898781', grid: 'rgba(255, 255, 255, 0.08)'
 };
+
+function updateChartColors() {
+  const theme = document.documentElement.getAttribute('data-theme') || 'warm-dark';
+  if (theme === 'light') {
+    COLORS.dim = '#898781';
+    COLORS.grid = 'rgba(11, 11, 11, 0.08)';
+    COLORS.blue = '#1d9e75';
+    COLORS.green = '#006300';
+    COLORS.yellow = '#734500';
+    COLORS.red = '#8e2626';
+  } else if (theme === 'classic-dark') {
+    COLORS.dim = '#8b949e';
+    COLORS.grid = 'rgba(48, 54, 61, 0.6)';
+    COLORS.blue = '#58a6ff';
+    COLORS.green = '#3fb950';
+    COLORS.yellow = '#d29922';
+    COLORS.red = '#f85149';
+  } else {
+    COLORS.dim = '#898781';
+    COLORS.grid = 'rgba(255, 255, 255, 0.08)';
+    COLORS.blue = '#1d9e75';
+    COLORS.green = '#0ca30c';
+    COLORS.yellow = '#db9300';
+    COLORS.red = '#ec7e7e';
+  }
+}
+updateChartColors();
+window.addEventListener('systor:theme-change', updateChartColors);
 
 function fmt(n, unit) {
   if (n === null || n === undefined) return '—';

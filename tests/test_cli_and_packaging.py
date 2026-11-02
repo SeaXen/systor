@@ -84,6 +84,36 @@ class TestCliAndPackaging(unittest.TestCase):
         self.assertIn("smartmontools", content)
         self.assertIn("systor.env", content)
 
+    def test_theme_tokens_and_switcher_assets(self):
+        """Verify 3-way theme tokens (classic-dark, warm-dark, light) and template hooks."""
+        repo_root = Path(__file__).resolve().parent.parent
+        css_file = repo_root / "systor" / "static" / "css" / "style.min.css"
+        base_html = repo_root / "systor" / "templates" / "base.html"
+        settings_html = repo_root / "systor" / "templates" / "settings.html"
+        app_js = repo_root / "systor" / "static" / "js" / "app.js"
+
+        css_text = css_file.read_text(encoding="utf-8")
+        self.assertIn('data-theme="warm-dark"', css_text)
+        self.assertIn('data-theme="light"', css_text)
+        self.assertIn('data-theme="classic-dark"', css_text)
+        self.assertIn('--teal:            #1d9e75', css_text)
+        self.assertIn('theme-picker-grid', css_text)
+
+        base_text = base_html.read_text(encoding="utf-8")
+        self.assertIn('theme-toggle-btn', base_text)
+        self.assertIn('setSystorTheme', base_text)
+        self.assertIn('localStorage.getItem(\'systor_theme\')', base_text)
+
+        settings_text = settings_html.read_text(encoding="utf-8")
+        self.assertIn('Appearance &amp; Theme', settings_text)
+        self.assertIn('data-theme-choice="warm-dark"', settings_text)
+        self.assertIn('data-theme-choice="light"', settings_text)
+        self.assertIn('data-theme-choice="classic-dark"', settings_text)
+
+        app_js_text = app_js.read_text(encoding="utf-8")
+        self.assertIn('systor:theme-change', app_js_text)
+        self.assertIn('updateChartColors', app_js_text)
+
 
 if __name__ == "__main__":
     unittest.main()
