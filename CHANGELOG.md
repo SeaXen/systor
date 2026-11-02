@@ -13,6 +13,7 @@ The format is loosely based on Keep a Changelog.
 - **Server-Sent Events (SSE) Live Log Streaming**: Real-time log streaming for host Systemd services (`journalctl -u`) and Docker containers (`docker logs -f`) with auto-scroll and terminal output formatting.
 - **Two-Way Interactive Telegram Bot Daemon**: Long-polling bot responding directly to mobile commands: `/status` (live host summary), `/speed` (instant network speedtest), `/alerts` (recent incidents), and `/ping`.
 - **Secure In-Browser Emergency Terminal**: Slide-up diagnostic console guarded strictly by private LAN/Tailscale verification, admin password re-authentication, and client-bound session tokens.
+- **Design Rhythm & Universal Layout Tokens**: Unified card gaps across all pages (`--gap-grid: 10px`, `--gap-page: 10px`), eliminated toolbar overflow scrollbars with clean flex-wrapping, integrated semantic `h2.dash-title` operator headers, and introduced sleek 6px custom scrollbars.
 
 ## [1.0.0] - 2026-11-02
 

@@ -175,9 +175,11 @@ The typography scale utilizes system-native UI font stacks for zero font downloa
 
 - **Maximum Width**: 1800px fluid desktop width with 8px–16px horizontal container padding.
 - **Grid Rhythms**:
-  - KPI Stat Grid: Fluid auto-fit grid (`repeat(auto-fit, minmax(156px, 1fr))`) with 8px gaps.
+  - Universal Rhythm Tokens: `--gap-page: 10px`, `--gap-grid: 10px`, `--gap-card-inner: 8px`, `--gap-controls: 6px`.
+  - KPI Stat Grid: Fluid auto-fit grid (`repeat(auto-fit, minmax(156px, 1fr))`) with universal 10px gaps (`--gap-grid`).
   - Two-Column Metric Grid: 2-column on desktop (`1fr 1fr`), collapsing to single column on viewports `<= 1100px`.
-  - Settings Split Grid: Asymmetric `1.05fr 0.95fr` grid collapsing cleanly on mobile viewports `<= 900px`.
+  - Operator Toolbars: Flex-wrapping (`flex-wrap: wrap`) with zero horizontal overflow, preserving label/select pairs without scrollbars.
+  - Custom Scrollbars: Sleek 6px rounded semi-transparent scrollbars (`scrollbar-width: thin; scrollbar-color: var(--border-2) transparent`).
 - **Top Sticky Header**: Compact 38px–42px sticky bar providing instant global health telemetry (`global-header-meta`) alongside pill navigation tabs.
 
 ## Elevation & Depth

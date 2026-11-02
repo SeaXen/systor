@@ -22,7 +22,7 @@ Unlike bloated monitoring platforms that require NodeJS runtimes, Redis, Elastic
 
 - Deployed as dual systemd services (`systor-collector.service` and `systor-web.service`) or run directly via Python.
 - Typical environments: Ubuntu, Debian, Proxmox VE, Arch Linux, Alpine, Raspberry Pi OS, macOS, and Windows.
-- Accessed via local LAN (`http://<ip>:8009`), Tailscale/WireGuard private mesh, or behind reverse proxies and Cloudflare Tunnels.
+- Accessed via local LAN (`http://<ip>:6677`), Tailscale/WireGuard private mesh, or behind reverse proxies and Cloudflare Tunnels.
 - Dual-role access model: Public read-only view for status pages and dashboards, with protected single-admin login for process actions, logs, settings, and file management.
 
 ## Capabilities and Constraints
@@ -39,13 +39,13 @@ Unlike bloated monitoring platforms that require NodeJS runtimes, Redis, Elastic
 ## Brand Commitments
 
 - **Tone**: Engineering-focused, authoritative, precise, and utilitarian.
-- **Palette**: GitHub-dark inspired palette with high-contrast functional color semantics (Accent Blue `#58a6ff`, Cyan `#22d3ee`, Emerald Green `#3fb950`, Amber `#d29922`, Crimson `#f85149`, Amethyst `#bc8cff`, Background Dark `#0f1117`).
+- **Palette**: 3-Way switchable design system featuring Warm Dark (`#0b0b0b` neutral slate + signature teal `#1d9e75`), Paper Light (`#f9f9f7` warm paper), and Classic Dark (`#0f1117` GitHub navy + blue `#58a6ff`).
 - **Typography**: Native system sans font stack with strict `tabular-nums` monospace for all timestamps, telemetry readings, and metrics.
 
 ## Evidence on Hand
 
 - Project codebase at `d:/Repo/systor`.
-- Full test suite: 52 automated pytest test cases (`tests/test_auth.py`, `tests/test_blueprints.py`, `tests/test_collector.py`, `tests/test_metrics.py`, `tests/test_security.py`, `tests/test_storage.py`).
+- Full test suite: 106 automated pytest unit & integration tests + 51 Playwright E2E browser tests (157 total tests, 100% passing across Python 3.9+).
 - Production templates in `systor/templates/` (`base.html`, `dashboard.html`, `apps.html`, `network.html`, `speed.html`, `storage.html`, `settings.html`, `logs.html`, `alerts.html`, `login.html`).
 - Zero-dependency assets in `systor/static/css/style.css` and `systor/static/js/app.js`.
 
