@@ -164,7 +164,7 @@
 })();
 
 {% if client_private %}
-(function(){
+document.addEventListener('DOMContentLoaded', function(){
   const toggle = document.getElementById('terminal-drawer-toggle');
   const drawer = document.getElementById('terminal-drawer');
   if(!toggle || !drawer) return;
@@ -313,7 +313,7 @@
       output.scrollTop = output.scrollHeight;
     }
   });
-})();
+});
 {% endif %}
 </script>
 
