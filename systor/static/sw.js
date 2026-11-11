@@ -5,12 +5,14 @@
    - Navigation: Network-First with dedicated offline page fallback
 */
 
-const CACHE_NAME = 'systor-shell-v1.1.0';
+const CACHE_NAME = 'systor-shell-v1.2.0';
 const OFFLINE_URL = '/offline';
 const STATIC_ASSETS = [
   '/static/css/style.css',
   '/static/css/tokens.css',
   '/static/js/app.js',
+  '/static/js/dialog.js',
+  '/static/js/base-shell.js',
   '/static/js/theme-boot.js',
   '/static/img/systor-logo-header.png',
   '/static/img/icon-192.png',

@@ -118,14 +118,20 @@ docker run -d \
   --name systor \
   --restart unless-stopped \
   --pid host \
-  -p 6677:6677 \
+  --network host \
+  --user 10001:10001 \
+  --security-opt no-new-privileges:true \
+  --cap-drop ALL \
+  --read-only \
+  --tmpfs /tmp:mode=1770,uid=10001,gid=10001 \
+  --tmpfs /var/run:mode=1770,uid=10001,gid=10001 \
   -v systor_config:/etc/systor \
   -v systor_data:/var/lib/systor \
   -v systor_log:/var/log/systor \
+  -v /proc:/proc:ro \
   -v /sys:/sys:ro \
-  -v /dev:/dev:ro \
+  -v /etc/os-release:/etc/os-release:ro \
   -v /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
   ghcr.io/seaxen/systor:latest
 ```
 

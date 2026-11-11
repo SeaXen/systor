@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# systor install script (v1.0.0)
+# systor install script (v1.2.0)
 # Supports both:
 #   1. Local execution: cd systor && sudo ./install.sh
 #   2. Headless remote: curl -sSL https://raw.githubusercontent.com/SeaXen/systor/main/install.sh | sudo bash
@@ -136,7 +136,7 @@ fi
 
 echo ""
 echo "=========================================================="
-echo "  ✓ Systor v1.0.0 installed successfully!"
+echo "  ✓ Systor v1.2.0 installed successfully!"
 echo "=========================================================="
 echo "  Web dashboard: http://127.0.0.1:6677"
 echo "  Configuration: $CONF_DIR/config.yaml"

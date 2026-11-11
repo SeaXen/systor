@@ -9,9 +9,9 @@ from systor import cli
 
 
 class TestCliAndPackaging(unittest.TestCase):
-    def test_version_bump_to_1_1_0(self):
-        """Verify that systor version is 1.1.0 across app and init."""
-        self.assertEqual(systor.__version__, "1.1.0")
+    def test_version_bump_to_1_2_0(self):
+        """Verify that systor version is 1.2.0 across app and init."""
+        self.assertEqual(systor.__version__, "1.2.0")
 
     def test_cli_serve_all_spawns_threads(self):
         """Verify that _serve_all launches collector in a thread and invokes web.run."""
