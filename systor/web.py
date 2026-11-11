@@ -11,7 +11,7 @@ from .config import load_config, get_or_create_session_secret
 from .services.runtime_service import start_apps_cache_worker
 from .blueprints import register_blueprints
 from .blueprints.common import (
-    client_private, auth_cfg, auth_enabled, auth_logged_in,
+    client_private, client_loopback, auth_cfg, auth_enabled, auth_logged_in,
     auth_session_expired, auth_logout_session, auth_touch_session,
     private_auth_protected, public_cfg, effective_private_ui,
     _login_rate_state,  # noqa: F401
@@ -107,8 +107,33 @@ def create_app(start_worker: bool = True) -> Flask:
     def _block_public_surfaces():
         path = request.path or ""
         private = client_private()
+        is_loopback = client_loopback()
+
+        # Exempt static assets, health check, and setup/login pages from setup/auth gates
+        if (
+            path in ("/health", "/metrics", "/setup", "/login", "/logout")
+            or path.startswith("/static/")
+            or path in ("/api/setup", "/favicon.ico", "/apple-touch-icon.png")
+        ):
+            return None
+
         if private:
-            if auth_enabled() and private_auth_protected(path):
+            # First-run setup gate for non-loopback clients when auth not yet configured
+            if not is_loopback and not auth_enabled():
+                allow_read_only = {
+                    "/", "/api/snapshot", "/api/series", "/api/network-series",
+                    "/api/public-dashboard", "/api/version"
+                }
+                if path in allow_read_only:
+                    return None
+                if path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "setup required: admin credentials must be configured"}), 403
+                next_url = request.full_path if request.query_string else request.path
+                if next_url.endswith("?"):
+                    next_url = next_url[:-1]
+                return redirect(url_for("auth.page_setup", next=next_url))
+
+            if auth_enabled() and (private_auth_protected(path) or (not is_loopback and request.method in ("POST", "PUT", "PATCH", "DELETE"))):
                 expired, timeout_min = auth_session_expired()
                 if expired:
                     auth_logout_session()

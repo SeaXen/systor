@@ -14,14 +14,15 @@ from .storage import Storage
 from . import __version__, __app_name__
 
 
-def _human_bytes(n: int | None) -> str:
+def _human_bytes(n: int | float | None) -> str:
     if n is None:
         return "?"
+    val = float(n)
     for u in ("B", "KB", "MB", "GB", "TB"):
-        if n < 1024:
-            return f"{n:.1f} {u}"
-        n /= 1024
-    return f"{n:.1f} PB"
+        if val < 1024:
+            return f"{val:.1f} {u}"
+        val /= 1024
+    return f"{val:.1f} PB"
 
 
 def _print_status(_args=None):
@@ -149,6 +150,40 @@ def cmd_config_show(args):
     print(json.dumps(cfg, indent=2))
 
 
+def cmd_passwd(args):
+    """Set or change the admin password from CLI."""
+    import getpass
+    from werkzeug.security import generate_password_hash
+    from .config import get_or_create_session_secret
+
+    cfg = load_config()
+    username = getattr(args, "username", None) or cfg.get("auth", {}).get("username") or "admin"
+    password = getattr(args, "password", None)
+    if not password:
+        password = getpass.getpass(f"Enter new password for '{username}': ")
+        confirm = getpass.getpass("Confirm password: ")
+        if password != confirm:
+            print("❌ Passwords do not match.")
+            sys.exit(1)
+    if len(password) < 12:
+        print("❌ Password must be at least 12 characters.")
+        sys.exit(1)
+
+    cfg.setdefault("auth", {})
+    cfg["auth"]["enabled"] = True
+    cfg["auth"]["username"] = username
+    cfg["auth"]["password_hash"] = generate_password_hash(password)
+    if not cfg["auth"].get("session_secret"):
+        cfg["auth"]["session_secret"] = get_or_create_session_secret(cfg)
+
+    try:
+        path = save_config(cfg)
+        print(f"✓ Password updated and auth enabled for user '{username}' (saved to {path})")
+    except Exception as e:
+        print(f"❌ Failed to save config: {e}")
+        sys.exit(1)
+
+
 def main():
     p = argparse.ArgumentParser(
         prog=__app_name__,
@@ -158,6 +193,11 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("status", help="show current system state").set_defaults(func=_print_status)
+
+    pw = sub.add_parser("passwd", help="set or change admin credentials")
+    pw.add_argument("--username", help="admin username (default: admin)")
+    pw.add_argument("--password", help="new password (min 12 chars; prompts if omitted)")
+    pw.set_defaults(func=cmd_passwd)
 
     tg = sub.add_parser("setup", help="configure channels")
     tg_sub = tg.add_subparsers(dest="channel", required=True)

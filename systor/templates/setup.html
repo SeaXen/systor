@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}systor · Initial Setup{% endblock %}
+{% block content %}
+<style>
+.login-wrap{max-width:540px;margin:16px auto 0;}
+.login-shell{background:var(--surface-1);color:var(--text);border:1px solid var(--border-2);border-radius:16px;padding:22px 20px 18px;box-shadow:var(--card-shadow)}
+.login-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.login-kicker{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid var(--border-2);background:var(--bg-card);color:var(--teal-text);font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.login-shell h2{margin:8px 0 4px;font-size:22px;line-height:1.1;text-transform:none;letter-spacing:0;color:var(--text-bright)}
+.login-sub{color:var(--text-muted);font-size:13px;line-height:1.5;max-width:44ch}
+.login-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
+.login-grid label{font-size:12px;font-weight:700;letter-spacing:.45px;text-transform:uppercase;color:var(--text)}
+.login-grid input{width:100%;background:var(--bg-input);color:var(--text-bright);border:1px solid var(--border-2);border-radius:12px;padding:11px 12px;font-size:14px}
+.login-grid input:focus-visible{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-track)}
+.login-error{margin-top:12px;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.45;border:1px solid var(--border-2);background:var(--bg-danger);color:var(--text-danger)}
+.login-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:16px}
+.login-actions .btn{min-width:140px}
+.pw-hint{font-size:11.5px;color:var(--text-muted);margin-top:-4px}
+</style>
+<div class="login-wrap">
+  <div class="login-shell">
+    <div class="login-top">
+      <div>
+        <div class="login-kicker">🛡️ first-run security</div>
+        <h2>Admin Setup Required</h2>
+        <div class="login-sub">Create your primary administrator credentials to secure this Systor instance from LAN and remote clients.</div>
+      </div>
+      <span class="status-chip warn">setup gate</span>
+    </div>
+    {% if error %}
+    <div class="login-error" role="alert" aria-live="polite">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/setup" class="login-grid">
+      <input type="hidden" name="next" value="{{ next_url or '/' }}">
+      <label for="setup-username">Admin Username</label>
+      <input type="text" id="setup-username" name="username" value="{{ username or 'admin' }}" autocomplete="username" spellcheck="false" required>
+      <label for="setup-password">Admin Password</label>
+      <input type="password" id="setup-password" name="password" minlength="12" autocomplete="new-password" spellcheck="false" required>
+      <div class="pw-hint">Must be at least 12 characters long.</div>
+      <label for="setup-confirm">Confirm Password</label>
+      <input type="password" id="setup-confirm" name="confirm_password" minlength="12" autocomplete="new-password" spellcheck="false" required>
+      <div class="login-actions">
+        <button type="submit" class="btn compact">Create Admin Account</button>
+        <a href="/" class="btn secondary compact">View Dashboard</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

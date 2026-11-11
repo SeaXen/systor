@@ -1,6 +1,6 @@
 """Authentication blueprint for Systor."""
 from __future__ import annotations
-from flask import Blueprint, render_template, request, redirect, url_for, abort, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, abort, current_app, jsonify
 from werkzeug.security import check_password_hash
 
 from .common import (
@@ -64,6 +64,78 @@ def page_login():
         error = "Invalid username or password"
         return render_template("login.html", error=error, next_url=next_url, wait_sec=0), 401
     return render_template("login.html", error=error, next_url=next_url, wait_sec=0)
+
+
+@auth_bp.route("/setup", methods=["GET", "POST"], endpoint="page_setup")
+def page_setup():
+    if not client_private():
+        abort(404)
+    if auth_enabled() and not current_app.config.get("AUDIT_MODE"):
+        return redirect(url_for("auth.page_login"))
+    error = ""
+    next_url = str(request.values.get("next") or "/")
+    if not next_url.startswith("/") or next_url.startswith("//"):
+        next_url = "/"
+    if request.method == "POST":
+        username = str(request.form.get("username") or "").strip()
+        password = str(request.form.get("password") or "")
+        confirm = str(request.form.get("confirm_password") or "")
+        if not username:
+            error = "Username is required."
+        elif len(password) < 12:
+            error = "Password must be at least 12 characters."
+        elif password != confirm:
+            error = "Passwords do not match."
+        else:
+            from werkzeug.security import generate_password_hash
+            from ..config import load_config, save_config, get_or_create_session_secret
+            cfg = load_config()
+            cfg.setdefault("auth", {})
+            cfg["auth"]["enabled"] = True
+            cfg["auth"]["username"] = username
+            cfg["auth"]["password_hash"] = generate_password_hash(password)
+            cfg["auth"]["session_secret"] = get_or_create_session_secret(cfg)
+            try:
+                save_config(cfg)
+                auth_login_session(username)
+                return redirect(next_url or "/")
+            except Exception as e:
+                error = f"Failed to save configuration: {e}"
+        return render_template("setup.html", error=error, next_url=next_url, username=username), 400
+    return render_template("setup.html", error=error, next_url=next_url, username="admin")
+
+
+@auth_bp.route("/api/setup", methods=["POST"], endpoint="api_setup")
+def api_setup():
+    if not client_private():
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    if auth_enabled():
+        return jsonify({"ok": False, "error": "Setup already completed"}), 400
+    data = request.get_json(silent=True) or request.form
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "")
+    confirm = str(data.get("confirm_password") or "")
+    if not username:
+        return jsonify({"ok": False, "error": "Username is required"}), 400
+    if len(password) < 12:
+        return jsonify({"ok": False, "error": "Password must be at least 12 characters"}), 400
+    if password != confirm:
+        return jsonify({"ok": False, "error": "Passwords do not match"}), 400
+
+    from werkzeug.security import generate_password_hash
+    from ..config import load_config, save_config, get_or_create_session_secret
+    cfg = load_config()
+    cfg.setdefault("auth", {})
+    cfg["auth"]["enabled"] = True
+    cfg["auth"]["username"] = username
+    cfg["auth"]["password_hash"] = generate_password_hash(password)
+    cfg["auth"]["session_secret"] = get_or_create_session_secret(cfg)
+    try:
+        save_config(cfg)
+        auth_login_session(username)
+        return jsonify({"ok": True, "message": "Admin credentials configured successfully", "redirect": "/"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to save configuration: {e}"}), 500
 
 
 @auth_bp.route("/logout", methods=["GET", "POST"], endpoint="page_logout")

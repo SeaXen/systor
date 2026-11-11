@@ -1,13 +1,14 @@
 """Shared middleware, auth, rate-limiting, and storage accessors for Systor Blueprints."""
 from __future__ import annotations
+import functools
 import logging
 import threading
 import time
-from flask import request, session
+from flask import request, session, jsonify, redirect, url_for
 
 from ..config import load_config
 from ..storage import Storage, DEFAULT_DB_PATH
-from ..security import is_request_private
+from ..security import is_request_private, is_request_loopback
 
 log = logging.getLogger("systor.blueprints.common")
 
@@ -39,12 +40,19 @@ def get_trusted_proxies() -> str | list[str]:
     return cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1")
 
 
+def client_loopback() -> bool:
+    """Evaluate if current request originates directly from loopback (127.0.0.1 or ::1)."""
+    return is_request_loopback(request, get_trusted_proxies())
+
+
 def client_private() -> bool:
     """Evaluate if current request is from a private/LAN/Tailscale client.
 
     Strictly protects against X-Forwarded-For forgery using configured trusted proxies.
     """
-    return is_request_private(request, get_trusted_proxies())
+    cfg = load_config()
+    trust_cgnat = bool(cfg.get("web", {}).get("trust_cgnat", True))
+    return is_request_private(request, get_trusted_proxies(), trust_cgnat=trust_cgnat)
 
 
 def auth_cfg() -> dict:
@@ -185,7 +193,7 @@ def login_rate_success(ip: str, username: str = "") -> None:
 def private_auth_exempt(path: str) -> bool:
     if path.startswith("/static/"):
         return True
-    return path in ("/login", "/logout", "/health", "/api/version")
+    return path in ("/login", "/logout", "/health", "/setup", "/api/setup", "/api/version")
 
 
 def private_auth_protected(path: str) -> bool:
@@ -207,7 +215,7 @@ def effective_private_ui() -> bool:
     private = client_private()
     if not private:
         return False
-    if not auth_enabled():
+    if client_loopback() and not auth_enabled():
         return True
     return auth_logged_in()
 
@@ -221,7 +229,50 @@ def public_cfg() -> dict:
 
 
 def storage_can_write() -> bool:
-    return client_private() and (not auth_enabled() or auth_logged_in())
+    if not client_private():
+        return False
+    if client_loopback() and not auth_enabled():
+        return True
+    return auth_logged_in()
+
+
+def admin_required(fn):
+    """Decorator requiring administrative authorization.
+    - Loopback connections are allowed if auth is not configured.
+    - Non-loopback connections:
+      * If auth not enabled -> redirects to /setup (or 403 on API)
+      * If auth enabled and not logged in -> redirects to /login (or 401 on API)
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not client_loopback():
+            if not auth_enabled():
+                if request.path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "setup required: admin credentials must be configured"}), 403
+                next_url = request.full_path if request.query_string else request.path
+                if next_url.endswith("?"):
+                    next_url = next_url[:-1]
+                return redirect(url_for("auth.page_setup", next=next_url))
+            if not auth_logged_in():
+                if request.path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "admin authentication required"}), 401
+                next_url = request.full_path if request.query_string else request.path
+                if next_url.endswith("?"):
+                    next_url = next_url[:-1]
+                return redirect(url_for("auth.page_login", next=next_url))
+            auth_touch_session()
+        else:
+            if auth_enabled() and not auth_logged_in():
+                if request.path.startswith("/api/"):
+                    return jsonify({"ok": False, "error": "admin authentication required"}), 401
+                next_url = request.full_path if request.query_string else request.path
+                if next_url.endswith("?"):
+                    next_url = next_url[:-1]
+                return redirect(url_for("auth.page_login", next=next_url))
+            if auth_enabled():
+                auth_touch_session()
+        return fn(*args, **kwargs)
+    return wrapper
 
 
 def parse_hours_arg(value, default: float) -> float:

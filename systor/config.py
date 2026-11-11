@@ -104,6 +104,7 @@ DEFAULT_CONFIG: dict = {
         "host": "0.0.0.0",
         "port": 6677,
         "trusted_proxies": "127.0.0.1, ::1",
+        "trust_cgnat": True,
     },
     "logging": {
         "level": "INFO",
@@ -199,6 +200,7 @@ def _apply_env(cfg: dict) -> None:
         "SYSTOR_SPEED_AUTO_MIN":         ("speed", "auto_interval_min", int, None),
         "SYSTOR_WEB_PORT":               ("web", "port", int, None),
         "SYSTOR_WEB_HOST":               ("web", "host", str, None),
+        "SYSTOR_WEB_TRUST_CGNAT":        ("web", "trust_cgnat", lambda v: str(v).lower() in ("1", "true", "yes", "on"), None),
     }
     for env_key, (section, key, cast, sub) in env_map.items():
         v = os.environ.get(env_key)

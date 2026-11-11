@@ -81,21 +81,42 @@ def get_client_ip(req, trusted_networks: list[ipaddress.IPv4Network | ipaddress.
     return peer
 
 
-def is_private_ip(ip_str: str) -> bool:
-    """Check if an IP is loopback, RFC1918 private, link-local, or Carrier-Grade NAT (Tailscale)."""
+def is_loopback_ip(ip_str: str) -> bool:
+    """Check if an IP is loopback (127.0.0.1 or ::1)."""
     try:
         ip = ipaddress.ip_address(ip_str.strip())
-        return (
-            ip.is_loopback
-            or ip.is_private
-            or ip.is_link_local
-            or ip in ipaddress.ip_network("100.64.0.0/10")  # CGNAT / Tailscale
-        )
+        return ip.is_loopback
     except (ValueError, AttributeError):
         return False
 
 
-def is_request_private(req, trusted_proxies: str | Sequence[str] | None = None) -> bool:
+def is_private_ip(ip_str: str, trust_cgnat: bool = True) -> bool:
+    """Check if an IP is loopback, RFC1918 private, link-local, or Carrier-Grade NAT (Tailscale)."""
+    try:
+        ip = ipaddress.ip_address(ip_str.strip())
+        if ip.is_loopback or ip.is_private or ip.is_link_local:
+            return True
+        if trust_cgnat and ip in ipaddress.ip_network("100.64.0.0/10"):
+            return True
+        return False
+    except (ValueError, AttributeError):
+        return False
+
+
+def is_request_loopback(req, trusted_proxies: str | Sequence[str] | None = None) -> bool:
+    """Evaluate whether the request directly originates from a loopback address."""
+    trusted_nets = parse_trusted_proxies(trusted_proxies)
+    client_ip = get_client_ip(req, trusted_nets)
+    if req.headers.get("Cf-Ray") or req.headers.get("CF-Connecting-IP"):
+        return False
+    return is_loopback_ip(client_ip)
+
+
+def is_request_private(
+    req,
+    trusted_proxies: str | Sequence[str] | None = None,
+    trust_cgnat: bool = True,
+) -> bool:
     """Evaluate whether the request originates from a private/LAN client.
 
     Cloudflare requests (Cf-Ray or CF-Connecting-IP) routed through tunnels are
@@ -107,8 +128,8 @@ def is_request_private(req, trusted_proxies: str | Sequence[str] | None = None) 
     # Cloudflare tunnel check: If the request came via Cloudflare, check if the CF client is private
     if req.headers.get("Cf-Ray") or req.headers.get("CF-Connecting-IP"):
         cf_ip = req.headers.get("CF-Connecting-IP", "").strip()
-        if cf_ip and is_private_ip(cf_ip):
+        if cf_ip and is_private_ip(cf_ip, trust_cgnat=trust_cgnat):
             return True
         return False
 
-    return is_private_ip(client_ip)
+    return is_private_ip(client_ip, trust_cgnat=trust_cgnat)
