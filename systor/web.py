@@ -98,7 +98,12 @@ def create_app(start_worker: bool = True) -> Flask:
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        resp.headers.setdefault("Content-Security-Policy", "default-src 'self' 'unsafe-inline'; img-src 'self' data:;")
+        resp.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; "
+            "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"
+        )
         if "systor_csrf" in session and "systor_csrf" not in request.cookies:
             resp.set_cookie("systor_csrf", session["systor_csrf"], samesite="Lax")
         return resp

@@ -12,16 +12,7 @@
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon-192.png') }}">
 <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4.0">
-<script>
-  (function(){
-    var t = localStorage.getItem('systor_theme') || 'warm-dark';
-    if (t !== 'light' && t !== 'classic-dark' && t !== 'warm-dark') t = 'warm-dark';
-    document.documentElement.setAttribute('data-theme', t);
-    document.documentElement.style.colorScheme = (t === 'light') ? 'light' : 'dark';
-    var tc = document.querySelector('meta[name="theme-color"]');
-    if (tc) tc.setAttribute('content', t === 'light' ? '#f9f9f7' : (t === 'classic-dark' ? '#0f1117' : '#0b0b0b'));
-  })();
-</script>
+<script src="{{ url_for('static', filename='js/theme-boot.js') }}?v=4.0"></script>
 </head>
 <body>
 <a href="#main-content" class="sr-only">Skip to content</a>
