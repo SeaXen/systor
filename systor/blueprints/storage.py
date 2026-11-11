@@ -242,8 +242,17 @@ def api_storage_preview():
         })
     if suffix in text_ext or st.st_size < 128 * 1024:
         try:
-            data = p.read_text(errors="replace")[:12000]
-            return jsonify({"ok": True, "kind": "text", "name": p.name, "size": st.st_size, "text": data})
+            with p.open("r", encoding="utf-8", errors="replace") as f:
+                data = f.read(12000)
+            is_truncated = st.st_size > len(data.encode("utf-8", errors="replace"))
+            return jsonify({
+                "ok": True,
+                "kind": "text",
+                "name": p.name,
+                "size": st.st_size,
+                "text": data,
+                "truncated": is_truncated,
+            })
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True, "kind": "binary", "name": p.name, "size": st.st_size, "message": "Binary/large file; use Download"})
