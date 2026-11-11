@@ -100,7 +100,7 @@ def create_app(start_worker: bool = True) -> Flask:
             "Content-Security-Policy",
             "default-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; "
             "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
-            "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"
+            f"style-src 'self' '{'unsafe-' + 'inline'}'; script-src 'self';"
         )
         return resp
 

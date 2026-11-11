@@ -120,8 +120,9 @@ class TestCliAndPackaging(unittest.TestCase):
         self.assertIn('theme-picker-grid', css_text)
 
         base_text = base_html.read_text(encoding="utf-8")
+        base_shell_js = (repo_root / "systor" / "static" / "js" / "base-shell.js").read_text(encoding="utf-8")
         self.assertIn('theme-toggle-btn', base_text)
-        self.assertIn('setSystorTheme', base_text)
+        self.assertTrue('setSystorTheme' in base_text or 'setSystorTheme' in base_shell_js)
         theme_boot_js = (repo_root / "systor" / "static" / "js" / "theme-boot.js").read_text(encoding="utf-8")
         self.assertIn('localStorage.getItem("systor_theme")', theme_boot_js)
 
@@ -150,8 +151,9 @@ class TestCliAndPackaging(unittest.TestCase):
         self.assertTrue(icon512.exists(), "icon-512.png must exist")
 
         base_text = base_html.read_text(encoding="utf-8")
+        base_shell_js = (repo_root / "systor" / "static" / "js" / "base-shell.js").read_text(encoding="utf-8")
         self.assertIn('rel="manifest"', base_text)
-        self.assertIn('serviceWorker.register', base_text)
+        self.assertTrue('serviceWorker.register' in base_text or 'serviceWorker.register' in base_shell_js)
 
         sw_text = sw.read_text(encoding="utf-8")
         self.assertIn("systor-shell-v", sw_text)

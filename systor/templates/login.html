@@ -1,25 +1,6 @@
 {% extends "base.html" %}
 {% block title %}systor · Login{% endblock %}
 {% block content %}
-<style>
-.login-wrap{max-width:520px;margin:14px auto 0;}
-.login-shell{background:var(--surface-1);color:var(--text);border:1px solid var(--border-2);border-radius:16px;padding:18px 18px 16px;box-shadow:var(--card-shadow)}
-.login-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
-.login-kicker{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid var(--border-2);background:var(--bg-card);color:var(--teal-text);font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
-.login-shell h2{margin:8px 0 4px;font-size:22px;line-height:1.1;text-transform:none;letter-spacing:0;color:var(--text-bright)}
-.login-sub{color:var(--text-muted);font-size:13px;line-height:1.5;max-width:42ch}
-.login-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:14px}
-.login-grid label{font-size:12px;font-weight:700;letter-spacing:.45px;text-transform:uppercase;color:var(--text)}
-.login-grid input{width:100%;background:var(--bg-input);color:var(--text-bright);border:1px solid var(--border-2);border-radius:12px;padding:11px 12px;font-size:14px}
-.login-grid input:focus-visible{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-track)}
-.login-error,.login-wait{margin-top:12px;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.45}
-.login-error{border:1px solid var(--border-2);background:var(--bg-danger);color:var(--text-danger)}
-.login-wait{border:1px solid var(--border-2);background:var(--bg-warning);color:var(--text-warning)}
-.login-actions{display:flex;gap:8px;align-items:center;justify-content:flex-start;margin-top:14px}
-.login-actions .btn{min-width:112px}
-.login-note{margin-top:10px;color:var(--text-muted);font-size:12px}
-@media (max-width:700px){.login-wrap{margin-top:8px}.login-shell{padding:14px 12px 12px;border-radius:14px}.login-shell h2{font-size:19px}.login-actions{display:grid;grid-template-columns:1fr 1fr}.login-actions .btn{min-width:0;width:100%}}
-</style>
 <div class="login-wrap">
   <div class="login-shell">
     <div class="login-top">

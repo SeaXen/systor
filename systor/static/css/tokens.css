@@ -1,5 +1,5 @@
 /* Systor unified design tokens: single source of truth for all three themes
-   (ExamForge warm dark, ExamForge paper light, and classic dark).
+   (Systor warm dark, Systor paper light, and classic dark).
    Enforces WCAG AA contrast >= 4.5:1 for text, >= 3:1 for graphical/chart elements. */
 
 :root,
@@ -31,7 +31,7 @@
   --text-bright: #f5f4f0;                      /* primary headers, KPI values (13.5:1) */
   --teal-text:   #2dd4bf;                      /* teal text on dark (7.2:1) */
 
-  /* ExamForge Teal signature accents */
+  /* Systor Teal signature accents */
   --teal:            #1d9e75;
   --teal-strong:     #0d5c45;
   --teal-nav-active: rgba(21, 128, 96, 0.18);
@@ -82,6 +82,22 @@
   --radius-bar:   3px;
 
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border);
+
+  /* App pills */
+  --pill-host-fg:       #58a6ff;
+  --pill-host-bg:       rgba(88, 166, 255, 0.08);
+  --pill-host-border:   rgba(88, 166, 255, 0.35);
+  --pill-docker-fg:     #2dd4bf;
+  --pill-docker-bg:     rgba(45, 212, 191, 0.08);
+  --pill-docker-border: rgba(45, 212, 191, 0.35);
+
+  /* Usage Bar Tracks & Fills */
+  --bar-track:          #151515;
+  --bar-border:         rgba(255, 255, 255, 0.12);
+  --bar-fill-cpu:       var(--chart-cpu);
+  --bar-fill-mem:       var(--chart-ram);
+  --bar-fill-net:       var(--chart-net);
+  --bar-fill-disk:      var(--chart-disk);
 
   /* Universal Layout Rhythm & Spacing Tokens */
   --gap-page:        10px;    /* Spacing between major page blocks & toolbars */
@@ -165,6 +181,22 @@
   --bg-neutral:  #f1f5f9;
 
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--border);
+
+  /* App pills - WCAG AA compliant >= 4.5:1 on light surface */
+  --pill-host-fg:       #1457b8;
+  --pill-host-bg:       rgba(20, 87, 184, 0.08);
+  --pill-host-border:   rgba(20, 87, 184, 0.35);
+  --pill-docker-fg:     #0b6b7d;
+  --pill-docker-bg:     rgba(11, 107, 125, 0.08);
+  --pill-docker-border: rgba(11, 107, 125, 0.35);
+
+  /* Usage Bar Tracks & Fills */
+  --bar-track:          #e6e6e1;
+  --bar-border:         rgba(11, 11, 11, 0.12);
+  --bar-fill-cpu:       var(--chart-cpu);
+  --bar-fill-mem:       var(--chart-ram);
+  --bar-fill-net:       var(--chart-net);
+  --bar-fill-disk:      var(--chart-disk);
 }
 
 [data-theme="classic-dark"] {
@@ -235,6 +267,22 @@
   --bg-neutral:  #161b22;
 
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+
+  /* App pills */
+  --pill-host-fg:       #58a6ff;
+  --pill-host-bg:       rgba(88, 166, 255, 0.08);
+  --pill-host-border:   rgba(88, 166, 255, 0.35);
+  --pill-docker-fg:     #22d3ee;
+  --pill-docker-bg:     rgba(34, 211, 238, 0.08);
+  --pill-docker-border: rgba(34, 211, 238, 0.35);
+
+  /* Usage Bar Tracks & Fills */
+  --bar-track:          #0f1720;
+  --bar-border:         #283242;
+  --bar-fill-cpu:       var(--chart-cpu);
+  --bar-fill-mem:       var(--chart-ram);
+  --bar-fill-net:       var(--chart-net);
+  --bar-fill-disk:      var(--chart-disk);
 }
 
 /* ==========================================================================

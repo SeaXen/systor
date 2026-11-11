@@ -33,56 +33,5 @@
 <div class="log-view" id="log-view">Loading…</div>
 {% endblock %}
 {% block scripts %}
-<script>
-async function fetchJSON(url) {
-  const r = await fetch(url, {cache:'no-store'});
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
-}
-async function loadLogs() {
-  const lines = document.getElementById('log-lines').value;
-  const level = document.getElementById('log-level').value;
-  const status = document.getElementById('log-status');
-  const dot = document.getElementById('log-dot');
-  try {
-    const data = await fetchJSON(`/logs/raw?lines=${lines}&level=${level}`);
-    const visible = (data.lines || []).slice().reverse();
-    const text = visible.length ? visible.join('\n') : '(no matching log lines)';
-    document.getElementById('log-view').textContent = text;
-    document.getElementById('log-path').textContent = data.path || '{{ log_path }}';
-    status.textContent = `${data.total || 0} lines · ${data.fresh_error_count || 0} fresh errors / 10m · ${new Date().toLocaleTimeString()}`;
-    dot.className = 'dot ' + ((data.fresh_error_count || 0) ? 'red' : 'green');
-  } catch (e) {
-    status.textContent = 'failed: ' + e.message;
-    dot.className = 'dot red';
-    document.getElementById('log-view').textContent = 'Could not load logs: ' + e.message;
-  }
-}
-document.getElementById('refresh-logs').addEventListener('click', loadLogs);
-document.getElementById('log-lines').addEventListener('change', loadLogs);
-document.getElementById('log-level').addEventListener('change', loadLogs);
-document.getElementById('copy-logs').addEventListener('click', async () => {
-  const text = document.getElementById('log-view').textContent;
-  try { await navigator.clipboard.writeText(text); document.getElementById('log-status').textContent = 'copied'; }
-  catch(e) { document.getElementById('log-status').textContent = 'copy failed'; }
-});
-document.getElementById('clear-logs').addEventListener('click', async () => {
-  if (!confirm('Clear the log file on disk now?')) return;
-  const status = document.getElementById('log-status');
-  status.textContent = 'clearing…';
-  try {
-    const r = await fetch('/api/logs/clear', { method:'POST' });
-    const j = await r.json();
-    if (!r.ok || !j.ok) throw new Error(j.error || j.message || ('HTTP ' + r.status));
-    document.getElementById('log-view').textContent = '(log file cleared)';
-    status.textContent = 'cleared · ' + new Date().toLocaleTimeString();
-    document.getElementById('log-dot').className = 'dot green';
-  } catch (e) {
-    status.textContent = 'clear failed: ' + e.message;
-    document.getElementById('log-dot').className = 'dot red';
-  }
-});
-loadLogs();
-setInterval(loadLogs, 10000);
-</script>
+<script src="{{ url_for('static', filename='js/pages/logs.js') }}?v=4.0"></script>
 {% endblock %}

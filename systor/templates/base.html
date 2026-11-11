@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0b0b0b">
+<meta name="theme-color" content="">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="format-detection" content="telephone=no">
@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=4.0">
 <script src="{{ url_for('static', filename='js/theme-boot.js') }}?v=4.0"></script>
 </head>
-<body>
+<body data-client-private="{{ 'true' if client_private else 'false' }}" data-storage-private="{{ 'true' if storage_private else 'false' }}">
 <a href="#main-content" class="sr-only">Skip to content</a>
 <div class="header" role="banner">
   <div class="header-left">
@@ -62,285 +62,96 @@
 <main class="container" id="main-content">
   {% block content %}{% endblock %}
 </main>
-<script src="/static/js/app.js"></script>
-<script src="/static/js/dialog.js"></script>
-{% block scripts %}{% endblock %}
-<script>
-(function(){
-  const el = document.getElementById('global-header-meta');
-  if(!el) return;
-  const IS_PRIVATE = {{ 'true' if client_private else 'false' }};
-  function fmt(n, unit){ if(n===null||n===undefined||Number.isNaN(Number(n))) return '—'; const v=Number(n); const s=Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2); return s+(unit?' '+unit:''); }
-  async function getJSON(url){ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
-  async function update(){
-    try{
-      const snap = await getJSON('/api/snapshot');
-      const runtime = IS_PRIVATE ? await getJSON('/api/runtime') : null;
-      const cpu=snap.cpu||{}, mem=snap.memory||{}, web=(runtime&&runtime.web)||{}, collector=(runtime&&runtime.collector)||{}, st=(runtime&&runtime.storage)||{};
-      const memPct=mem.total_mb?Math.round(100*mem.used_mb/mem.total_mb):null;
-      const upd = snap.system_updates || {};
-      let updChips = '';
-      if (upd.reboot_required) {
-        updChips += ` <span class="header-chip" style="border-color:var(--rose,#ff4772);color:var(--rose,#ff4772);"><span class="chip-k" style="background:var(--rose,#ff4772);color:#fff;">Reboot</span><strong>Required</strong></span>`;
-      }
-      if (upd.updates_security > 0) {
-        updChips += ` <span class="header-chip" style="border-color:var(--amber,#ffb84d);color:var(--amber,#ffb84d);"><span class="chip-k" style="background:var(--amber,#ffb84d);color:#000;">Security</span><strong>${upd.updates_security}</strong></span>`;
-      } else if (upd.updates_total > 0) {
-        updChips += ` <span class="header-chip"><span class="chip-k">Updates</span><strong>${upd.updates_total}</strong></span>`;
-      }
-      if(!IS_PRIVATE){
-        el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span>${updChips}`;
-        return;
-      }
-      el.innerHTML = `<span class="header-chip"><span class="chip-k cpu-chip">CPU</span><strong>${fmt(cpu.percent,'%')}</strong></span><span class="header-chip"><span class="chip-k temp-chip">Temp</span><strong>${fmt(cpu.temp_c,'°C')}</strong></span><span class="header-chip"><span class="chip-k load-chip-mini">Load</span><strong>${fmt(cpu.load_1m)}</strong></span><span class="header-chip"><span class="chip-k ram-chip">RAM</span><strong>${memPct===null?'—':memPct+'%'}</strong></span><span class="header-sep">·</span><span class="header-chip"><span class="chip-k sys-chip">CPU</span><strong>W ${fmt(web.cpu_percent,'%')} · C ${fmt(collector.cpu_percent,'%')}</strong></span><span class="header-chip"><span class="chip-k sys-chip">RAM</span><strong>W ${fmt(web.rss_mb,'MB')} · C ${fmt(collector.rss_mb,'MB')}</strong></span><span class="header-chip"><span class="chip-k disk-chip">Disk</span><strong>${fmt(st.total_mb,'MB')}</strong></span>${updChips}`;
-    } catch(e) { /* keep fallback text */ }
 
-  }
-  update(); setInterval(update, 15000);
-})();
-
-(function() {
-  const THEME_ORDER = ['warm-dark', 'light', 'classic-dark'];
-  const THEME_METAS = {
-    'warm-dark':   { icon: '🌙', label: 'Warm Dark', color: '#0b0b0b', scheme: 'dark' },
-    'light':       { icon: '☀', label: 'Paper Light', color: '#f9f9f7', scheme: 'light' },
-    'classic-dark':{ icon: '🌌', label: 'Classic Dark', color: '#0f1117', scheme: 'dark' }
-  };
-
-  function updateThemeUI(theme) {
-    const meta = THEME_METAS[theme] || THEME_METAS['warm-dark'];
-    const iconEl = document.getElementById('theme-toggle-icon');
-    const labelEl = document.getElementById('theme-toggle-label');
-    const btn = document.getElementById('theme-toggle-btn');
-    const metaColor = document.querySelector('meta[name="theme-color"]');
-
-    if (iconEl) iconEl.textContent = meta.icon;
-    if (labelEl) labelEl.textContent = meta.label;
-    if (btn) btn.title = `Theme: ${meta.label} (click to switch)`;
-    if (metaColor) metaColor.setAttribute('content', meta.color);
-
-    // Update settings theme cards if on settings page
-    document.querySelectorAll('.theme-picker-card').forEach(card => {
-      const cardTheme = card.getAttribute('data-theme-choice');
-      card.classList.toggle('active', cardTheme === theme);
-    });
-  }
-
-  window.setSystorTheme = function(newTheme) {
-    if (!THEME_ORDER.includes(newTheme)) newTheme = 'warm-dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    document.documentElement.style.colorScheme = THEME_METAS[newTheme].scheme;
-    try { localStorage.setItem('systor_theme', newTheme); } catch(e){}
-    updateThemeUI(newTheme);
-    window.dispatchEvent(new CustomEvent('systor:theme-change', { detail: { theme: newTheme } }));
-  };
-
-  const btn = document.getElementById('theme-toggle-btn');
-  if (btn) {
-    btn.addEventListener('click', function() {
-      const current = document.documentElement.getAttribute('data-theme') || 'warm-dark';
-      const idx = THEME_ORDER.indexOf(current);
-      const nextTheme = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
-      window.setSystorTheme(nextTheme);
-    });
-  }
-
-  // Initialize UI state
-  const curTheme = document.documentElement.getAttribute('data-theme') || 'warm-dark';
-  updateThemeUI(curTheme);
-
-  // Register PWA Service Worker for offline shell and asset caching
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', function() {
-      navigator.serviceWorker.register("/sw.js").catch(function() {});
-    });
-  }
-})();
+<nav class="mobile-bottom-bar" role="navigation" aria-label="Mobile Navigation">
+  <a href="/" class="mobile-tab {% if request.path == '/' %}active" aria-current="page{% endif %}" aria-label="Dashboard">
+    <span class="mobile-icon" aria-hidden="true">⌂</span>
+    <span class="mobile-label">Dash</span>
+  </a>
+  {% if client_private %}
+  <a href="/apps" class="mobile-tab {% if request.path == '/apps' %}active" aria-current="page{% endif %}" aria-label="Apps">
+    <span class="mobile-icon" aria-hidden="true">◫</span>
+    <span class="mobile-label">Apps</span>
+  </a>
+  <a href="/network" class="mobile-tab {% if request.path == '/network' %}active" aria-current="page{% endif %}" aria-label="Network">
+    <span class="mobile-icon" aria-hidden="true">⇄</span>
+    <span class="mobile-label">Net</span>
+  </a>
+  <a href="/speed" class="mobile-tab {% if request.path == '/speed' %}active" aria-current="page{% endif %}" aria-label="Speed">
+    <span class="mobile-icon" aria-hidden="true">⚡</span>
+    <span class="mobile-label">Speed</span>
+  </a>
+  <button type="button" class="mobile-tab" id="mobile-more-btn" aria-label="More navigation links" aria-expanded="false">
+    <span class="mobile-icon" aria-hidden="true">☰</span>
+    <span class="mobile-label">More</span>
+  </button>
+  {% elif public_pages and public_pages.get('alerts') %}
+  <a href="/alerts" class="mobile-tab {% if request.path == '/alerts' %}active" aria-current="page{% endif %}" aria-label="Alerts">
+    <span class="mobile-icon" aria-hidden="true">⚠</span>
+    <span class="mobile-label">Alerts</span>
+  </a>
+  {% endif %}
+</nav>
 
 {% if client_private %}
-document.addEventListener('DOMContentLoaded', function(){
-  const toggle = document.getElementById('terminal-drawer-toggle');
-  const drawer = document.getElementById('terminal-drawer');
-  if(!toggle || !drawer) return;
+<div id="mobile-more-sheet" class="mobile-sheet" style="display:none;" role="dialog" aria-modal="true" aria-label="More Pages">
+  <div class="mobile-sheet-backdrop" id="mobile-more-backdrop"></div>
+  <div class="mobile-sheet-content">
+    <div class="mobile-sheet-head">
+      <h3>More Pages</h3>
+      <button type="button" class="btn secondary compact" id="mobile-more-close" aria-label="Close sheet">Close</button>
+    </div>
+    <div class="mobile-sheet-links">
+      {% if storage_private %}
+      <a href="/storage" class="mobile-sheet-link {% if request.path.startswith('/storage') %}active{% endif %}">
+        <span class="sheet-icon">▣</span> Storage Manager
+      </a>
+      {% endif %}
+      <a href="/alerts" class="mobile-sheet-link {% if request.path == '/alerts' %}active{% endif %}">
+        <span class="sheet-icon">⚠</span> Alerts & Health
+      </a>
+      <a href="/logs" class="mobile-sheet-link {% if request.path == '/logs' %}active{% endif %}">
+        <span class="sheet-icon">≣</span> System Logs
+      </a>
+      <a href="/settings" class="mobile-sheet-link {% if request.path.startswith('/settings') %}active{% endif %}">
+        <span class="sheet-icon">⚙</span> Settings & Config
+      </a>
+    </div>
+  </div>
+</div>
 
-  const unlockBtn = document.getElementById('term-unlock-btn');
-  const passInput = document.getElementById('term-password-input');
-  const authErr = document.getElementById('term-auth-error');
-  const lockView = document.getElementById('term-lock-view');
-  const consoleView = document.getElementById('term-console-view');
-  const statusChip = document.getElementById('term-status-chip');
-  const output = document.getElementById('term-output');
-  const cmdInput = document.getElementById('term-command-input');
-  const closeBtn = document.getElementById('term-close-btn');
-  const clearBtn = document.getElementById('term-clear-btn');
-
-  let termToken = sessionStorage.getItem('systor_term_token') || null;
-  const history = [];
-  let historyIdx = -1;
-
-  function setUnlocked(){
-    lockView.style.display = 'none';
-    consoleView.style.display = 'flex';
-    statusChip.textContent = 'Unlocked';
-    statusChip.className = 'status-chip ok';
-    cmdInput.focus();
-  }
-
-  function setLocked(){
-    lockView.style.display = 'flex';
-    consoleView.style.display = 'none';
-    statusChip.textContent = 'Locked';
-    statusChip.className = 'status-chip neutral';
-    sessionStorage.removeItem('systor_term_token');
-    termToken = null;
-  }
-
-  function openDrawer(){
-    drawer.style.display = 'flex';
-    if(termToken){
-      setUnlocked();
-      cmdInput?.focus();
-    } else {
-      setLocked();
-      passInput?.focus();
-    }
-  }
-
-  function closeDrawer(){
-    drawer.style.display = 'none';
-    toggle?.focus();
-  }
-
-  toggle.addEventListener('click', () => {
-    if(drawer.style.display === 'flex') closeDrawer();
-    else openDrawer();
-  });
-
-  closeBtn?.addEventListener('click', closeDrawer);
-  clearBtn?.addEventListener('click', () => { output.textContent = ''; });
-
-  window.addEventListener('keydown', (ev) => {
-    if(ev.key === 'Escape' && drawer.style.display === 'flex'){
-      closeDrawer();
-    }
-  });
-
-  unlockBtn?.addEventListener('click', async () => {
-    const pw = passInput.value.trim();
-    if(!pw) return;
-    authErr.style.display = 'none';
-    unlockBtn.disabled = true;
-    unlockBtn.textContent = 'Unlocking…';
-    try {
-      const res = await fetch('/api/terminal/auth', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({password: pw}),
-      });
-      const data = await res.json();
-      if(!res.ok || !data.ok){
-        throw new Error(data.error || 'Authentication failed');
-      }
-      termToken = data.token;
-      sessionStorage.setItem('systor_term_token', termToken);
-      passInput.value = '';
-      setUnlocked();
-      output.textContent = '--- Emergency Terminal Console Initialized ---\nType commands below.\n\n';
-    } catch(err){
-      authErr.textContent = err.message;
-      authErr.style.display = 'block';
-    } finally {
-      unlockBtn.disabled = false;
-      unlockBtn.textContent = 'Unlock';
-    }
-  });
-
-  passInput?.addEventListener('keydown', (ev) => {
-    if(ev.key === 'Enter') unlockBtn?.click();
-  });
-
-  cmdInput?.addEventListener('keydown', async (ev) => {
-    if(ev.key === 'ArrowUp'){
-      if(history.length && historyIdx < history.length - 1){
-        historyIdx++;
-        cmdInput.value = history[history.length - 1 - historyIdx];
-      }
-      ev.preventDefault();
-      return;
-    }
-    if(ev.key === 'ArrowDown'){
-      if(historyIdx > 0){
-        historyIdx--;
-        cmdInput.value = history[history.length - 1 - historyIdx];
-      } else if(historyIdx === 0){
-        historyIdx = -1;
-        cmdInput.value = '';
-      }
-      ev.preventDefault();
-      return;
-    }
-    if(ev.key === 'Enter'){
-      const cmd = cmdInput.value.trim();
-      if(!cmd) return;
-      history.push(cmd);
-      historyIdx = -1;
-      cmdInput.value = '';
-
-      output.textContent += `$ ${cmd}\n`;
-      output.scrollTop = output.scrollHeight;
-
-      try {
-        const res = await fetch('/api/terminal/exec', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({token: termToken, command: cmd}),
-        });
-        const data = await res.json();
-        if(res.status === 401 || (data.error && data.error.includes('expired'))){
-          setLocked();
-          authErr.textContent = 'Session expired. Please re-authenticate.';
-          authErr.style.display = 'block';
-          return;
-        }
-        output.textContent += (data.output || data.error || '') + '\n\n';
-      } catch(err){
-        output.textContent += `[Error: ${err.message}]\n\n`;
-      }
-      output.scrollTop = output.scrollHeight;
-    }
-  });
-});
-{% endif %}
-</script>
-
-{% if client_private %}
-<div id="terminal-drawer" class="terminal-drawer" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: var(--surface-0); border-top: 2px solid var(--teal, #1d9e75); z-index: 1100; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); flex-direction: column; overscroll-behavior: contain;" role="dialog" aria-modal="true" aria-labelledby="term-title">
-  <div class="terminal-drawer-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; background: var(--surface-1); border-bottom: 1px solid var(--border);">
+<div id="terminal-drawer" class="terminal-drawer" role="dialog" aria-modal="true" aria-labelledby="term-title">
+  <div class="terminal-drawer-header">
     <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span id="term-title" class="mono" style="font-weight: 700; color: var(--teal, #1d9e75);">&gt;_ Emergency Terminal</span>
+      <span id="term-title" class="mono">&gt;_ Emergency Terminal</span>
       <span id="term-status-chip" class="status-chip neutral">Locked</span>
     </div>
     <div style="display: flex; gap: 0.5rem;">
-      <button class="btn secondary compact" id="term-clear-btn" aria-label="Clear terminal output">Clear</button>
-      <button class="btn secondary compact" id="term-close-btn" aria-label="Close terminal drawer">Close (Esc)</button>
+      <button type="button" class="btn secondary compact" id="term-clear-btn" aria-label="Clear terminal output">Clear</button>
+      <button type="button" class="btn secondary compact" id="term-close-btn" aria-label="Close terminal drawer">Close (Esc)</button>
     </div>
   </div>
-  <div id="term-lock-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 1rem;">
-    <p style="margin-bottom: 0.75rem; color: var(--text-dim);">Enter admin password to unlock emergency console:</p>
-    <div style="display: flex; gap: 0.5rem; max-width: 320px; width: 100%;">
+  <div id="term-lock-view">
+    <p>Enter admin password to unlock emergency console:</p>
+    <div class="term-input-box">
       <input type="password" id="term-password-input" class="control-input compact" placeholder="Admin password…" aria-label="Admin password" style="flex: 1;" autocomplete="current-password" spellcheck="false">
-      <button class="btn ok compact" id="term-unlock-btn" aria-label="Unlock console">Unlock</button>
+      <button type="button" class="btn ok compact" id="term-unlock-btn" aria-label="Unlock console">Unlock</button>
     </div>
-    <span id="term-auth-error" style="color: var(--rose, #ff4772); font-size: 0.85rem; margin-top: 0.5rem; display: none;"></span>
+    <span id="term-auth-error"></span>
   </div>
-  <div id="term-console-view" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
-    <div id="term-output" class="mono" style="flex: 1; overflow-y: auto; padding: 0.75rem; font-size: 0.85rem; line-height: 1.4; color: var(--text); background: var(--surface-0); white-space: pre-wrap; word-break: break-all; overscroll-behavior: contain;" tabindex="0" aria-label="Terminal output log"></div>
-    <div class="term-input-row" style="display: flex; align-items: center; padding: 0.4rem 0.75rem; background: var(--surface-1); border-top: 1px solid var(--border);">
-      <span class="mono" style="color: var(--teal, #1d9e75); font-weight: 700; margin-right: 0.5rem;" aria-hidden="true">$</span>
-      <input type="text" id="term-command-input" class="control-input mono" placeholder="Type command (e.g. uname -a, df -h, docker ps)…" aria-label="Terminal command prompt" style="flex: 1; background: transparent; border: none; box-shadow: none;" autocomplete="off" spellcheck="false">
+  <div id="term-console-view">
+    <div id="term-output" class="mono" tabindex="0" aria-label="Terminal output log"></div>
+    <div class="term-input-row">
+      <span class="mono term-prompt-char" aria-hidden="true">$</span>
+      <input type="text" id="term-command-input" class="control-input mono" placeholder="Type command (e.g. uname -a, df -h, docker ps)…" aria-label="Terminal command prompt" autocomplete="off" spellcheck="false">
     </div>
   </div>
 </div>
 {% endif %}
+
+<script src="{{ url_for('static', filename='js/app.js') }}?v=4.0"></script>
+<script src="{{ url_for('static', filename='js/dialog.js') }}?v=4.0"></script>
+<script src="{{ url_for('static', filename='js/base-shell.js') }}?v=4.0"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>
