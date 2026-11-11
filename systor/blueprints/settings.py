@@ -537,8 +537,18 @@ def api_apply():
     })
 
 
+_LAST_COLLECTOR_RESTART = 0.0
+_LAST_WEB_RESTART = 0.0
+
+
 @settings_bp.route("/api/restart-collector", methods=["POST"])
 def api_restart_collector():
+    global _LAST_COLLECTOR_RESTART
+    now = time.time()
+    if now - _LAST_COLLECTOR_RESTART < 2.0:
+        return jsonify({"ok": False, "error": "Collector restart was recently requested; please wait a moment."}), 429
+    _LAST_COLLECTOR_RESTART = now
+
     pid = find_collector_pid()
     started_fallback = False
     if pid is not None:
@@ -590,6 +600,12 @@ def api_restart_collector():
 
 @settings_bp.route("/api/restart-web", methods=["POST"])
 def api_restart_web():
+    global _LAST_WEB_RESTART
+    now = time.time()
+    if now - _LAST_WEB_RESTART < 2.0:
+        return jsonify({"ok": False, "error": "Web restart was recently requested; please wait a moment."}), 429
+    _LAST_WEB_RESTART = now
+
     runtime = get_runtime_status()
     current_pid = runtime.get("web", {}).get("pid")
     host = runtime.get("web", {}).get("host", "0.0.0.0")  # nosec: B104
