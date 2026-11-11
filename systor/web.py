@@ -54,18 +54,16 @@ def create_app(start_worker: bool = True) -> Flask:
         import secrets
         if "systor_csrf" not in session:
             session["systor_csrf"] = secrets.token_hex(16)
+        if request.is_secure or request.headers.get("X-Forwarded-Proto") == "https":
+            app.config["SESSION_COOKIE_SECURE"] = True
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             if app.config.get("TESTING") and not app.config.get("CSRF_CHECK_IN_TESTS"):
                 return None
             expected_session = session.get("systor_csrf")
-            expected_cookie = request.cookies.get("systor_csrf")
             token = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
             valid = False
-            if token:
-                if expected_cookie and secrets.compare_digest(token, expected_cookie):
-                    valid = True
-                elif expected_session and secrets.compare_digest(token, expected_session):
-                    valid = True
+            if token and expected_session and secrets.compare_digest(token, expected_session):
+                valid = True
             if not valid:
                 if request.path.startswith("/api/"):
                     return jsonify({"ok": False, "error": "Invalid or missing CSRF token"}), 403
@@ -77,6 +75,7 @@ def create_app(start_worker: bool = True) -> Flask:
         effective_private = effective_private_ui()
         auth = auth_cfg()
         return {
+            "csrf_token": session.get("systor_csrf", ""),
             "storage_private": effective_private,
             "client_private": effective_private,
             "client_private_raw": private,
@@ -104,8 +103,6 @@ def create_app(start_worker: bool = True) -> Flask:
             "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
             "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"
         )
-        if "systor_csrf" in session and "systor_csrf" not in request.cookies:
-            resp.set_cookie("systor_csrf", session["systor_csrf"], samesite="Lax")
         return resp
 
     @app.before_request

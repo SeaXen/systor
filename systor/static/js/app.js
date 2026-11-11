@@ -112,8 +112,43 @@ function drawLineChart(canvas, data, color, ymin, ymax) {
   }
 }
 
-async function fetchJSON(url) {
-  const r = await fetch(url);
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+
+async function api(url, opts) {
+  const options = Object.assign({ cache: 'no-store' }, opts || {});
+  options.headers = Object.assign({}, options.headers || {});
+  const method = (options.method || 'GET').toUpperCase();
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const token = getCsrfToken();
+    if (token && !options.headers['X-CSRF-Token']) {
+      options.headers['X-CSRF-Token'] = token;
+    }
+  }
+  const r = await fetch(url, options);
+  if (r.status === 401) {
+    window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+    return;
+  }
+  const j = await r.json().catch(() => ({ ok: false, error: 'HTTP ' + r.status }));
+  if (!r.ok || j.ok === false) {
+    const err = new Error(j.error || j.message || ('HTTP ' + r.status));
+    err.response = j;
+    err.status = r.status;
+    throw err;
+  }
+  return j;
+}
+
+window.api = api;
+
+async function fetchJSON(url, opts) {
+  if (opts && opts.method && opts.method.toUpperCase() !== 'GET') {
+    return api(url, opts);
+  }
+  const r = await fetch(url, Object.assign({ cache: 'no-store' }, opts || {}));
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
