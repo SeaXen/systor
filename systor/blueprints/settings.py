@@ -14,7 +14,7 @@ from pathlib import Path
 from flask import Blueprint, render_template, request, jsonify, Response, current_app
 from werkzeug.security import generate_password_hash
 
-from ..config import load_config, save_config, DEFAULT_CONFIG, _yaml_to_dict
+from ..config import load_config, save_config, DEFAULT_CONFIG, _yaml_to_dict, get_or_create_session_secret
 from ..metrics import collect_snapshot, read_top_processes
 from ..notifier import send_telegram, send_discord
 from ..services.runtime_service import get_runtime_status
@@ -378,7 +378,7 @@ def page_settings():
             if not auth.get("password_hash"):
                 return jsonify({"ok": False, "message": "Set an auth password before enabling login protection."}), 400
             if not auth.get("session_secret"):
-                auth["session_secret"] = secrets.token_hex(32)
+                auth["session_secret"] = get_or_create_session_secret(cfg)
         if auth.get("session_secret"):
             current_app.secret_key = auth.get("session_secret") or current_app.secret_key
 

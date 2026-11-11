@@ -7,7 +7,7 @@ import time  # noqa: F401
 from pathlib import Path
 from flask import Flask, jsonify, request, abort, redirect, url_for, session
 
-from .config import load_config
+from .config import load_config, get_or_create_session_secret
 from .services.runtime_service import start_apps_cache_worker
 from .blueprints import register_blueprints
 from .blueprints.common import (
@@ -43,7 +43,7 @@ def create_app(start_worker: bool = True) -> Flask:
         static_folder="static"
     )
     auth_boot = auth_cfg()
-    app.secret_key = auth_boot.get("session_secret") or os.environ.get("SYSTOR_SESSION_SECRET") or "systor-secret-key-32b-secure-fallback"
+    app.secret_key = get_or_create_session_secret(auth_boot)
     app.config["JSON_SORT_KEYS"] = False
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 300
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"

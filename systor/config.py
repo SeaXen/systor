@@ -7,6 +7,8 @@ Resolution order (later wins):
   4. ./systor.yaml (cwd)
   5. Environment variables SYSTOR_* (e.g. SYSTOR_POLL_INTERVAL=15)
 """
+from __future__ import annotations
+
 import os
 import json
 from pathlib import Path
@@ -309,3 +311,76 @@ def _scalar_repr(v: Any) -> str:
     if isinstance(v, (int, float)):
         return str(v)
     return f'"{v}"'
+
+
+def get_data_dir() -> Path:
+    """Return the writable persistent data directory for systor.
+    Checks SYSTOR_DATA_DIR, /var/lib/systor, ~/.local/share/systor, or cwd."""
+    env_dir = os.environ.get("SYSTOR_DATA_DIR")
+    if env_dir:
+        p = Path(env_dir)
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except Exception:
+            pass
+    for candidate in [
+        Path("/var/lib/systor"),
+        Path.home() / ".local" / "share" / "systor",
+        Path.cwd() / ".systor_data",
+    ]:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            test_file = candidate / ".test_write"
+            test_file.touch()
+            test_file.unlink()
+            return candidate
+        except (OSError, PermissionError):
+            continue
+    return Path.cwd()
+
+
+def get_or_create_session_secret(cfg: dict | None = None) -> str:
+    """Resolve session secret:
+    1. config auth.session_secret
+    2. env SYSTOR_SESSION_SECRET
+    3. persisted random secret in <data_dir>/session.key (mode 0600)
+    4. in-memory random secret if file cannot be written (with warning)
+    """
+    if cfg is not None:
+        sec = cfg.get("auth", {}).get("session_secret")
+        if sec:
+            return str(sec)
+    env_sec = os.environ.get("SYSTOR_SESSION_SECRET")
+    if env_sec:
+        return env_sec
+
+    data_dir = get_data_dir()
+    key_file = data_dir / "session.key"
+    if key_file.exists():
+        try:
+            val = key_file.read_text(encoding="utf-8").strip()
+            if val:
+                return val
+        except Exception as e:
+            import logging
+            logging.getLogger("systor.config").warning("Failed reading session.key: %s", e)
+
+    import secrets
+    new_secret = secrets.token_hex(32)
+    try:
+        tmp_key = key_file.with_name(f".session.key.tmp.{secrets.token_hex(4)}")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        mode = 0o600
+        fd = os.open(str(tmp_key), flags, mode)
+        with open(fd, "w", encoding="utf-8") as f:
+            f.write(new_secret)
+        tmp_key.replace(key_file)
+        return new_secret
+    except Exception as e:
+        import logging
+        logging.getLogger("systor.config").warning(
+            "Could not persist session key to %s (%s); using in-memory random secret",
+            key_file, e
+        )
+        return new_secret
