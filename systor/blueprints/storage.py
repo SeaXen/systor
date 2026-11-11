@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import tempfile
+import urllib.parse
 import zipfile
 from pathlib import Path
 from flask import Blueprint, render_template, request, jsonify, abort, send_file, after_this_request
@@ -231,7 +232,14 @@ def api_storage_preview():
     text_ext = {".txt", ".md", ".log", ".json", ".yaml", ".yml", ".toml", ".csv", ".py", ".sh", ".js", ".ts", ".css", ".html", ".xml"}
     image_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
     if suffix in image_ext:
-        return jsonify({"ok": True, "kind": "image", "name": p.name, "size": st.st_size, "download_url": "/api/storage/download?path=" + str(p)})
+        encoded_path = urllib.parse.quote(str(p))
+        return jsonify({
+            "ok": True,
+            "kind": "image",
+            "name": p.name,
+            "size": st.st_size,
+            "download_url": f"/api/storage/download?path={encoded_path}",
+        })
     if suffix in text_ext or st.st_size < 128 * 1024:
         try:
             data = p.read_text(errors="replace")[:12000]
