@@ -5,41 +5,50 @@ with strict injection guards and critical infrastructure deny-lists.
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import logging
 import re
 import shutil
 import subprocess
+import time
 from typing import Any
 
-import time
+from ..config import load_config
 
 log = logging.getLogger("systor.services.systemd")
 
 # Allowed service unit name pattern
 _UNIT_RE = re.compile(r"^[a-zA-Z0-9_\-\.@]+\.service$")
 
-# Safety deny-list to prevent breaking host OS and remote connectivity
-_DENY_UNITS = {
-    "init.scope",
-    "systemd-journald.service",
-    "systemd-udevd.service",
-    "systemd-logind.service",
-    "systemd-networkd.service",
-    "systemd-resolved.service",
-    "dbus.service",
-    "emergency.service",
-    "rescue.service",
-    "ssh.service",
-    "sshd.service",
-    "docker.service",
-    "ufw.service",
-    "iptables.service",
-    "networking.service",
-    "network.service",
-}
-
 _last_restart_by_ip: dict[str, float] = {}
+
+
+def get_allowed_units() -> list[str]:
+    """Retrieve allowed systemd unit globs from configuration."""
+    cfg = load_config()
+    allowed = cfg.get("systemd", {}).get("allowed_units")
+    if isinstance(allowed, str):
+        if allowed.startswith("[") and allowed.endswith("]"):
+            try:
+                import ast
+                parsed = ast.literal_eval(allowed)
+                if isinstance(parsed, list):
+                    return [str(x).strip() for x in parsed if str(x).strip()]
+            except Exception:
+                pass
+        return [x.strip() for x in allowed.split(",") if x.strip()]
+    if isinstance(allowed, list):
+        return [str(x).strip() for x in allowed if str(x).strip()]
+    return ["systor-*.service"]
+
+
+def is_unit_allowed(unit_name: str, allowed_patterns: list[str] | None = None) -> bool:
+    """Check if a systemd unit name matches any allowed unit glob pattern."""
+    if allowed_patterns is None:
+        allowed_patterns = get_allowed_units()
+    clean = unit_name.strip().lower()
+    return any(fnmatch.fnmatch(clean, pat.strip().lower()) for pat in allowed_patterns)
 
 
 def list_systemd_services() -> dict[str, Any]:
@@ -64,12 +73,14 @@ def list_systemd_services() -> dict[str, Any]:
             raw_units = json.loads(p.stdout)
             units = []
             for u in raw_units:
+                unit_name = str(u.get("unit") or "")
                 units.append({
-                    "unit": u.get("unit"),
+                    "unit": unit_name,
                     "load": u.get("load"),
                     "active": u.get("active"),
                     "sub": u.get("sub"),
                     "description": u.get("description", ""),
+                    "actionable": is_unit_allowed(unit_name),
                 })
             return {"available": True, "services": units, "count": len(units)}
     except Exception:
@@ -87,12 +98,14 @@ def list_systemd_services() -> dict[str, Any]:
         for line in p.stdout.splitlines():
             parts = line.split(None, 4)
             if len(parts) >= 4 and parts[0].endswith(".service"):
+                unit_name = parts[0]
                 units.append({
-                    "unit": parts[0],
+                    "unit": unit_name,
                     "load": parts[1],
                     "active": parts[2],
                     "sub": parts[3],
                     "description": parts[4] if len(parts) > 4 else "",
+                    "actionable": is_unit_allowed(unit_name),
                 })
         return {"available": True, "services": units, "count": len(units)}
     except Exception as e:
@@ -108,8 +121,9 @@ def restart_systemd_service(unit: str, user: str, ip: str, storage) -> tuple[boo
         storage.log_systemd_action(clean_unit, "restart", user, ip, False, msg)
         return False, msg
 
-    if clean_unit.lower() in _DENY_UNITS:
-        msg = f"Operation rejected: '{clean_unit}' is a critical protected system service."
+    # S06: Enforce allow-list (systemd.allowed_units)
+    if not is_unit_allowed(clean_unit):
+        msg = f"Operation rejected: '{clean_unit}' is not in systemd.allowed_units allow-list."
         storage.log_systemd_action(clean_unit, "restart", user, ip, False, msg)
         return False, msg
 

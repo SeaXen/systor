@@ -110,6 +110,9 @@ DEFAULT_CONFIG: dict = {
         "level": "INFO",
         "file": "/var/log/systor/systor.log",
     },
+    "systemd": {
+        "allowed_units": ["systor-*.service"],
+    },
 }
 
 
@@ -145,8 +148,17 @@ def _yaml_to_dict(text: str) -> dict:
                         v = v.split(" #", 1)[0].rstrip()
                     elif "\t#" in v:
                         v = v.split("\t#", 1)[0].rstrip()
-                # scalar
-                if v.lower() in ("true", "false"):
+                # scalar or list
+                if v.startswith("[") and v.endswith("]"):
+                    try:
+                        val = json.loads(v)
+                    except Exception:
+                        try:
+                            import ast
+                            val = ast.literal_eval(v)
+                        except Exception:
+                            val = v
+                elif v.lower() in ("true", "false"):
                     val: Any = v.lower() == "true"
                 else:
                     try:
@@ -312,6 +324,8 @@ def _scalar_repr(v: Any) -> str:
         return "true" if v else "false"
     if isinstance(v, (int, float)):
         return str(v)
+    if isinstance(v, list):
+        return json.dumps(v)
     return f'"{v}"'
 
 
