@@ -1,4 +1,5 @@
 """Unit tests for the secure Web Terminal engine."""
+import pytest
 from werkzeug.security import generate_password_hash
 
 from systor.terminal import (
@@ -6,6 +7,11 @@ from systor.terminal import (
     validate_terminal_token,
     execute_console_command,
 )
+
+
+@pytest.fixture(autouse=True)
+def enable_terminal(monkeypatch):
+    monkeypatch.setattr("systor.terminal.load_config", lambda: {"terminal": {"enabled": True}, "auth": {}})
 
 
 def test_terminal_auth_success():

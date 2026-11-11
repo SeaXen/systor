@@ -6,6 +6,7 @@ import logging
 import urllib.request
 import urllib.error
 import urllib.parse
+from .security import safe_urlopen
 
 log = logging.getLogger("systor.notifier")
 
@@ -28,7 +29,7 @@ def send_telegram(bot_token: str, chat_id: str, text: str, timeout: int = 10) ->
             "User-Agent": "systor/0.4 (+https://github.com/SeaXen/systor)",
         })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with safe_urlopen(req, timeout=timeout) as r:
             data = json.loads(r.read())
             if data.get("ok"):
                 return True, None
@@ -52,7 +53,7 @@ def send_discord(webhook_url: str, text: str, timeout: int = 10) -> tuple[bool, 
             "User-Agent": "systor/0.4 (+https://github.com/SeaXen/systor)",
         })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with safe_urlopen(req, timeout=timeout) as r:
             return (200 <= r.status < 300), None
     except urllib.error.HTTPError as e:
         return False, f"HTTP {e.code}: {e.read().decode(errors='replace')[:200]}"

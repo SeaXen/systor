@@ -1,6 +1,4 @@
-import pytest
 from systor.web import create_app
-from systor.config import save_config, load_config
 
 
 def test_S02_first_run_requires_setup(tmp_path, monkeypatch):

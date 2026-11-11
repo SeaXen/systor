@@ -1,6 +1,5 @@
 import io
 import tarfile
-import pytest
 from systor.storage import Storage
 from systor.services.backup_service import restore_backup_archive
 

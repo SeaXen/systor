@@ -2,7 +2,18 @@
 from __future__ import annotations
 import ipaddress
 import re
+import urllib.parse
+import urllib.request
 from typing import Sequence
+
+
+def safe_urlopen(url_or_req: str | urllib.request.Request, *args, **kwargs):
+    """Safe wrapper for urllib.request.urlopen that enforces http/https schemes only."""
+    url = url_or_req.full_url if isinstance(url_or_req, urllib.request.Request) else str(url_or_req)
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme '{parsed.scheme}'; only http and https are permitted.")
+    return urllib.request.urlopen(url_or_req, *args, **kwargs)  # nosec B310
 
 
 def parse_trusted_proxies(raw: str | Sequence[str] | None) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:

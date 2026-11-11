@@ -16,6 +16,7 @@ import subprocess
 import time
 from typing import Any
 from werkzeug.security import check_password_hash
+from .config import load_config
 
 log = logging.getLogger("systor.terminal")
 
@@ -29,6 +30,10 @@ def authenticate_terminal_session(
     stored_password_hash: str,
 ) -> tuple[bool, str, str | None]:
     """Verify admin password and issue a time-limited terminal token."""
+    cfg = load_config()
+    if not cfg.get("terminal", {}).get("enabled", False):
+        return False, "Terminal console is disabled in configuration (terminal.enabled is false).", None
+
     if not password:
         return False, "Password is required", None
 
@@ -80,8 +85,13 @@ def execute_console_command(
     client_ip: str,
     command: str,
     timeout_sec: float = 12.0,
+    user: str = "admin",
 ) -> dict[str, Any]:
     """Execute command in host shell safely with timeout and output capture."""
+    cfg = load_config()
+    if not cfg.get("terminal", {}).get("enabled", False):
+        return {"ok": False, "error": "Terminal console is disabled in configuration (terminal.enabled is false)."}
+
     if not validate_terminal_token(token, client_ip):
         return {"ok": False, "error": "Invalid or expired session token. Please re-authenticate."}
 
@@ -104,18 +114,27 @@ def execute_console_command(
         if proc.stderr:
             combined += ("\n" if combined else "") + proc.stderr
 
+        log.info("terminal audit: user=%s ip=%s cmd=%r returncode=%s", user, client_ip, cmd, proc.returncode)
+
+        # S08: Cap output to 256 KB
+        MAX_OUTPUT = 256 * 1024
+        if len(combined) > MAX_OUTPUT:
+            combined = combined[:MAX_OUTPUT] + "\n... [output truncated at 256 KB]"
+
         return {
             "ok": True,
             "output": combined or "(no output)",
             "returncode": proc.returncode,
         }
     except subprocess.TimeoutExpired:
+        log.warning("terminal audit: user=%s ip=%s cmd=%r TIMED OUT after %ss", user, client_ip, cmd, timeout_sec)
         return {
             "ok": False,
             "error": f"Command timed out after {timeout_sec:.0f} seconds",
             "returncode": 124,
         }
     except Exception as e:
+        log.error("terminal audit: user=%s ip=%s cmd=%r FAILED: %s", user, client_ip, cmd, e)
         return {
             "ok": False,
             "error": f"Execution failed: {e}",

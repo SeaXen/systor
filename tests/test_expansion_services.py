@@ -157,14 +157,14 @@ def test_uptime_http_check_execution(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_systemd_deny_list_enforcement(tmp_path):
-    """Verify security deny-list stops destructive or PID 1 unit restarts."""
+    """Verify security allow-list stops unauthorized or system unit restarts."""
     db_file = tmp_path / "test_systor.db"
     store = Storage(str(db_file))
 
     for forbidden in ["systemd-journald.service", "init.scope", "dbus.service", "ssh.service", "docker.service", "ufw.service"]:
         ok, msg = restart_systemd_service(forbidden, "admin", "127.0.0.1", store)
         assert ok is False
-        assert "protected" in msg.lower() or "invalid" in msg.lower()
+        assert "allow-list" in msg.lower() or "protected" in msg.lower() or "invalid" in msg.lower()
 
 
 def test_systemd_unit_input_validation(tmp_path):
@@ -192,14 +192,14 @@ def test_systemd_restart_audit_logging(tmp_path):
     with patch("shutil.which", return_value="/usr/bin/systemctl"):
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stderr="")
-            ok, msg = restart_systemd_service("nginx.service", "admin", "10.0.0.5", store)
+            ok, msg = restart_systemd_service("systor-web.service", "admin", "10.0.0.5", store)
             assert ok is True
             assert "Successfully" in msg
 
             # Verify audit log
             logs = store.recent_systemd_actions(limit=10)
             assert len(logs) == 1
-            assert logs[0]["unit"] == "nginx.service"
+            assert logs[0]["unit"] == "systor-web.service"
             assert logs[0]["action"] == "restart"
             assert logs[0]["user"] == "admin"
             assert logs[0]["ip"] == "10.0.0.5"

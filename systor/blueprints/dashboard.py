@@ -10,7 +10,8 @@ from ..config import load_config
 from ..metrics import collect_snapshot
 from .. import __version__, __app_name__
 from .common import (
-    get_storage, parse_hours_arg, bucket_series_points, bucket_network_points
+    get_storage, parse_hours_arg, bucket_series_points, bucket_network_points,
+    client_private
 )
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -48,6 +49,8 @@ def health():
         if st.get("samples", 0) > 0 and newest is not None:
             age = now - newest
             if age > (3 * poll_sec):
+                if not client_private():
+                    return jsonify({"ok": False, "status": "stale"}), 503
                 return jsonify({
                     "ok": False,
                     "error": f"Stale collector data: newest sample is {age:.1f}s old (limit {3 * poll_sec}s)",
@@ -57,7 +60,8 @@ def health():
                 }), 503
         return jsonify({"ok": True, "ts": now, "db_ok": True})
     except Exception as e:
-        return jsonify({"ok": False, "error": f"Database unreachable: {e}", "ts": time.time()}), 503
+        err_text = "Database unreachable" if not client_private() else f"Database unreachable: {e}"
+        return jsonify({"ok": False, "error": err_text, "ts": time.time()}), 503
 
 
 @dashboard_bp.route("/api/version")
@@ -70,7 +74,7 @@ def api_snapshot():
     s = collect_snapshot()
     s["db_stats"] = get_storage().stats()
     body = jsonify(s).get_data()
-    etag = '"' + hashlib.md5(body).hexdigest()[:16] + '"'
+    etag = '"' + hashlib.md5(body, usedforsecurity=False).hexdigest()[:16] + '"'
     if request.headers.get("If-None-Match") == etag:
         resp = Response(status=304)
         resp.headers["ETag"] = etag
@@ -137,7 +141,7 @@ def api_public_dashboard():
     }
     net = bucket_network_points(storage.network_series(hours=hours), 600)
     body = json.dumps({"ok": True, "hours": hours, "snapshot": snap, "metrics": metrics, "network": net}, separators=(",", ":")).encode()
-    etag = '"' + hashlib.md5(body).hexdigest()[:16] + '"'
+    etag = '"' + hashlib.md5(body, usedforsecurity=False).hexdigest()[:16] + '"'
     _public_dash_cache = {"ts": now, "hours": hours, "body": body, "etag": etag}
 
     if request.headers.get("If-None-Match") == etag:
@@ -154,7 +158,7 @@ def api_public_dashboard():
 @dashboard_bp.route("/api/access")
 def api_access():
     cfg = load_config()
-    host = cfg.get("web", {}).get("host", "0.0.0.0")
+    host = cfg.get("web", {}).get("host", "0.0.0.0")  # nosec: B104
     port = int(cfg.get("web", {}).get("port", 6677))
     lan_ips = []
     try:

@@ -1,9 +1,8 @@
 import io
 import json
 import tarfile
-import pytest
 from systor.storage import Storage
-from systor.services.backup_service import create_backup_archive, restore_backup_archive
+from systor.services.backup_service import create_backup_archive
 from systor.config import save_config, load_config
 
 

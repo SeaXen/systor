@@ -7,6 +7,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+from .security import safe_urlopen
 
 _SUBPROCESS_SEMAPHORE = threading.BoundedSemaphore(2)
 
@@ -43,7 +44,7 @@ def _http_probe(name: str, url: str, read_bytes: int = 262144, timeout: int = 25
     ts = int(time.time())
     t0 = time.time()
     req = urllib.request.Request(url, headers={"User-Agent": "systor-speed/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with safe_urlopen(req, timeout=timeout) as r:
         data = r.read(read_bytes)
         dt = max(0.001, time.time() - t0)
         dl_mbps = round((len(data) * 8) / (dt * 1_000_000), 3)

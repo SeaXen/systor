@@ -188,10 +188,13 @@ def run():
         log.warning("cannot write to %s, logging to stdout only", log_file)
 
     # Write a pidfile so the web UI or system can manage us
+    import tempfile
+    from .config import get_data_dir
     pidfile_candidates = [
         Path("/var/lib/systor/collector.pid"),
         Path("/run/systor/collector.pid"),
-        Path("/tmp/systor-collector.pid"),
+        get_data_dir() / "collector.pid",
+        Path(tempfile.gettempdir()) / "systor-collector.pid",
     ]
     active_pidfile = None
     for p in pidfile_candidates:

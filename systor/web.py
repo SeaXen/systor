@@ -1,7 +1,6 @@
 """systor web dashboard — Clean Flask app on port 6677 with modular Blueprints."""
 from __future__ import annotations
 import logging
-import os
 import signal
 import time  # noqa: F401
 from pathlib import Path

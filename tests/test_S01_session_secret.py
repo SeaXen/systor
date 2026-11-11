@@ -1,9 +1,6 @@
-import os
-import pytest
 from flask.sessions import SecureCookieSessionInterface
-from itsdangerous import URLSafeTimedSerializer
 from systor.web import create_app
-from systor.config import get_or_create_session_secret, get_data_dir
+from systor.config import get_or_create_session_secret
 
 
 def forge_cookie(data: dict, secret: str = "systor-secret-key-32b-secure-fallback") -> str:
@@ -37,6 +34,7 @@ def test_S01_no_static_fallback_secret(tmp_path, monkeypatch):
     with client:
         # Accessing settings or login status must not treat forged session as authenticated
         res = client.get("/api/runtime")
+        assert res.status_code == 200
         # Ensure session in Flask is empty or invalid
         from flask import session
         assert session.get("systor_auth") is not True

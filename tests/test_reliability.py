@@ -1,8 +1,14 @@
 """Tests for system reliability, concurrency limits, and security enforcement."""
+import pytest
 from werkzeug.security import generate_password_hash
 from systor.terminal import authenticate_terminal_session, validate_terminal_token
 from systor.web import create_app
 from systor import speed
+
+
+@pytest.fixture(autouse=True)
+def enable_terminal(monkeypatch):
+    monkeypatch.setattr("systor.terminal.load_config", lambda: {"terminal": {"enabled": True}, "auth": {}})
 
 
 def test_emergency_terminal_auth_fail_when_unconfigured():
@@ -69,9 +75,10 @@ def test_csrf_double_submit_protection():
     assert resp.status_code == 403
     assert "CSRF" in resp.get_json()["error"]
 
-    # Mutation with matching cookie and header
+    # Mutation with matching session and header
     token = "test_csrf_token_12345"
-    client.set_cookie("systor_csrf", token)
+    with client.session_transaction() as sess:
+        sess["systor_csrf"] = token
     resp = client.post(
         "/api/terminal/auth",
         json={"password": "wrong_password"},

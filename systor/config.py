@@ -101,7 +101,7 @@ DEFAULT_CONFIG: dict = {
     },
     "web": {
         # 0.0.0.0 = accessible from LAN. Use 127.0.0.1 for local-only.
-        "host": "0.0.0.0",
+        "host": "0.0.0.0",  # nosec B104
         "port": 6677,
         "trusted_proxies": "127.0.0.1, ::1",
         "trust_cgnat": True,
@@ -109,6 +109,9 @@ DEFAULT_CONFIG: dict = {
     "logging": {
         "level": "INFO",
         "file": "/var/log/systor/systor.log",
+    },
+    "terminal": {
+        "enabled": False,
     },
     "systemd": {
         "allowed_units": ["systor-*.service"],

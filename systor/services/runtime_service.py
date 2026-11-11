@@ -260,7 +260,7 @@ def get_runtime_status() -> dict:
 
     return {
         "ok": True,
-        "web": _proc_row(web_rows) | {"host": cfg.get("web", {}).get("host", "0.0.0.0"), "port": int(cfg.get("web", {}).get("port", 6677))},
+        "web": _proc_row(web_rows) | {"host": cfg.get("web", {}).get("host", "0.0.0.0"), "port": int(cfg.get("web", {}).get("port", 6677))},  # nosec: B104
         "collector": _proc_row(collector_rows) | {"poll_interval_sec": int(cfg.get("collector", {}).get("poll_interval_sec", 30))},
         "cloudflared": cloudflare,
         "tailscaled": tailscaled,

@@ -122,7 +122,8 @@ class TestCliAndPackaging(unittest.TestCase):
         base_text = base_html.read_text(encoding="utf-8")
         self.assertIn('theme-toggle-btn', base_text)
         self.assertIn('setSystorTheme', base_text)
-        self.assertIn('localStorage.getItem(\'systor_theme\')', base_text)
+        theme_boot_js = (repo_root / "systor" / "static" / "js" / "theme-boot.js").read_text(encoding="utf-8")
+        self.assertIn('localStorage.getItem("systor_theme")', theme_boot_js)
 
         settings_text = settings_html.read_text(encoding="utf-8")
         self.assertIn('Appearance &amp; Theme', settings_text)

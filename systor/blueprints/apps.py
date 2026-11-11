@@ -2,7 +2,7 @@
 from __future__ import annotations
 import threading
 import time
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session
 
 from ..config import load_config
 from ..metrics import read_top_processes, read_total_memory_mb
@@ -291,7 +291,8 @@ def api_terminal_exec():
     client_ip = get_client_ip(request, trusted)
 
     from ..terminal import execute_console_command
-    res = execute_console_command(token, client_ip, command)
+    user = session.get("systor_user", "admin")
+    res = execute_console_command(token, client_ip, command, user=user)
     status = 200 if res.get("ok") else 400
     return jsonify(res), status
 

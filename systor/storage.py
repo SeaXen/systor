@@ -258,7 +258,7 @@ class Storage:
         cutoff = int(time.time()) - hours * 3600
         with self._lock, self._conn() as c:
             rows = c.execute(
-                f"SELECT ts, {col} FROM samples WHERE ts >= ? AND {col} IS NOT NULL ORDER BY ts",
+                f"SELECT ts, {col} FROM samples WHERE ts >= ? AND {col} IS NOT NULL ORDER BY ts",  # nosec: B608
                 (cutoff,),
             ).fetchall()
         return [(r[0], r[1]) for r in rows]
@@ -310,9 +310,9 @@ class Storage:
             vals.append(run_type)
         clause = (" WHERE " + " AND ".join(where)) if where else ""
         with self._lock, self._conn() as c:
-            total = c.execute("SELECT COUNT(*) FROM speedtests" + clause, tuple(vals)).fetchone()[0]
+            total = c.execute("SELECT COUNT(*) FROM speedtests" + clause, tuple(vals)).fetchone()[0]  # nosec: B608
             rows = c.execute(
-                "SELECT * FROM speedtests" + clause + " ORDER BY ts DESC LIMIT ? OFFSET ?",
+                "SELECT * FROM speedtests" + clause + " ORDER BY ts DESC LIMIT ? OFFSET ?",  # nosec: B608
                 tuple(vals + [limit, offset]),
             ).fetchall()
         return [dict(r) for r in rows], int(total)
@@ -433,7 +433,7 @@ class Storage:
     def list_uptime_targets(self, enabled_only: bool = False) -> list[dict]:
         with self._lock, self._conn() as c:
             clause = " WHERE enabled = 1" if enabled_only else ""
-            rows = c.execute(f"SELECT * FROM uptime_targets{clause} ORDER BY name COLLATE NOCASE").fetchall()
+            rows = c.execute(f"SELECT * FROM uptime_targets{clause} ORDER BY name COLLATE NOCASE").fetchall()  # nosec: B608
         return [dict(r) for r in rows]
 
     def get_uptime_target(self, target_id: int) -> dict | None:

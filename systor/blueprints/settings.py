@@ -14,7 +14,7 @@ from pathlib import Path
 from flask import Blueprint, render_template, request, jsonify, Response, current_app
 from werkzeug.security import generate_password_hash
 
-from ..config import load_config, save_config, DEFAULT_CONFIG, _yaml_to_dict, get_or_create_session_secret
+from ..config import load_config, save_config, DEFAULT_CONFIG, _yaml_to_dict, get_or_create_session_secret, get_data_dir
 from ..metrics import collect_snapshot, read_top_processes
 from ..notifier import send_telegram, send_discord
 from ..services.runtime_service import get_runtime_status
@@ -62,7 +62,13 @@ def build_channel_test_message(channel: str) -> str:
 
 
 def find_collector_pid() -> int | None:
-    for p in (Path("/var/lib/systor/collector.pid"), Path("/run/systor/collector.pid"), Path("/tmp/systor-collector.pid")):
+    import tempfile
+    for p in (
+        Path("/var/lib/systor/collector.pid"),
+        Path("/run/systor/collector.pid"),
+        get_data_dir() / "collector.pid",
+        Path(tempfile.gettempdir()) / "systor-collector.pid",
+    ):
         if p.exists():
             try:
                 pid = int(p.read_text().strip())
@@ -586,7 +592,7 @@ def api_restart_collector():
 def api_restart_web():
     runtime = get_runtime_status()
     current_pid = runtime.get("web", {}).get("pid")
-    host = runtime.get("web", {}).get("host", "0.0.0.0")
+    host = runtime.get("web", {}).get("host", "0.0.0.0")  # nosec: B104
     port = runtime.get("web", {}).get("port", 6677)
     workdir = str(Path(__file__).resolve().parents[2])
 

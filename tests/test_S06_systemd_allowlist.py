@@ -1,9 +1,7 @@
 from unittest.mock import MagicMock
-import pytest
 from systor.services.systemd_service import (
     is_unit_allowed,
     restart_systemd_service,
-    get_allowed_units,
 )
 from systor.config import save_config, load_config
 

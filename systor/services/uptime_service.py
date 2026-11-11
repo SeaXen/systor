@@ -13,6 +13,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from ..security import safe_urlopen
+
 log = logging.getLogger("systor.services.uptime")
 
 _uptime_thread: threading.Thread | None = None
@@ -67,7 +69,7 @@ def ping_target(target: dict[str, Any]) -> tuple[bool, int | None, float, str | 
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
 
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+        with safe_urlopen(req, timeout=timeout, context=ctx) as resp:
             code = resp.getcode()
             latency = round((time.perf_counter() - start) * 1000.0, 2)
             ok = (code == expected_status) or (expected_status == 200 and 200 <= code < 400)

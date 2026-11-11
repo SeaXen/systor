@@ -15,6 +15,7 @@ import urllib.parse
 
 from .metrics import collect_snapshot
 from .storage import Storage, DEFAULT_DB_PATH
+from .security import safe_urlopen
 
 log = logging.getLogger("systor.bot")
 
@@ -39,7 +40,7 @@ def send_telegram_message(bot_token: str, chat_id: str, text: str, parse_mode: s
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with safe_urlopen(req, timeout=10) as resp:
             return resp.status == 200
     except Exception as e:
         log.warning("Telegram send failed: %s", e)
@@ -125,7 +126,7 @@ def bot_poll_worker(bot_token: str, authorized_chat_id: str, storage: Storage | 
         try:
             url = f"https://api.telegram.org/bot{bot_token}/getUpdates?offset={offset}&timeout=15"
             req = urllib.request.Request(url, headers={"User-Agent": "Systor-Bot/1.0"})
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            with safe_urlopen(req, timeout=20) as resp:
                 if resp.status != 200:
                     time.sleep(5)
                     continue
