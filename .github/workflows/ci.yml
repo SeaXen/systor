@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    name: Code Quality & Lint
+    name: Code Quality, Typing & Security Scans
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -23,11 +23,23 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install -r requirements-dev.txt
 
       - name: Run Ruff Linter
         run: |
           ruff check .
+
+      - name: Run Mypy Type Checker
+        run: |
+          mypy systor
+
+      - name: Run Bandit Security Scanner
+        run: |
+          bandit -r systor -ll
+
+      - name: Run pip-audit Dependency Vulnerability Scan
+        run: |
+          pip-audit -r requirements.txt
 
       - name: Validate shell script syntax
         run: |
@@ -59,9 +71,9 @@ jobs:
           pip install pytest pytest-cov
           pip install -e .
 
-      - name: Run test suite with pytest & coverage
+      - name: Run test suite with coverage gate (>= 80%)
         run: |
-          pytest -v --cov=systor --cov-report=term-missing tests/ --ignore=tests/test_webapp_playwright.py
+          pytest -v --cov=systor --cov-report=term-missing --cov-fail-under=80 tests/ --ignore=tests/test_webapp_playwright.py
 
   e2e:
     name: Playwright E2E & Design Audit
@@ -89,4 +101,24 @@ jobs:
 
       - name: Run Design & WCAG Audit
         run: |
-          python tools/design_audit.py
+          python tools/design_audit.py --seed
+
+  container:
+    name: Container Build & Trivy Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t systor:local .
+
+      - name: Run Trivy container vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'systor:local'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'

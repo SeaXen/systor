@@ -39,7 +39,7 @@ def probe_remote_cert(host: str, port: int = 443, timeout: float = 4.0) -> dict[
 
                 # Format example: 'May 20 12:00:00 2027 GMT'
                 expire_dt = dt.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
-                now = dt.datetime.utcnow()
+                now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                 days_left = (expire_dt - now).days
 
                 # Issuer organization

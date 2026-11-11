@@ -31,7 +31,8 @@ def _print_status(_args=None):
     print(f"Config:        {cfg.get('logging', {}).get('file', '')}")
     snap = collect_snapshot()
     print(f"Hostname:      {snap.get('hostname')}")
-    print(f"Uptime:        {snap.get('uptime_sec', 0) // 3600}h {(snap.get('uptime_sec', 0) % 3600) // 60}m")
+    uptime = int(snap.get("uptime_sec") or 0)
+    print(f"Uptime:        {uptime // 3600}h {(uptime % 3600) // 60}m")
     cpu = snap.get("cpu", {})
     print(f"CPU load 1m:   {cpu.get('load_1m')}")
     print(f"CPU temp:      {cpu.get('temp_c')}")
@@ -39,7 +40,9 @@ def _print_status(_args=None):
     print(f"Memory:        {mem.get('used_mb', 0)} / {mem.get('total_mb', 0)} MB used, {mem.get('available_mb', 0)} MB available")
     print(f"Swap:          {mem.get('swap_used_mb', 0)} / {mem.get('swap_total_mb', 0)} MB")
     for d in snap.get("disks", [])[:5]:
-        print(f"Disk {d['mount']:20s}  {d['used_pct']}% used ({d['used_gb']:.1f} / {d['size_gb']:.1f} GB)")
+        used_gb = float(d.get("used_gb") or 0.0)
+        size_gb = float(d.get("size_gb") or 0.0)
+        print(f"Disk {d.get('mount', '/'):20s}  {d.get('used_pct', 0)}% used ({used_gb:.1f} / {size_gb:.1f} GB)")
     try:
         s = Storage()
         st = s.stats()

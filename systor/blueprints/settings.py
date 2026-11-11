@@ -1,7 +1,7 @@
 """Settings, alerts, logs, and maintenance blueprint for Systor."""
 from __future__ import annotations
 import datetime as _dt
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -460,7 +460,7 @@ def api_test_discord():
 def api_settings_export():
     cfg = load_config()
     body = json.dumps(cfg, indent=2, sort_keys=True).encode()
-    ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     return Response(
         body,
         mimetype="application/json",

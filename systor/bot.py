@@ -67,7 +67,7 @@ def handle_bot_command(cmd_text: str, storage: Storage | None = None) -> str:
     if cmd == "/status":
         snap = collect_snapshot()
         host = snap.get("hostname", "systor")
-        up_sec = snap.get("uptime_sec", 0)
+        up_sec = int(snap.get("uptime_sec") or 0)
         up_str = f"{up_sec // 3600}h {(up_sec % 3600) // 60}m"
         cpu = snap.get("cpu", {})
         mem = snap.get("memory", {})
