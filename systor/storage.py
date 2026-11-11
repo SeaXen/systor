@@ -6,6 +6,7 @@ import threading
 import datetime as dt
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Any
 
 DEFAULT_DB_PATH = Path("/var/lib/systor/systor.db")
 
@@ -187,7 +188,7 @@ class Storage:
     def insert_sample(self, s: dict) -> None:
         with self._lock, self._conn() as c:
             # Worst disk
-            worst_disk = max(s.get("disks", []), key=lambda d: d.get("used_pct", 0), default={})
+            worst_disk: dict[str, Any] = max(s.get("disks", []), key=lambda d: d.get("used_pct", 0), default={})
             mem = s.get("memory", {}) or {}
             net = s.get("network", {}) or {}
             cpu = s.get("cpu", {}) or {}
@@ -461,13 +462,13 @@ class Storage:
                    WHERE id = ?""",
                 (name.strip(), url.strip(), method.strip().upper(), expected_status, max(10, interval_sec), max(1.0, timeout_sec), 1 if enabled else 0, target_id),
             )
-            return cur.rowcount > 0
+            return bool(cur.rowcount > 0)
 
     def delete_uptime_target(self, target_id: int) -> bool:
         with self._lock, self._conn() as c:
             c.execute("DELETE FROM uptime_checks WHERE target_id = ?", (target_id,))
             cur = c.execute("DELETE FROM uptime_targets WHERE id = ?", (target_id,))
-            return cur.rowcount > 0
+            return bool(cur.rowcount > 0)
 
     def record_uptime_check(self, target_id: int, status_code: int | None, latency_ms: float | None, ok: bool, error: str | None = None) -> None:
         with self._lock, self._conn() as c:

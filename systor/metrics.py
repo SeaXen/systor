@@ -280,7 +280,7 @@ def read_network_interfaces() -> list[dict]:
     global _prev_net_ifaces, _last_net_ts
     with _METRIC_LOCK:
         try:
-            rows = []
+            rows: list[dict[str, Any]] = []
             cur: dict[str, tuple[int, int]] = {}
             now = time.time()
             elapsed = (now - _last_net_ts) if _last_net_ts else 0.0
@@ -313,7 +313,7 @@ def read_network_interfaces() -> list[dict]:
                 })
             _prev_net_ifaces = cur
             _last_net_ts = now
-            rows.sort(key=lambda r: (r['rx_mbps'] + r['tx_mbps'], r['total_bytes']), reverse=True)
+            rows.sort(key=lambda r: (float(r['rx_mbps']) + float(r['tx_mbps']), int(r['total_bytes'])), reverse=True)
             return rows
         except Exception:
             return []
@@ -356,11 +356,14 @@ def _read_proc_uid(pid: int) -> str:
     try:
         st = os.stat(f"/proc/{pid}")
         uid = st.st_uid
-        import pwd
         try:
-            return pwd.getpwuid(uid).pw_name
-        except KeyError:
-            return str(uid)
+            import pwd
+            getpwuid = getattr(pwd, "getpwuid", None)
+            if callable(getpwuid):
+                return str(getpwuid(uid).pw_name)
+        except (KeyError, ImportError):
+            pass
+        return str(uid)
     except Exception:
         return "?"
 
@@ -391,7 +394,7 @@ def read_top_processes(n: int = 10, by: str = "cpu") -> list[dict]:
         elapsed = now - _last_proc_scan_ts if _last_proc_scan_ts else None
         _last_proc_scan_ts = now
 
-        procs = []
+        procs: list[dict[str, Any]] = []
         try:
             pids = [int(p) for p in os.listdir("/proc") if p.isdigit()]
         except Exception:

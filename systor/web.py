@@ -1,6 +1,7 @@
 """systor web dashboard — Clean Flask app on port 6677 with modular Blueprints."""
 from __future__ import annotations
 import logging
+import os
 import signal
 import time  # noqa: F401
 from pathlib import Path
@@ -201,8 +202,9 @@ def create_app(start_worker: bool = True) -> Flask:
         resp.headers["Service-Worker-Allowed"] = "/"
         return resp
 
-    # Start background cache worker when not running under unit tests
-    if start_worker and not app.config.get("TESTING"):
+    # Start background cache worker when not running under unit tests or supervisor processes
+    is_reloader_parent = "WERKZEUG_RUN_MAIN" in os.environ and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
+    if start_worker and not app.config.get("TESTING") and not is_reloader_parent and not os.environ.get("SYSTOR_NO_WORKERS"):
         start_apps_cache_worker()
         from .services.uptime_service import start_uptime_worker
         start_uptime_worker()

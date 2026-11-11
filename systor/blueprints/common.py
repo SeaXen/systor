@@ -37,7 +37,10 @@ def get_storage() -> Storage:
 
 def get_trusted_proxies() -> str | list[str]:
     cfg = load_config()
-    return cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1")
+    val = cfg.get("web", {}).get("trusted_proxies", "127.0.0.1, ::1")
+    if isinstance(val, (str, list)):
+        return val
+    return str(val)
 
 
 def client_loopback() -> bool:
@@ -295,7 +298,7 @@ def bucket_series_points(rows, limit: int = 600):
     bucket_sec = max(1, int((span + limit - 1) // limit))
     out = []
     cur_key = None
-    cur_vals = []
+    cur_vals: list[float] = []
     cur_ts = first_ts
     for ts, val in rows:
         key = int(ts) // bucket_sec
@@ -325,8 +328,8 @@ def bucket_network_points(rows, limit: int = 600):
     bucket_sec = max(1, int((span + limit - 1) // limit))
     out = []
     cur_key = None
-    rx_vals = []
-    tx_vals = []
+    rx_vals: list[float] = []
+    tx_vals: list[float] = []
     cur_ts = first_ts
     for row in rows:
         ts = int(row["ts"])

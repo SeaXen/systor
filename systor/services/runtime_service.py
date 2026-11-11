@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from ..config import load_config
 from ..metrics import read_top_processes, read_total_memory_mb
@@ -237,8 +238,8 @@ def get_runtime_status() -> dict:
         row = rows[0]
         return {"running": True, "pid": row["pid"], "uptime_sec": row["uptime_sec"]} | pid_stats(row["pid"])
 
-    cloudflare = {"running": False, "pid": None, "uptime_sec": None, "label": "cloudflared"}
-    tailscaled = {"running": False, "pid": None, "uptime_sec": None, "label": "tailscaled"}
+    cloudflare: dict[str, Any] = {"running": False, "pid": None, "uptime_sec": None, "label": "cloudflared"}
+    tailscaled: dict[str, Any] = {"running": False, "pid": None, "uptime_sec": None, "label": "tailscaled"}
     try:
         out = subprocess.run(["ps", "-eo", "pid=,etimes=,comm=,args="], capture_output=True, text=True, timeout=3).stdout.splitlines()
         for line in out:

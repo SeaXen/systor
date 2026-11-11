@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import time
-from typing import Any
+from typing import Any, cast
 
 log = logging.getLogger("systor.services.security_audit")
 
@@ -217,7 +217,7 @@ def get_security_audit(force_refresh: bool = False) -> dict[str, Any]:
     """Return aggregated security audit with in-memory caching."""
     now = time.time()
     if not force_refresh and (now - _AUDIT_CACHE["ts"]) < _CACHE_TTL:
-        return _AUDIT_CACHE["data"]
+        return cast(dict[str, Any], _AUDIT_CACHE["data"])
 
     ports = get_listening_ports()
     fw = get_firewall_status()

@@ -15,6 +15,17 @@ from typing import Any
 log = logging.getLogger("systor.services.ssl")
 
 
+def _parse_dn(dn_tuple: Any) -> dict[str, str]:
+    parts: dict[str, str] = {}
+    if isinstance(dn_tuple, (tuple, list)):
+        for rdn in dn_tuple:
+            if isinstance(rdn, (tuple, list)):
+                for item in rdn:
+                    if isinstance(item, (tuple, list)) and len(item) == 2:
+                        parts[str(item[0])] = str(item[1])
+    return parts
+
+
 def probe_remote_cert(host: str, port: int = 443, timeout: float = 4.0) -> dict[str, Any] | None:
     """Connect to a TLS host and retrieve its certificate details."""
     clean_host = host.strip()
@@ -33,25 +44,30 @@ def probe_remote_cert(host: str, port: int = 443, timeout: float = 4.0) -> dict[
                 if not cert:
                     return None
 
-                not_after_str = cert.get("notAfter")
-                if not not_after_str:
+                not_after_val = cert.get("notAfter")
+                if not isinstance(not_after_val, str):
                     return None
 
                 # Format example: 'May 20 12:00:00 2027 GMT'
-                expire_dt = dt.datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z")
+                expire_dt = dt.datetime.strptime(not_after_val, "%b %d %H:%M:%S %Y %Z")
                 now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
                 days_left = (expire_dt - now).days
 
                 # Issuer organization
-                issuer_parts = dict(x[0] for x in cert.get("issuer", ()))
+                issuer_parts = _parse_dn(cert.get("issuer"))
                 issuer = issuer_parts.get("organizationName") or issuer_parts.get("commonName") or "Unknown"
 
                 # Subject common name
-                sub_parts = dict(x[0] for x in cert.get("subject", ()))
+                sub_parts = _parse_dn(cert.get("subject"))
                 subject = sub_parts.get("commonName") or clean_host
 
                 # SANs (Subject Alternative Names)
-                sans = [item[1] for item in cert.get("subjectAltName", ()) if item[0] == "DNS"]
+                san_tuple = cert.get("subjectAltName", ())
+                sans: list[str] = []
+                if isinstance(san_tuple, (tuple, list)):
+                    for item in san_tuple:
+                        if isinstance(item, (tuple, list)) and len(item) == 2 and item[0] == "DNS":
+                            sans.append(str(item[1]))
 
                 status = "ok" if days_left > 30 else ("warn" if days_left > 7 else "critical")
 

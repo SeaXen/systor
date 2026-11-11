@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 from flask import Blueprint, render_template, request, jsonify, Response, current_app
 from werkzeug.security import generate_password_hash
 
@@ -45,7 +46,7 @@ def build_channel_test_message(channel: str) -> str:
     cpu = snap.get("cpu", {}) or {}
     mem = snap.get("memory", {}) or {}
     disks = snap.get("disks", []) or []
-    worst_disk = max(disks, key=lambda d: d.get("used_pct", 0), default={})
+    worst_disk: dict[str, Any] = max(disks, key=lambda d: d.get("used_pct", 0), default={})
     top_cpu = (read_top_processes(n=1, by="cpu") or [{}])[0]
     host = snap.get("hostname", "systor")
     lines = [

@@ -9,6 +9,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from werkzeug.security import check_password_hash
 
 from ..config import load_config
@@ -334,15 +335,15 @@ def virtual_root_entries() -> list[dict]:
                 continue
     except Exception:
         pass
-    rows.sort(key=lambda r: (r.get("type") != "dir", r.get("name", "").lower()))
+    rows.sort(key=lambda r: (r.get("type") != "dir", str(r.get("name", "")).lower()))
     return rows
 
 
 def quick_storage_analysis(path: Path, limit: int) -> dict:
-    files = []
-    folders = []
-    old = []
-    type_map = {}
+    files: list[dict[str, Any]] = []
+    folders: list[dict[str, Any]] = []
+    old: list[dict[str, Any]] = []
+    type_map: dict[str, dict[str, Any]] = {}
     scanned = 0
     now = time.time()
     if str(path) == "/":
@@ -373,7 +374,7 @@ def quick_storage_analysis(path: Path, limit: int) -> dict:
     files.sort(key=lambda x: x["size"], reverse=True)
     folders.sort(key=lambda x: x["size"], reverse=True)
     old.sort(key=lambda x: (x["age_days"], x["size"]), reverse=True)
-    dup_map = {}
+    dup_map: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for rec in files:
         key = (Path(rec["path"]).name.lower(), rec["size"])
         dup_map.setdefault(key, []).append(rec)

@@ -7,7 +7,7 @@ import argparse
 import json
 import sys
 
-from .config import load_config, save_config
+from .config import load_config, save_config, validate_config
 from .metrics import collect_snapshot
 from .notifier import send_telegram, send_discord
 from .storage import Storage
@@ -153,6 +153,22 @@ def cmd_config_show(args):
     print(json.dumps(cfg, indent=2))
 
 
+def cmd_config_check(args):
+    """Validate active configuration schema and values."""
+    cfg = load_config()
+    is_valid, errors, warnings = validate_config(cfg)
+    for w in warnings:
+        print(f"⚠️  Warning: {w}")
+    for e in errors:
+        print(f"❌ Error: {e}")
+    if is_valid:
+        print("✓ Configuration is valid.")
+        sys.exit(0)
+    else:
+        print(f"❌ Configuration check failed with {len(errors)} error(s).")
+        sys.exit(1)
+
+
 def cmd_passwd(args):
     """Set or change the admin password from CLI."""
     import getpass
@@ -228,6 +244,8 @@ def main():
     cs_sub = cs.add_subparsers(dest="config_cmd", required=True)
     cs_show = cs_sub.add_parser("show", help="dump current config as JSON")
     cs_show.set_defaults(func=cmd_config_show)
+    cs_check = cs_sub.add_parser("check", help="validate config schema and values")
+    cs_check.set_defaults(func=cmd_config_check)
 
     args = p.parse_args()
     args.func(args)

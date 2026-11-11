@@ -65,7 +65,7 @@ def get_client_ip(req, trusted_networks: list[ipaddress.IPv4Network | ipaddress.
 
     # Peer is a trusted proxy. Check proxy-specific headers in priority order:
     # 1. CF-Connecting-IP (from Cloudflare)
-    cf_ip = req.headers.get("CF-Connecting-IP", "").strip()
+    cf_ip = str(req.headers.get("CF-Connecting-IP", "")).strip()
     if cf_ip:
         try:
             ipaddress.ip_address(cf_ip)
@@ -74,7 +74,7 @@ def get_client_ip(req, trusted_networks: list[ipaddress.IPv4Network | ipaddress.
             pass
 
     # 2. X-Forwarded-For: Client, Proxy1, Proxy2...
-    xff = req.headers.get("X-Forwarded-For", "").strip()
+    xff = str(req.headers.get("X-Forwarded-For", "")).strip()
     if xff:
         # Walk from right to left to find the first untrusted IP
         hops = [h.strip() for h in xff.split(",") if h.strip()]

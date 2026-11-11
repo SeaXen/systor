@@ -11,7 +11,7 @@ import os
 import shutil
 import subprocess
 import time
-from typing import Any
+from typing import Any, cast
 
 log = logging.getLogger("systor.sensors")
 
@@ -191,7 +191,7 @@ def get_all_sensors(force_refresh: bool = False) -> dict[str, Any]:
     """Aggregate all hardware sensors with lightweight thread-safe caching."""
     now = time.time()
     if not force_refresh and (now - _SENSORS_CACHE["ts"]) < _CACHE_TTL:
-        return _SENSORS_CACHE["data"]
+        return cast(dict[str, Any], _SENSORS_CACHE["data"])
 
     gpu_list = get_gpu_metrics()
     rpi_info = get_rpi_metrics()

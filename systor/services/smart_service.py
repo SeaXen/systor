@@ -12,7 +12,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 log = logging.getLogger("systor.services.smart")
 
@@ -26,7 +26,7 @@ def get_drive_health(force_refresh: bool = False) -> list[dict[str, Any]]:
     now = time.time()
     with _smart_lock:
         if not force_refresh and (now - _smart_cache["ts"]) < _CACHE_TTL_SEC and _smart_cache["drives"]:
-            return _smart_cache["drives"]
+            return cast(list[dict[str, Any]], _smart_cache["drives"])
 
     smartctl_bin = shutil.which("smartctl")
     drives: list[dict[str, Any]] = []

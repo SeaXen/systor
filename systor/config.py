@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 APP_NAME = "systor"
 
@@ -162,7 +162,7 @@ def _yaml_to_dict(text: str) -> dict:
                         except Exception:
                             val = v
                 elif v.lower() in ("true", "false"):
-                    val: Any = v.lower() == "true"
+                    val = v.lower() == "true"
                 else:
                     try:
                         val = int(v)
@@ -191,7 +191,7 @@ def _apply_env(cfg: dict) -> None:
     For threshold metrics (which are dicts with value/duration_min/enabled),
     the SYSTOR_CPU_LOAD etc. env vars set the "value" field.
     """
-    env_map = {
+    env_map: dict[str, tuple[str, str, Callable[[Any], Any], str | None]] = {
         "SYSTOR_POLL_INTERVAL":          ("collector", "poll_interval_sec", int, None),
         "SYSTOR_RETENTION_DAYS":         ("collector", "retention_days", int, None),
         "SYSTOR_CPU_LOAD":               ("thresholds", "cpu_load_1m", float, "value"),
@@ -217,11 +217,11 @@ def _apply_env(cfg: dict) -> None:
         "SYSTOR_WEB_HOST":               ("web", "host", str, None),
         "SYSTOR_WEB_TRUST_CGNAT":        ("web", "trust_cgnat", lambda v: str(v).lower() in ("1", "true", "yes", "on"), None),
     }
-    for env_key, (section, key, cast, sub) in env_map.items():
+    for env_key, (section, key, converter, sub) in env_map.items():
         v = os.environ.get(env_key)
         if v is not None:
             try:
-                casted = cast(v)
+                casted = converter(v)
                 if sub is not None and isinstance(cfg.get(section, {}).get(key), dict):
                     cfg[section][key][sub] = casted
                 else:
@@ -283,12 +283,12 @@ def _migrate_thresholds(cfg: dict) -> None:
     cfg["thresholds"] = new_th
 
 
-def load_config() -> dict:
+def load_config() -> dict[str, Any]:
     """Load config with env overrides. Returns a fresh dict each call.
 
     Migrates old flat-threshold schema to the new dict schema on the fly.
     """
-    cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
+    cfg: dict[str, Any] = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
     for path in CONFIG_PATHS:
         if path.exists() and path.is_file():
             try:
@@ -301,6 +301,103 @@ def load_config() -> dict:
     _migrate_thresholds(cfg)
     _apply_env(cfg)
     return cfg
+
+
+def validate_config(cfg: dict[str, Any] | None = None) -> tuple[bool, list[str], list[str]]:
+    """Validate configuration schema, value types, and bounds.
+
+    Returns (is_valid, errors, warnings).
+    """
+    if cfg is None:
+        cfg = load_config()
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    # 1. Section checks
+    known_sections = set(DEFAULT_CONFIG.keys())
+    for sec in cfg.keys():
+        if sec not in known_sections:
+            warnings.append(f"Unknown configuration section '{sec}'")
+
+    # 2. Collector
+    col = cfg.get("collector", {})
+    if isinstance(col, dict):
+        poll = col.get("poll_interval_sec")
+        if not isinstance(poll, (int, float)) or poll < 1:
+            errors.append("collector.poll_interval_sec must be an integer >= 1")
+        ret = col.get("retention_days")
+        if not isinstance(ret, (int, float)) or ret < 1:
+            errors.append("collector.retention_days must be an integer >= 1")
+        rollup_h = col.get("rollup_after_hours")
+        if not isinstance(rollup_h, (int, float)) or rollup_h < 1:
+            errors.append("collector.rollup_after_hours must be an integer >= 1")
+        rollup_d = col.get("rollup_retention_days")
+        if not isinstance(rollup_d, (int, float)) or rollup_d < 1:
+            errors.append("collector.rollup_retention_days must be an integer >= 1")
+    else:
+        errors.append("collector section must be a dictionary")
+
+    # 3. Web
+    web = cfg.get("web", {})
+    if isinstance(web, dict):
+        port = web.get("port")
+        if not isinstance(port, int) or not (1 <= port <= 65535):
+            errors.append("web.port must be an integer between 1 and 65535")
+        host = web.get("host")
+        if not isinstance(host, str) or not host.strip():
+            errors.append("web.host must be a non-empty string")
+    else:
+        errors.append("web section must be a dictionary")
+
+    # 4. Auth
+    auth = cfg.get("auth", {})
+    if isinstance(auth, dict):
+        if not isinstance(auth.get("enabled", False), bool):
+            errors.append("auth.enabled must be a boolean")
+        max_fails = auth.get("max_fails")
+        if max_fails is not None and (not isinstance(max_fails, int) or max_fails < 1):
+            errors.append("auth.max_fails must be an integer >= 1")
+        cooldown = auth.get("cooldown_sec")
+        if cooldown is not None and (not isinstance(cooldown, int) or cooldown < 0):
+            errors.append("auth.cooldown_sec must be an integer >= 0")
+    else:
+        errors.append("auth section must be a dictionary")
+
+    # 5. Thresholds
+    th = cfg.get("thresholds", {})
+    if isinstance(th, dict):
+        for k, v in th.items():
+            if k == "cooldown_sec":
+                if not isinstance(v, (int, float)) or v < 0:
+                    errors.append("thresholds.cooldown_sec must be a number >= 0")
+            elif isinstance(v, dict):
+                val = v.get("value")
+                if val is not None and not isinstance(val, (int, float)):
+                    errors.append(f"thresholds.{k}.value must be numeric")
+                dur = v.get("duration_min")
+                if dur is not None and (not isinstance(dur, (int, float)) or dur < 0):
+                    errors.append(f"thresholds.{k}.duration_min must be >= 0")
+    else:
+        errors.append("thresholds section must be a dictionary")
+
+    # 6. Speed
+    speed = cfg.get("speed", {})
+    if isinstance(speed, dict):
+        interval = speed.get("auto_interval_min")
+        if interval is not None and (not isinstance(interval, (int, float)) or interval < 5):
+            warnings.append("speed.auto_interval_min is recommended to be >= 5 minutes")
+    else:
+        errors.append("speed section must be a dictionary")
+
+    # 7. Logging
+    logging_sec = cfg.get("logging", {})
+    if isinstance(logging_sec, dict):
+        lvl = str(logging_sec.get("level", "INFO")).upper()
+        if lvl not in ("DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL"):
+            warnings.append(f"logging.level '{lvl}' is not a standard log level")
+
+    return (len(errors) == 0, errors, warnings)
 
 
 def save_config(cfg: dict, path: Path | None = None) -> Path:

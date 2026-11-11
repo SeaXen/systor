@@ -41,7 +41,7 @@ def send_telegram_message(bot_token: str, chat_id: str, text: str, parse_mode: s
     )
     try:
         with safe_urlopen(req, timeout=10) as resp:
-            return resp.status == 200
+            return bool(resp.status == 200)
     except Exception as e:
         log.warning("Telegram send failed: %s", e)
         return False
