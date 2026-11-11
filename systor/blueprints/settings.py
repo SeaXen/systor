@@ -689,9 +689,14 @@ def api_backup_export():
     if auth_enabled() and not auth_logged_in():
         return jsonify({"ok": False, "error": "Admin login required for backup export"}), 401
 
+    include_secrets = request.args.get("include_secrets") in ("1", "true")
     from ..services.backup_service import create_backup_archive
     storage = get_storage()
-    archive_bytes, filename = create_backup_archive(storage, custom_note=request.args.get("note", ""))
+    archive_bytes, filename = create_backup_archive(
+        storage,
+        custom_note=request.args.get("note", ""),
+        include_secrets=include_secrets,
+    )
     return Response(
         archive_bytes,
         mimetype="application/gzip",
@@ -707,14 +712,23 @@ def api_backup_restore():
     if auth_enabled() and not auth_logged_in():
         return jsonify({"ok": False, "error": "Admin login required for backup restore"}), 401
 
+    # S05: Enforce upload size bound
+    MAX_BACKUP_SIZE = 256 * 1024 * 1024
+    if request.content_length and request.content_length > MAX_BACKUP_SIZE:
+        return jsonify({"ok": False, "error": "Backup archive exceeds maximum permitted size (256 MB)"}), 413
+
     file = request.files.get("backup_file")
     if not file:
         return jsonify({"ok": False, "error": "No backup archive file provided"}), 400
 
-    archive_bytes = file.read()
+    archive_bytes = file.read(MAX_BACKUP_SIZE + 1)
+    if len(archive_bytes) > MAX_BACKUP_SIZE:
+        return jsonify({"ok": False, "error": "Backup archive exceeds maximum permitted size (256 MB)"}), 413
+
+    restore_secrets = request.form.get("restore_secrets") in ("1", "true")
     from ..services.backup_service import restore_backup_archive
     storage = get_storage()
-    ok, msg = restore_backup_archive(archive_bytes, storage)
+    ok, msg = restore_backup_archive(archive_bytes, storage, restore_secrets=restore_secrets)
     status = 200 if ok else 400
     return jsonify({"ok": ok, "message": msg}), status
 
