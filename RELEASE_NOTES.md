@@ -1,72 +1,36 @@
-# Release Notes: Systor v1.1.0
+# Release Notes: Systor v1.2.0
 
-🎉 **Systor v1.1.0** is officially released! 
+🎉 **Systor v1.2.0** is officially released!
 
-Systor is a lightweight Linux server and homelab monitoring system featuring a responsive web dashboard, persistent sustained-threshold alerts, SMART disk insights, speedtesting, and one-click disaster recovery.
-
----
-
-### Highlights in v1.1.0
-
-#### 🎨 WCAG AA Certified Design System & 3-Way Theme Switcher
-- **Warm Dark (`warm-dark`)**: Neutral slate background (`#0b0b0b`), elevated panels (`#141414`), crisp borders (`#262626`), and signature teal accents (`#1d9e75`).
-- **Paper Light (`light`)**: Warm paper background (`#f9f9f7`), crisp white panels (`#ffffff`), dark high-contrast typography (`#161616`), and theme-adapted accent tokens.
-- **Classic Dark (`classic-dark`)**: Preserved deep GitHub navy (`#0f1117`) and blue accents (`#58a6ff`).
-- **Zero Contrast Failures**: Fully compliant with WCAG AA across all three themes (0 contrast failures across 2,600+ text nodes).
-- **Responsive Layout**: Zero horizontal overflow from 390px mobile viewports up to 1440px ultra-wide screens.
-- **Pure Native Canvas Charts**: Hand-rolled, zero-dependency HTML5 canvas charts dynamically responsive to theme token changes.
-
-#### 🛡️ Full-Stack Security Hardening
-- **Double-Submit CSRF Protection**: Cryptographically secure double-submit CSRF cookie/header validation (`systor_csrf`) on all non-GET API and mutation requests.
-- **Session Hardening**: Cookies enforce `SameSite=Lax` and `HttpOnly=True`.
-- **Storage Isolation**: Storage browsing and previewing strictly restricted to configured `allowed_roots`, rejecting unauthorized paths with HTTP 403.
-- **Tar-Slip Vulnerability Elimination**: Backup restoration strictly extracts with safety filters, preventing directory traversal via malicious archives.
-- **Emergency Console Security**: Removed fallback default credentials. Terminal access requires an explicit `auth.password_hash` with per-IP rate limiting and ephemeral session tokens.
-- **Reverse Proxy Protection**: Enforced `trusted_proxies` validation against header spoofing on public reverse-proxy setups.
-
-#### ⚡ Performance & High Concurrency Reliability
-- **Multi-threaded Web Server**: Waitress thread pool configured with `threads=16` for responsive multi-client concurrency.
-- **Subprocess Limiting**: Process-wide `BoundedSemaphore(2)` prevents external CLI tools (Ookla speedtest, docker stats) from saturating CPU.
-- **SSE Stream Concurrency Cap**: Live log streaming capped at 2 concurrent streams to protect host resources.
-- **SQLite Concurrency & Data Integrity**: Database operates in WAL mode with connection-level `PRAGMA busy_timeout=5000` and thread-safe `threading.RLock()`.
-- **Accurate Metric Sampling**: Dynamic sysconf page-size derivation prevents memory calculation errors on 64 KB page-size architectures (arm64).
-
-#### 🐳 Hardened Containers & Systemd Sandboxing
-- **Least-Privilege Docker**: `docker.sock` removed from default compose files (opt-in profile). Added `security_opt: ["no-new-privileges:true"]`.
-- **Systemd Sandboxing**: Added `NoNewPrivileges=true`, `PrivateTmp=true`, `ProtectSystem=strict`, `ProtectHome=true`, and explicit `ReadWritePaths`.
+Systor is the ultra-lightweight, zero-external-dependency, privacy-first Linux system monitor designed for single-board computers (Raspberry Pi), homelabs, VPS instances, and bare-metal production servers.
 
 ---
 
-### Verification & Testing Suite
+### Highlights in v1.2.0
 
-- **107 Automated Pytest Unit & Integration Tests Passed (100%)**
-- **51 Playwright E2E Multi-Viewport Checks Passed (100%)**
-- **Automated Design & Accessibility Audit Passed**:
-  - `0` Contrast Failures in Warm Dark (735 nodes checked)
-  - `0` Contrast Failures in Paper Light (726 nodes checked)
-  - `0` Contrast Failures in Classic Dark (735 nodes checked)
-  - `0` Horizontal Overflow across all 27 page/viewport combinations
-  - `0` Console Errors across all 27 page/viewport combinations
-  - `51` Semantic `<h2>` Section Headings
-  - `100%` Form Control Labeling (`<label for="...">`)
-  - Terminal Dialog Focus Trap & Restoration Verified
+#### 🛡️ Complete Security Hardening & Zero-Privilege Containerization
+- **SSRF Defense in Probes**: All outgoing HTTP requests (uptime monitor, webhook testers) route through `systor.notifier.safe_urlopen` which resolves DNS hostnames before socket connection and strictly blocks loopback (`127.0.0.0/8`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local, and cloud instance metadata services (`169.254.169.254`).
+- **Cryptographically Secure Session Secrets**: Guaranteed 32-byte session secrets auto-generated with `0600` permissions on disk.
+- **Strict Content Security Policy**: `default-src 'self'; script-src 'self'; object-src 'none'`. 100% of inline scripts extracted into modular controllers under `/static/js/pages/`.
+- **Zero-Privilege Docker Runtime**: Runs as dedicated non-root user `10001:10001`, `cap_drop: ALL`, `no-new-privileges: true`, and `read_only: true` root filesystem.
+- **Subprocess Shell Injection Elimination**: Replaced all shell invocations with discrete tokenized argument vectors (`shell=False`).
+- **Atomic File Writes**: Configuration saved atomically via temporary file replacement and fsync.
 
----
+#### 🎨 100% WCAG 2.2 AA Contrast & Accessible UI Polish
+- **Zero-Failure WCAG 2.2 AA Contrast**: 0 contrast failures across all 3 themes (warm-dark, paper light, classic-dark) verified via pixel-accurate headless Chromium testing.
+- **Accessible Custom Dialogs (`window.SystorDialog`)**: Replaced native browser `alert()`, `confirm()`, and `prompt()` with keyboard-accessible, focus-trapped modal dialogs.
+- **Mobile Ergonomics**: Mobile bottom navigation bar and slide-up page drawer for viewports under 700px.
+- **Minimum Font Size Floor**: Enforced >= 11px font size floor across all styles.
+- **Zero Hardcoded Hex in Templates**: Semantic CSS tokens used exclusively across all HTML templates.
 
-### Installation Quick-Start
+#### 🏗️ Architecture Decoupling & Strict Typing
+- **Decoupled Blueprint Architecture**: Blueprints delegate data access and hardware queries to dedicated service modules.
+- **Strict Typing**: 0 mypy errors across all 33 source files.
+- **Config Schema Validation & CLI**: Hand-rolled schema validator and `systor config check` CLI subcommand.
+- **Background Worker Safety**: Thread-safe worker initialization preventing duplicate processes under multi-process WSGI reloaders.
 
-#### Option A: Automated Remote Installer (Bare-Metal / VPS / Raspberry Pi)
-```bash
-curl -sSL https://raw.githubusercontent.com/SeaXen/systor/main/install.sh | sudo bash
-```
-
-#### Option B: Docker Compose
-```bash
-docker compose up -d
-```
-
-#### Option C: Python PIP
-```bash
-pip install .
-systor serve all
-```
+#### 🧪 Testing & Verification
+- **Test Suite Expansion**: 204 automated unit and integration tests passing.
+- **Enforced Coverage Gate**: Code coverage elevated to **80.29%** enforced with `--cov-fail-under=80`.
+- **Database Schema Upgrade Safe**: Automated tests verifying zero data loss during migrations from earlier database versions.
+- **Multi-Tool CI Pipeline**: GitHub Actions workflow executing pytest, ruff, mypy, bandit, and pip-audit.

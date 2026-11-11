@@ -163,6 +163,14 @@ class TestCliAndPackaging(unittest.TestCase):
         self.assertNotIn("style.min.css", sw_text)
         self.assertIn("/api/", sw_text)
 
+    def test_pyproject_package_data_includes_pages_and_subdirs(self):
+        """Ensure pyproject.toml package-data recursively includes all page JS and CSS."""
+        repo_root = Path(__file__).resolve().parent.parent
+        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+        self.assertIn('"static/js/**/*.js"', pyproject_text)
+        self.assertIn('"static/css/**/*.css"', pyproject_text)
+        self.assertIn('"templates/**/*.html"', pyproject_text)
+
 
 if __name__ == "__main__":
     unittest.main()

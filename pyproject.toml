@@ -53,8 +53,11 @@ exclude = ["tests*", "tools*"]
 [tool.setuptools.package-data]
 systor = [
     "templates/*.html",
+    "templates/**/*.html",
     "static/css/*.css",
+    "static/css/**/*.css",
     "static/js/*.js",
+    "static/js/**/*.js",
     "static/img/*",
     "static/*.json",
     "static/*.js",
