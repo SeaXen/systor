@@ -152,7 +152,7 @@
   // Register PWA Service Worker for offline shell and asset caching
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}").catch(function() {});
+      navigator.serviceWorker.register("/sw.js").catch(function() {});
     });
   }
 })();

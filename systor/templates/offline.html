@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Offline — systor{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:3rem auto;text-align:center;padding:2.5rem 1.5rem;">
+  <div style="font-size:3rem;margin-bottom:1rem;color:var(--text-muted);">📡</div>
+  <h2 style="margin:0 0 0.5rem;">Connection Unavailable</h2>
+  <p style="color:var(--text-muted);margin-bottom:1.5rem;font-size:0.95rem;">
+    Systor cannot reach the server right now. Live system telemetry and actions are paused while offline.
+  </p>
+  <button type="button" class="btn btn-primary" onclick="window.location.reload()">Retry Connection</button>
+</div>
+{% endblock %}

@@ -112,7 +112,7 @@ def create_app(start_worker: bool = True) -> Flask:
 
         # Exempt static assets, health check, and setup/login pages from setup/auth gates
         if (
-            path in ("/health", "/metrics", "/setup", "/login", "/logout")
+            path in ("/health", "/metrics", "/setup", "/login", "/logout", "/sw.js", "/offline")
             or path.startswith("/static/")
             or path in ("/api/setup", "/favicon.ico", "/apple-touch-icon.png")
         ):
@@ -193,6 +193,13 @@ def create_app(start_worker: bool = True) -> Flask:
             abort(404)
 
     register_blueprints(app)
+
+    @app.route("/sw.js")
+    def service_worker_root():
+        resp = app.send_static_file("sw.js")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Service-Worker-Allowed"] = "/"
+        return resp
 
     # Start background cache worker when not running under unit tests
     if start_worker and not app.config.get("TESTING"):

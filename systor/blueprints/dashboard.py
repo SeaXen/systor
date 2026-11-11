@@ -25,6 +25,12 @@ def page_dashboard():
     return render_template("dashboard.html", cfg=cfg)
 
 
+@dashboard_bp.route("/offline", endpoint="page_offline")
+def page_offline():
+    cfg = load_config()
+    return render_template("offline.html", cfg=cfg)
+
+
 def _clean_config(cfg: dict) -> dict:
     if not isinstance(cfg, dict):
         return cfg
