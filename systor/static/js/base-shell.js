@@ -61,9 +61,9 @@
   // --- Theme Controller & Synchronizer ---
   const THEME_ORDER = ['warm-dark', 'light', 'classic-dark'];
   const THEME_METAS = {
-    'warm-dark':    { icon: '🌙', label: 'Warm Dark', color: '#0b0b0b', scheme: 'dark' },
-    'light':        { icon: '☀', label: 'Paper Light', color: '#f9f9f7', scheme: 'light' },
-    'classic-dark': { icon: '🌌', label: 'Classic Dark', color: '#0f1117', scheme: 'dark' }
+    'warm-dark':    { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg>', label: 'Warm Dark', color: '#0b0b0b', scheme: 'dark' },
+    'light':        { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>', label: 'Paper Light', color: '#f9f9f7', scheme: 'light' },
+    'classic-dark': { icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>', label: 'Classic Dark', color: '#0f1117', scheme: 'dark' }
   };
 
   function updateThemeUI(theme) {
@@ -73,7 +73,7 @@
     const btn = document.getElementById('theme-toggle-btn');
     const metaColor = document.querySelector('meta[name="theme-color"]');
 
-    if (iconEl) iconEl.textContent = meta.icon;
+    if (iconEl) iconEl.innerHTML = meta.icon;
     if (labelEl) labelEl.textContent = meta.label;
     if (btn) {
       btn.title = `Theme: ${meta.label} (click to switch)`;

@@ -48,14 +48,15 @@
   --purple:          #a78bfa;
   --cyan:            #2dd4bf;
 
-  /* Chart Lines (>= 3:1 on dark) */
-  --chart-cpu:   #22d3ee;
-  --chart-ram:   #ff6b8a;
-  --chart-disk:  #f6c453;
-  --chart-disk2: #ffb347;
-  --chart-net:   #3fb950;
-  --chart-load:  #58a6ff;
-  --chart-alt:   #bc8cff;
+  /* Chart lines: one teal lead, the rest neutral steps of the ramp.
+     Semantic red is reserved for warnings. */
+  --chart-cpu:   #2dd4bf;
+  --chart-ram:   #b8b5ac;
+  --chart-disk:  #8f8c84;
+  --chart-disk2: #65635e;
+  --chart-net:   #cbc9c1;
+  --chart-load:  #9d9a92;
+  --chart-alt:   #6f6d67;
   --chart-warn:  #f85149;
   --chart-grid:  rgba(255, 255, 255, 0.08);
   --chart-label: #a3a199;
@@ -100,12 +101,12 @@
   --bar-fill-disk:      var(--chart-disk);
 
   /* Universal Layout Rhythm & Spacing Tokens */
-  --gap-page:        10px;    /* Spacing between major page blocks & toolbars */
-  --gap-grid:        10px;    /* Consistent universal gap between all major cards & grids */
+  --gap-page:        12px;    /* Spacing between major page blocks & toolbars */
+  --gap-grid:        12px;    /* Consistent universal gap between all major cards & grids */
   --gap-card-inner:  8px;     /* Gap between sub-elements inside cards */
-  --gap-controls:    6px;     /* Gap between buttons, inputs, pills */
+  --gap-controls:    8px;     /* Gap between buttons, inputs, pills */
   --card-pad-y:      12px;    /* Card vertical padding */
-  --card-pad-x:      14px;    /* Card horizontal padding */
+  --card-pad-x:      16px;    /* Card horizontal padding */
 
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -154,13 +155,13 @@
   --cyan:            #0369a1;
 
   /* Chart Lines & Accents (verified >= 4.5:1 on white #ffffff and #f9f9f7) */
-  --chart-cpu:   #0369a1;   /* 5.5:1 */
-  --chart-ram:   #be123c;   /* 5.8:1 */
-  --chart-disk:  #854d0e;   /* 5.9:1 */
-  --chart-disk2: #9a3412;   /* 6.1:1 */
-  --chart-net:   #15803d;   /* 5.3:1 */
-  --chart-load:  #1d4ed8;   /* 6.2:1 */
-  --chart-alt:   #6b21a8;   /* 8.1:1 */
+  --chart-cpu:   #0f766e;   /* teal lead, 5.4:1 */
+  --chart-ram:   #57564f;   /* neutral steps, 7:1 and up */
+  --chart-disk:  #6b6a62;
+  --chart-disk2: #85847b;
+  --chart-net:   #42413c;
+  --chart-load:  #606059;
+  --chart-alt:   #929087;
   --chart-warn:  #b91c1c;   /* 6.4:1 */
 
   /* Chart Furniture */

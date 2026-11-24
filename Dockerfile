@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir --upgrade pip build
 
 COPY pyproject.toml README.md ./
 COPY systor/ ./systor/
-RUN python -m build --wheel --outdir /wheels
+RUN pip wheel --no-cache-dir --wheel-dir /wheels .
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime. Runs as a dedicated non-root system user.
