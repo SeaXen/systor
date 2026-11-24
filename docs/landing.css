@@ -29,9 +29,6 @@ body {
   line-height: 1.55;
   color: var(--text);
   background: var(--bg);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(31, 111, 235, 0.18), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(88, 166, 255, 0.08), transparent);
 }
 
 a { color: var(--blue); text-decoration: none; }
@@ -44,8 +41,7 @@ a:hover { text-decoration: underline; }
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(15, 17, 23, 0.85);
-  backdrop-filter: blur(10px);
+  background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
 }
 .site-nav .wrap {
@@ -88,7 +84,7 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
 }
 .nav-links a.cta {
-  background: linear-gradient(180deg, var(--blue-2) 0%, #1a4f9c 100%);
+  background: var(--blue-2);
   border-color: var(--blue);
   color: #fff;
 }
@@ -148,10 +144,9 @@ a:hover { text-decoration: underline; }
 }
 .btn:hover { text-decoration: none; transform: translateY(-1px); }
 .btn-primary {
-  background: linear-gradient(180deg, var(--blue-2) 0%, #1a4f9c 100%);
+  background: var(--blue-2);
   border-color: var(--blue);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(31, 111, 235, 0.25);
 }
 .btn-ghost {
   background: var(--bg-elev);
