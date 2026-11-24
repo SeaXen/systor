@@ -1,5 +1,6 @@
 """systor web dashboard — Clean Flask app on port 6677 with modular Blueprints."""
 from __future__ import annotations
+import gzip
 import logging
 import os
 import signal
@@ -103,6 +104,29 @@ def create_app(start_worker: bool = True) -> Flask:
             "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
             f"style-src 'self' '{'unsafe-' + 'inline'}'; script-src 'self';"
         )
+
+        # Compress text responses so the dashboard stays light over slow links.
+        compressible = {
+            "text/css", "text/html", "text/plain", "image/svg+xml",
+            "application/javascript", "application/json",
+        }
+        if (
+            request.method == "GET"
+            and resp.status_code == 200
+            and not resp.headers.get("Content-Encoding")
+            and resp.mimetype in compressible
+            and "gzip" in request.headers.get("Accept-Encoding", "").lower()
+        ):
+            resp.direct_passthrough = False
+            body = resp.get_data()
+            if len(body) >= 1024:
+                packed = gzip.compress(body, compresslevel=6)
+                resp.set_data(packed)
+                resp.headers["Content-Encoding"] = "gzip"
+                resp.headers["Content-Length"] = str(len(packed))
+                vary = resp.headers.get("Vary", "")
+                if "Accept-Encoding" not in vary:
+                    resp.headers["Vary"] = (vary + ", Accept-Encoding").strip(", ")
         return resp
 
     @app.before_request
