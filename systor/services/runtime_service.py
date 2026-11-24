@@ -1,6 +1,7 @@
 """Runtime inspection, process metrics, and Docker/Host monitoring service."""
 from __future__ import annotations
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -211,6 +212,54 @@ def pid_stats(pid: int | None) -> dict:
         return {"cpu_percent": None, "rss_mb": None, "vsz_mb": None}
 
 
+def _proc_process_rows() -> list[dict]:
+    """Read process rows from /proc, so runtime stats work without procps."""
+    rows: list[dict] = []
+    try:
+        uptime = float(Path("/proc/uptime").read_text().split()[0])
+        hz = os.sysconf("SC_CLK_TCK")
+        page = os.sysconf("SC_PAGE_SIZE")
+    except Exception:
+        return rows
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            raw = (entry / "cmdline").read_bytes().split(b"\0")
+            args = b" ".join(x for x in raw if x).decode(errors="replace").strip()
+            if not args:
+                continue
+            stat = (entry / "stat").read_text()
+            fields = stat[stat.rfind(")") + 2:].split()
+            starttime = int(fields[19])
+            utime, stime = int(fields[11]), int(fields[12])
+            vsz, rss = int(fields[20]), int(fields[21])
+            secs = max(1, int(uptime - starttime / hz))
+            rows.append({
+                "pid": int(entry.name),
+                "uptime_sec": secs,
+                "args": args,
+                "cpu_percent": round((utime + stime) / hz / secs * 100, 1),
+                "rss_mb": round(rss * page / 1048576, 1),
+                "vsz_mb": round(vsz / 1024, 1),
+            })
+        except (OSError, ValueError, IndexError):
+            continue
+    return rows
+
+
+def find_systor_process(component: str) -> list[dict]:
+    """Match `systor serve <component>` and the combined `systor serve all`."""
+    rows = []
+    for row in _proc_process_rows():
+        args = row["args"]
+        if "/usr/bin/tini" in args or args.startswith("tini "):
+            continue
+        if f"systor serve {component}" in args or "systor serve all" in args:
+            rows.append(row)
+    return sorted(rows, key=lambda r: r.get("rss_mb") or 0, reverse=True)
+
+
 def file_size_mb(path: Path) -> float:
     try:
         return round(path.stat().st_size / (1024 * 1024), 2)
@@ -231,12 +280,19 @@ def get_runtime_status() -> dict:
     py = sys.executable
     web_rows = find_exact_processes(["python3 -m systor serve web", f"{py} -m systor serve web"])
     collector_rows = find_exact_processes(["python3 -m systor serve collector", f"{py} -m systor serve collector"])
+    if not web_rows:
+        web_rows = find_systor_process("web")
+    if not collector_rows:
+        collector_rows = find_systor_process("collector")
 
     def _proc_row(rows: list[dict]) -> dict:
         if not rows:
             return {"running": False, "pid": None, "uptime_sec": None, "cpu_percent": None, "rss_mb": None, "vsz_mb": None}
         row = rows[0]
-        return {"running": True, "pid": row["pid"], "uptime_sec": row["uptime_sec"]} | pid_stats(row["pid"])
+        stats = pid_stats(row["pid"])
+        if stats.get("cpu_percent") is None:
+            stats = {k: row.get(k) for k in ("cpu_percent", "rss_mb", "vsz_mb")}
+        return {"running": True, "pid": row["pid"], "uptime_sec": row["uptime_sec"]} | stats
 
     cloudflare: dict[str, Any] = {"running": False, "pid": None, "uptime_sec": None, "label": "cloudflared"}
     tailscaled: dict[str, Any] = {"running": False, "pid": None, "uptime_sec": None, "label": "tailscaled"}

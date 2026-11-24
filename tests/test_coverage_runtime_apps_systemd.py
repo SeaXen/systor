@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock
 from systor.services.runtime_service import (
     _parse_docker_size_mb, get_docker_apps, find_exact_processes,
     pid_stats, file_size_mb, systor_storage_state, get_runtime_status,
+    _proc_process_rows, find_systor_process,
     get_compose_stacks, restart_compose_project, _docker_cache
 )
 from systor.services.systemd_service import (
@@ -215,3 +216,12 @@ def test_apps_blueprint_logs_and_terminal(monkeypatch):
         # /api/terminal/exec - invalid token
         resp = client.post("/api/terminal/exec", json={"token": "fake-token", "command": "uptime"}, headers={"X-Forwarded-For": "127.0.0.1"})
         assert resp.status_code == 400
+
+
+def test_proc_fallback_reports_runtime_stats():
+    """Slim containers have no ps; /proc rows still carry CPU and RSS."""
+    rows = _proc_process_rows()
+    assert rows
+    row = rows[0]
+    assert {"pid", "uptime_sec", "args", "cpu_percent", "rss_mb", "vsz_mb"} <= set(row)
+    assert isinstance(find_systor_process("web"), list)
