@@ -21,7 +21,11 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq git
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        run: |
+          REPO_URL="${GITHUB_SERVER_URL:-http://localhost:3002}/${GITHUB_REPOSITORY:-sagar/systor}.git"
+          git clone --quiet "$REPO_URL" .
+          git checkout --quiet "${GITHUB_SHA:-main}"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -50,7 +54,11 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq git
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        run: |
+          REPO_URL="${GITHUB_SERVER_URL:-http://localhost:3002}/${GITHUB_REPOSITORY:-sagar/systor}.git"
+          git clone --quiet "$REPO_URL" .
+          git checkout --quiet "${GITHUB_SHA:-main}"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -75,7 +83,11 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq git
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        run: |
+          REPO_URL="${GITHUB_SERVER_URL:-http://localhost:3002}/${GITHUB_REPOSITORY:-sagar/systor}.git"
+          git clone --quiet "$REPO_URL" .
+          git checkout --quiet "${GITHUB_SHA:-main}"
       - name: Install dependencies & browsers
         run: |
           python -m pip install --upgrade pip
