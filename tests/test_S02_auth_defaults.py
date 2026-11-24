@@ -1,8 +1,8 @@
 from systor.web import create_app
 
 
-def test_S02_first_run_requires_setup(tmp_path, monkeypatch):
-    """S02: Fresh app requested from LAN (192.168.1.50) redirects sensitive routes to /setup."""
+def test_S02_first_run_allows_lan_reads(tmp_path, monkeypatch):
+    """S02: Fresh app from LAN may read every page; mutations still need setup."""
     monkeypatch.setenv("SYSTOR_DATA_DIR", str(tmp_path))
     cfg_path = tmp_path / "config.yaml"
     monkeypatch.setattr("systor.config.CONFIG_PATHS", [cfg_path])
@@ -11,14 +11,10 @@ def test_S02_first_run_requires_setup(tmp_path, monkeypatch):
     app.config["TESTING"] = True
     client = app.test_client()
 
-    # Request from LAN IP 192.168.1.50 to /settings
-    res = client.get("/settings", environ_base={"REMOTE_ADDR": "192.168.1.50"})
-    assert res.status_code == 302
-    assert "/setup" in res.headers["Location"]
-
-    # Dashboard / and /api/snapshot remain visible
-    res_dash = client.get("/", environ_base={"REMOTE_ADDR": "192.168.1.50"})
-    assert res_dash.status_code == 200
+    # LAN clients see all pages, including Settings, with no auth configured.
+    for path in ("/", "/settings", "/apps", "/network", "/speed"):
+        res = client.get(path, environ_base={"REMOTE_ADDR": "192.168.1.50"})
+        assert res.status_code == 200, path
 
     res_snap = client.get("/api/snapshot", environ_base={"REMOTE_ADDR": "192.168.1.50"})
     assert res_snap.status_code == 200

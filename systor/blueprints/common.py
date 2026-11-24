@@ -218,7 +218,8 @@ def effective_private_ui() -> bool:
     private = client_private()
     if not private:
         return False
-    if client_loopback() and not auth_enabled():
+    # With auth disabled, any LAN/Tailscale client gets the full private UI.
+    if not auth_enabled():
         return True
     return auth_logged_in()
 
@@ -234,7 +235,7 @@ def public_cfg() -> dict:
 def storage_can_write() -> bool:
     if not client_private():
         return False
-    if client_loopback() and not auth_enabled():
+    if not auth_enabled():
         return True
     return auth_logged_in()
 

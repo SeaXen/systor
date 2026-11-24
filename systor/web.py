@@ -144,21 +144,10 @@ def create_app(start_worker: bool = True) -> Flask:
             return None
 
         if private:
-            # First-run setup gate for non-loopback clients when auth not yet configured
-            if not is_loopback and not auth_enabled():
-                allow_read_only = {
-                    "/", "/api/snapshot", "/api/series", "/api/network-series",
-                    "/api/public-dashboard", "/api/version"
-                }
-                if path in allow_read_only:
-                    return None
-                if path.startswith("/api/"):
-                    return jsonify({"ok": False, "error": "setup required: admin credentials must be configured"}), 403
-                next_url = request.full_path if request.query_string else request.path
-                if next_url.endswith("?"):
-                    next_url = next_url[:-1]
-                return redirect(url_for("auth.page_setup", next=next_url))
-
+            # With auth disabled, LAN/Tailscale clients may read every page, but
+            # changing settings or services still requires setup/login.
+            if not auth_enabled() and not is_loopback and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+                return jsonify({"ok": False, "error": "setup required: admin credentials must be configured"}), 403
             if auth_enabled() and (private_auth_protected(path) or (not is_loopback and request.method in ("POST", "PUT", "PATCH", "DELETE"))):
                 expired, timeout_min = auth_session_expired()
                 if expired:
